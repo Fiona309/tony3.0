@@ -1,0 +1,794 @@
+"""SQLite storage for the Mock API and P0 knowledge base seeds."""
+
+from __future__ import annotations
+
+import csv
+import hashlib
+import json
+import re
+import sqlite3
+from datetime import datetime, timezone
+from pathlib import Path
+from zipfile import ZipFile
+import xml.etree.ElementTree as ET
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+HAIRDYE_COLOR_MATRIX_CSV = PROJECT_ROOT / "docs" / "hairdye_color_palette_rgb.csv"
+OPERATION_QA_TSV = PROJECT_ROOT / "docs" / "操作问题知识库.tsv"
+COLOR_TRANSITION_MATRIX_MD = PROJECT_ROOT / "docs" / "target_color_current_color_simple_matrix(1).md"
+PRODUCT_KB_DOCX = PROJECT_ROOT / "docs" / "商品知识库（SKU级RAG版）(1).docx"
+PRODUCT_KB_SOURCE = "docs/商品知识库（SKU级RAG版）(1).docx"
+PRODUCT_KB_COLLECTED_AT = "2026-07-26T01:18:00+08:00"
+WORD_NS = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
+
+PRIMARY_TONE_ALIASES = {
+    "黑": "black",
+    "灰": "gray",
+    "银": "gray",
+    "红": "red",
+    "粉": "pink",
+    "橙": "orange",
+    "橘": "orange",
+    "铜": "orange",
+    "黄": "yellow",
+    "金": "yellow",
+    "蓝": "blue",
+    "紫": "purple",
+    "绿": "green",
+    "青": "green",
+    "棕": "brown",
+    "褐": "brown",
+}
+
+# P0 rules transcribed from the annotated product chart provided by the user.
+# The CSV says whether a cell is recommendable; this table says whether a
+# recommendable result is still visibly biased.
+BIASED_RESULT_RULES = {
+    ("雾霾灰", 6): "6度底色染雾霾灰容易偏脏、偏灰绿，标注为偏色。",
+    ("脏橘色", 6): "6度底色染脏橘色容易偏暗、偏棕，标注为偏色。",
+    ("橙色", 6): "6度底色染橙色容易偏暗、偏红棕，标注为偏色。",
+    ("蓝色", 6): "6度底色染蓝色容易受黄橙底影响偏青绿，标注为偏色。",
+    ("紫色", 6): "6度底色染紫色容易受暖底影响偏红棕，标注为偏色。",
+    # The product note mentions an additional raspberry-red level-10 exception.
+    # The current CSV only covers levels 5-9; keep this here so the rule is
+    # applied automatically once level 10 data is added.
+    ("树莓红", 10): "树莓红在10度底色上过于接近紫色，标注为偏色。",
+}
+
+
+def _now() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _bool_text(value: str) -> int:
+    return 1 if value.strip().lower() == "true" else 0
+
+
+def _int_or_none(value: str) -> int | None:
+    value = value.strip()
+    return int(value) if value else None
+
+
+def _extract_primary_tone(color_name: str) -> tuple[str, str]:
+    """Extract one coarse tone from a Chinese commercial color name."""
+    matches = [
+        (color_name.index(token), token, tone)
+        for token, tone in PRIMARY_TONE_ALIASES.items()
+        if token in color_name
+    ]
+    if not matches:
+        return "unknown", "no_color_token"
+    _, token, tone = sorted(matches, key=lambda item: item[0])[0]
+    return tone, f"first_token:{token}"
+
+
+def _docx_tables(path: Path) -> list[list[list[str]]]:
+    """Read DOCX table cells directly so SKU fields do not depend on OCR/text layout."""
+    with ZipFile(path) as archive:
+        root = ET.fromstring(archive.read("word/document.xml"))
+    tables = []
+    for table in root.findall(".//w:tbl", WORD_NS):
+        rows = []
+        for row in table.findall("./w:tr", WORD_NS):
+            rows.append(
+                [
+                    "".join(cell.itertext()).strip()
+                    for cell in row.findall("./w:tc", WORD_NS)
+                ]
+            )
+        tables.append(rows)
+    return tables
+
+
+def _product_id(brand: str, product_name: str) -> str:
+    digest = hashlib.sha1(f"{brand}|{product_name}".encode("utf-8")).hexdigest()[:16]
+    return f"product_{digest}"
+
+
+def _price(value: str) -> float:
+    match = re.search(r"(\d+(?:\.\d+)?)", value.replace(",", ""))
+    if not match:
+        raise ValueError(f"商品结算价无效: {value}")
+    return float(match.group(1))
+
+
+class Database:
+    def __init__(self, path: Path) -> None:
+        self.path = path
+
+    def initialize(self) -> None:
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        with self._connect() as connection:
+            self._create_tables(connection)
+            self._seed_color_knowledge_base(connection)
+            self._seed_operation_qa(connection)
+            self._seed_product_knowledge_base(connection)
+
+    def record_event(
+        self,
+        *,
+        user_key: str | None,
+        method: str,
+        path: str,
+        trace_id: str,
+    ) -> None:
+        with self._connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO api_events (created_at, user_key, method, path, trace_id)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (
+                    datetime.now(timezone.utc).isoformat(),
+                    user_key,
+                    method,
+                    path,
+                    trace_id,
+                ),
+            )
+
+    def save_state(
+        self,
+        *,
+        user_key: str,
+        entity_type: str,
+        entity_id: str,
+        payload: dict,
+    ) -> None:
+        with self._connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO app_state (user_key, entity_type, entity_id, payload_json, updated_at)
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(user_key, entity_type, entity_id) DO UPDATE SET
+                    payload_json = excluded.payload_json,
+                    updated_at = excluded.updated_at
+                """,
+                (
+                    user_key,
+                    entity_type,
+                    entity_id,
+                    json.dumps(payload, ensure_ascii=False),
+                    _now(),
+                ),
+            )
+
+    def load_state(self) -> list[dict]:
+        with self._connect() as connection:
+            connection.row_factory = sqlite3.Row
+            rows = connection.execute(
+                """
+                SELECT user_key, entity_type, entity_id, payload_json
+                FROM app_state
+                ORDER BY updated_at ASC
+                """
+            ).fetchall()
+        result = []
+        for row in rows:
+            result.append(
+                {
+                    "user_key": row["user_key"],
+                    "entity_type": row["entity_type"],
+                    "entity_id": row["entity_id"],
+                    "payload": json.loads(row["payload_json"]),
+                }
+            )
+        return result
+
+    def _connect(self) -> sqlite3.Connection:
+        return sqlite3.connect(self.path)
+
+    def _create_tables(self, connection: sqlite3.Connection) -> None:
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS api_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                created_at TEXT NOT NULL,
+                user_key TEXT,
+                method TEXT NOT NULL,
+                path TEXT NOT NULL,
+                trace_id TEXT NOT NULL
+            )
+            """
+        )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS app_state (
+                user_key TEXT NOT NULL,
+                entity_type TEXT NOT NULL,
+                entity_id TEXT NOT NULL,
+                payload_json TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                PRIMARY KEY (user_key, entity_type, entity_id)
+            )
+            """
+        )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS color_effect_matrix (
+                color_id TEXT PRIMARY KEY,
+                color_en TEXT NOT NULL,
+                color_zh TEXT NOT NULL,
+                base_level INTEGER NOT NULL,
+                recommended INTEGER NOT NULL CHECK (recommended IN (0, 1)),
+                r INTEGER,
+                g INTEGER,
+                b INTEGER,
+                hex TEXT,
+                rgb_quality TEXT NOT NULL,
+                source TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                UNIQUE(color_zh, base_level)
+            )
+            """
+        )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS operation_qa (
+                qa_id TEXT PRIMARY KEY,
+                category TEXT NOT NULL,
+                query TEXT NOT NULL,
+                original_user_questions TEXT,
+                original_comment_answer_clues TEXT,
+                answer TEXT NOT NULL,
+                product_id TEXT NOT NULL DEFAULT 'default',
+                step_id TEXT NOT NULL DEFAULT 'all',
+                source TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+            """
+        )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS color_result_rules (
+                color_id TEXT PRIMARY KEY,
+                color_zh TEXT NOT NULL,
+                base_level INTEGER NOT NULL,
+                result_quality TEXT NOT NULL
+                    CHECK (result_quality IN ('not_recommended', 'normal', 'biased')),
+                reason TEXT NOT NULL,
+                source TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+            """
+        )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS color_alias (
+                color_zh TEXT PRIMARY KEY,
+                primary_tone TEXT NOT NULL,
+                extraction_method TEXT NOT NULL,
+                source TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+            """
+        )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS color_transition_rules (
+                target_color_zh TEXT NOT NULL,
+                current_color_zh TEXT NOT NULL,
+                decision TEXT NOT NULL CHECK (decision IN ('可以', '不能染', '不建议')),
+                result_quality TEXT NOT NULL
+                    CHECK (result_quality IN ('normal', 'not_recommended', 'discouraged')),
+                add_color TEXT,
+                reason TEXT NOT NULL,
+                source TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                PRIMARY KEY (target_color_zh, current_color_zh)
+            )
+            """
+        )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS products (
+                product_id TEXT PRIMARY KEY,
+                brand TEXT NOT NULL,
+                product_name TEXT NOT NULL,
+                product_type TEXT NOT NULL,
+                selected_price REAL NOT NULL,
+                selected_spec TEXT NOT NULL,
+                selected_color TEXT,
+                checkout_quantity INTEGER,
+                price_evidence_path TEXT,
+                capacity TEXT,
+                confirmed_sku_count INTEGER,
+                product_image_path TEXT,
+                unused_price_text TEXT,
+                purchase_channel TEXT NOT NULL,
+                risk_notes TEXT,
+                source TEXT NOT NULL,
+                collected_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                UNIQUE(brand, product_name)
+            )
+            """
+        )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS product_sku (
+                sku_id TEXT PRIMARY KEY,
+                product_id TEXT NOT NULL REFERENCES products(product_id),
+                shade_name TEXT NOT NULL,
+                color_family TEXT NOT NULL,
+                aliases TEXT,
+                base_levels_text TEXT,
+                selected_price REAL NOT NULL,
+                selected_spec TEXT NOT NULL,
+                product_image_path TEXT,
+                purchase_channel TEXT NOT NULL,
+                evidence_path TEXT,
+                source TEXT NOT NULL,
+                collected_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+            """
+        )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS product_usage (
+                product_id TEXT PRIMARY KEY REFERENCES products(product_id),
+                quantity_policy_text TEXT NOT NULL,
+                operation_text TEXT,
+                operation_image_path TEXT,
+                evidence_path TEXT,
+                source TEXT NOT NULL,
+                collected_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+            """
+        )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS product_price_snapshot (
+                sku_id TEXT NOT NULL REFERENCES product_sku(sku_id),
+                selected_price REAL NOT NULL,
+                selected_spec TEXT NOT NULL,
+                evidence_path TEXT,
+                collected_at TEXT NOT NULL,
+                source TEXT NOT NULL,
+                PRIMARY KEY (sku_id, collected_at)
+            )
+            """
+        )
+
+    def _seed_color_knowledge_base(self, connection: sqlite3.Connection) -> None:
+        if not HAIRDYE_COLOR_MATRIX_CSV.exists():
+            return
+
+        now = _now()
+        with HAIRDYE_COLOR_MATRIX_CSV.open(encoding="utf-8-sig", newline="") as csv_file:
+            rows = list(csv.DictReader(csv_file))
+
+        for row in rows:
+            color_id = row["color_id"].strip()
+            color_zh = row["color_zh"].strip()
+            base_level = int(row["base_level"])
+            recommended = _bool_text(row["recommended"])
+            rgb = (_int_or_none(row["r"]), _int_or_none(row["g"]), _int_or_none(row["b"]))
+            connection.execute(
+                """
+                INSERT INTO color_effect_matrix (
+                    color_id, color_en, color_zh, base_level, recommended,
+                    r, g, b, hex, rgb_quality, source, updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(color_id) DO UPDATE SET
+                    color_en = excluded.color_en,
+                    color_zh = excluded.color_zh,
+                    base_level = excluded.base_level,
+                    recommended = excluded.recommended,
+                    r = excluded.r,
+                    g = excluded.g,
+                    b = excluded.b,
+                    hex = excluded.hex,
+                    rgb_quality = excluded.rgb_quality,
+                    source = excluded.source,
+                    updated_at = excluded.updated_at
+                """,
+                (
+                    color_id,
+                    row["color_en"].strip(),
+                    color_zh,
+                    base_level,
+                    recommended,
+                    *rgb,
+                    row["hex"].strip() or None,
+                    row["rgb_quality"].strip(),
+                    "docs/hairdye_color_palette_rgb.csv",
+                    now,
+                ),
+            )
+
+            result_quality, reason = self._result_quality(color_zh, base_level, recommended)
+            connection.execute(
+                """
+                INSERT INTO color_result_rules (
+                    color_id, color_zh, base_level, result_quality, reason, source, updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(color_id) DO UPDATE SET
+                    color_zh = excluded.color_zh,
+                    base_level = excluded.base_level,
+                    result_quality = excluded.result_quality,
+                    reason = excluded.reason,
+                    source = excluded.source,
+                    updated_at = excluded.updated_at
+                """,
+                (
+                    color_id,
+                    color_zh,
+                    base_level,
+                    result_quality,
+                    reason,
+                    "user_annotated_product_chart",
+                    now,
+                ),
+            )
+
+        for color_zh in sorted({row["color_zh"].strip() for row in rows}):
+            primary_tone, method = _extract_primary_tone(color_zh)
+            connection.execute(
+                """
+                INSERT INTO color_alias (
+                    color_zh, primary_tone, extraction_method, source, updated_at
+                )
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(color_zh) DO UPDATE SET
+                    primary_tone = excluded.primary_tone,
+                    extraction_method = excluded.extraction_method,
+                    source = excluded.source,
+                    updated_at = excluded.updated_at
+                """,
+                (
+                    color_zh,
+                    primary_tone,
+                    method,
+                    "primary_color_token_rule",
+                    now,
+                ),
+            )
+        self._seed_color_transition_rules(connection)
+
+    def _seed_color_transition_rules(self, connection: sqlite3.Connection) -> None:
+        if not COLOR_TRANSITION_MATRIX_MD.exists():
+            return
+
+        source = "docs/target_color_current_color_simple_matrix(1).md"
+        now = _now()
+        rows = self._parse_color_transition_matrix(COLOR_TRANSITION_MATRIX_MD)
+        connection.execute("DELETE FROM color_transition_rules WHERE source = ?", (source,))
+        for row in rows:
+            connection.execute(
+                """
+                INSERT INTO color_transition_rules (
+                    target_color_zh, current_color_zh, decision, result_quality,
+                    add_color, reason, source, updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(target_color_zh, current_color_zh) DO UPDATE SET
+                    decision = excluded.decision,
+                    result_quality = excluded.result_quality,
+                    add_color = excluded.add_color,
+                    reason = excluded.reason,
+                    source = excluded.source,
+                    updated_at = excluded.updated_at
+                """,
+                (
+                    row["target_color_zh"],
+                    row["current_color_zh"],
+                    row["decision"],
+                    row["result_quality"],
+                    row["add_color"],
+                    row["reason"],
+                    source,
+                    now,
+                ),
+            )
+
+    @staticmethod
+    def _parse_color_transition_matrix(path: Path) -> list[dict[str, str | None]]:
+        result = []
+        current_target = None
+        for raw_line in path.read_text(encoding="utf-8").splitlines():
+            line = raw_line.strip()
+            if line.startswith("## "):
+                current_target = line.removeprefix("## ").strip()
+                continue
+            if not current_target or not line.startswith("|"):
+                continue
+            cells = [cell.strip() for cell in line.strip("|").split("|")]
+            if len(cells) != 3 or cells[0] in {"用户现有色", "---"} or set(cells[0]) == {"-"}:
+                continue
+            current_color, decision, add_color = cells
+            if decision not in {"可以", "不能染", "不建议"}:
+                continue
+            normalized_add_color = None if add_color in {"", "—", "-"} else add_color
+            result_quality = {
+                "可以": "normal",
+                "不能染": "not_recommended",
+                "不建议": "discouraged",
+            }[decision]
+            reason = (
+                f"按目标色与现有色中和矩阵，当前{current_color}发色可以往{current_target}方向染，"
+                f"建议补充{normalized_add_color}。"
+                if decision == "可以"
+                else f"按目标色与现有色中和矩阵，当前{current_color}发色{decision}{current_target}。"
+            )
+            result.append(
+                {
+                    "target_color_zh": current_target,
+                    "current_color_zh": current_color,
+                    "decision": decision,
+                    "result_quality": result_quality,
+                    "add_color": normalized_add_color,
+                    "reason": reason,
+                }
+            )
+        return result
+
+    def _seed_product_knowledge_base(self, connection: sqlite3.Connection) -> None:
+        if not PRODUCT_KB_DOCX.exists():
+            return
+
+        tables = _docx_tables(PRODUCT_KB_DOCX)
+        if len(tables) < 19:
+            raise ValueError("商品知识库 DOCX 缺少商品、SKU 或用量表")
+
+        now = _now()
+        products_by_identity: dict[tuple[str, str], str] = {}
+        for row in tables[1][1:]:
+            if len(row) != 14:
+                continue
+            (
+                brand,
+                product_name,
+                product_type,
+                price_text,
+                selected_spec,
+                selected_color,
+                checkout_quantity,
+                price_evidence_path,
+                capacity,
+                confirmed_sku_count,
+                product_image_path,
+                unused_price_text,
+                purchase_channel,
+                risk_notes,
+            ) = row
+            product_id = _product_id(brand, product_name)
+            products_by_identity[(brand, product_name)] = product_id
+            connection.execute(
+                """
+                INSERT INTO products (
+                    product_id, brand, product_name, product_type, selected_price,
+                    selected_spec, selected_color, checkout_quantity, price_evidence_path,
+                    capacity, confirmed_sku_count, product_image_path, unused_price_text,
+                    purchase_channel, risk_notes, source, collected_at, updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(product_id) DO UPDATE SET
+                    brand = excluded.brand, product_name = excluded.product_name,
+                    product_type = excluded.product_type, selected_price = excluded.selected_price,
+                    selected_spec = excluded.selected_spec, selected_color = excluded.selected_color,
+                    checkout_quantity = excluded.checkout_quantity,
+                    price_evidence_path = excluded.price_evidence_path, capacity = excluded.capacity,
+                    confirmed_sku_count = excluded.confirmed_sku_count,
+                    product_image_path = excluded.product_image_path,
+                    unused_price_text = excluded.unused_price_text,
+                    purchase_channel = excluded.purchase_channel, risk_notes = excluded.risk_notes,
+                    source = excluded.source, collected_at = excluded.collected_at,
+                    updated_at = excluded.updated_at
+                """,
+                (
+                    product_id,
+                    brand,
+                    product_name,
+                    product_type,
+                    _price(price_text),
+                    selected_spec,
+                    selected_color,
+                    int(checkout_quantity) if checkout_quantity.isdigit() else None,
+                    price_evidence_path,
+                    capacity,
+                    int(re.search(r"\d+", confirmed_sku_count).group())
+                    if re.search(r"\d+", confirmed_sku_count)
+                    else None,
+                    product_image_path,
+                    unused_price_text,
+                    purchase_channel,
+                    risk_notes,
+                    PRODUCT_KB_SOURCE,
+                    PRODUCT_KB_COLLECTED_AT,
+                    now,
+                ),
+            )
+
+        for table in tables[2:18]:
+            for row in table[1:]:
+                if len(row) != 13:
+                    continue
+                (
+                    sku_id,
+                    brand,
+                    product_name,
+                    _product_type,
+                    shade_name,
+                    color_family,
+                    aliases,
+                    base_levels_text,
+                    price_text,
+                    selected_spec,
+                    product_image_path,
+                    purchase_channel,
+                    evidence_path,
+                ) = row
+                product_id = products_by_identity.get((brand, product_name))
+                if not product_id:
+                    raise ValueError(f"SKU 找不到商品主表: {sku_id}")
+                price = _price(price_text)
+                connection.execute(
+                    """
+                    INSERT INTO product_sku (
+                        sku_id, product_id, shade_name, color_family, aliases, base_levels_text,
+                        selected_price, selected_spec, product_image_path, purchase_channel,
+                        evidence_path, source, collected_at, updated_at
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(sku_id) DO UPDATE SET
+                        product_id = excluded.product_id, shade_name = excluded.shade_name,
+                        color_family = excluded.color_family, aliases = excluded.aliases,
+                        base_levels_text = excluded.base_levels_text,
+                        selected_price = excluded.selected_price,
+                        selected_spec = excluded.selected_spec,
+                        product_image_path = excluded.product_image_path,
+                        purchase_channel = excluded.purchase_channel,
+                        evidence_path = excluded.evidence_path, source = excluded.source,
+                        collected_at = excluded.collected_at, updated_at = excluded.updated_at
+                    """,
+                    (
+                        sku_id,
+                        product_id,
+                        shade_name,
+                        color_family,
+                        aliases,
+                        base_levels_text,
+                        price,
+                        selected_spec,
+                        product_image_path,
+                        purchase_channel,
+                        evidence_path,
+                        PRODUCT_KB_SOURCE,
+                        PRODUCT_KB_COLLECTED_AT,
+                        now,
+                    ),
+                )
+                connection.execute(
+                    """
+                    INSERT INTO product_price_snapshot (
+                        sku_id, selected_price, selected_spec, evidence_path, collected_at, source
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(sku_id, collected_at) DO UPDATE SET
+                        selected_price = excluded.selected_price,
+                        selected_spec = excluded.selected_spec,
+                        evidence_path = excluded.evidence_path,
+                        source = excluded.source
+                    """,
+                    (
+                        sku_id,
+                        price,
+                        selected_spec,
+                        evidence_path,
+                        PRODUCT_KB_COLLECTED_AT,
+                        PRODUCT_KB_SOURCE,
+                    ),
+                )
+
+        for row in tables[18][1:]:
+            if len(row) != 6:
+                continue
+            brand, product_name, policy, operation, image_path, evidence_path = row
+            product_id = products_by_identity.get((brand, product_name))
+            if not product_id:
+                raise ValueError(f"用量规则找不到商品主表: {brand} {product_name}")
+            connection.execute(
+                """
+                INSERT INTO product_usage (
+                    product_id, quantity_policy_text, operation_text, operation_image_path,
+                    evidence_path, source, collected_at, updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(product_id) DO UPDATE SET
+                    quantity_policy_text = excluded.quantity_policy_text,
+                    operation_text = excluded.operation_text,
+                    operation_image_path = excluded.operation_image_path,
+                    evidence_path = excluded.evidence_path, source = excluded.source,
+                    collected_at = excluded.collected_at, updated_at = excluded.updated_at
+                """,
+                (
+                    product_id,
+                    policy,
+                    operation,
+                    image_path,
+                    evidence_path,
+                    PRODUCT_KB_SOURCE,
+                    PRODUCT_KB_COLLECTED_AT,
+                    now,
+                ),
+            )
+
+    def _seed_operation_qa(self, connection: sqlite3.Connection) -> None:
+        if not OPERATION_QA_TSV.exists():
+            return
+
+        now = _now()
+        with OPERATION_QA_TSV.open(encoding="utf-8-sig", newline="") as tsv_file:
+            rows = list(csv.DictReader(tsv_file, delimiter="\t"))
+
+        for row in rows:
+            qa_id = row["id"].strip()
+            if not qa_id:
+                continue
+            connection.execute(
+                """
+                INSERT INTO operation_qa (
+                    qa_id, category, query, original_user_questions,
+                    original_comment_answer_clues, answer, product_id, step_id,
+                    source, updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(qa_id) DO UPDATE SET
+                    category = excluded.category,
+                    query = excluded.query,
+                    original_user_questions = excluded.original_user_questions,
+                    original_comment_answer_clues = excluded.original_comment_answer_clues,
+                    answer = excluded.answer,
+                    product_id = excluded.product_id,
+                    step_id = excluded.step_id,
+                    source = excluded.source,
+                    updated_at = excluded.updated_at
+                """,
+                (
+                    qa_id,
+                    row["category"].strip(),
+                    row["query"].strip(),
+                    row.get("original_user_questions", "").strip(),
+                    row.get("original_comment_answer_clues", "").strip(),
+                    row["agent_answer"].strip(),
+                    "default",
+                    "all",
+                    "docs/操作问题知识库.tsv",
+                    now,
+                ),
+            )
+
+    @staticmethod
+    def _result_quality(color_zh: str, base_level: int, recommended: int) -> tuple[str, str]:
+        if not recommended:
+            return "not_recommended", "商品官方效果图标注该底色不推荐。"
+        bias_reason = BIASED_RESULT_RULES.get((color_zh, base_level))
+        if bias_reason:
+            return "biased", bias_reason
+        return "normal", "商品官方效果图标注为推荐，且未命中偏色规则。"
