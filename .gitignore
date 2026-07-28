@@ -1,6 +1,7 @@
 .gh-config/
 .DS_Store
 .env*
+!.env.example
 .venv/
 node_modules/
 .next/

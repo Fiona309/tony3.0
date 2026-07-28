@@ -1,0 +1,444 @@
+{
+  "schema_version": 3,
+  "aliases": [
+    {
+      "id": "alias_7151tq",
+      "trend_name": "黑茶",
+      "canonical_color_candidates": [
+        "soft_black_tea"
+      ],
+      "mapping_confidence": "medium",
+      "requires_image_confirmation": true,
+      "disambiguation_dimensions": [
+        "目标图片",
+        "室内或自然光",
+        "期望深浅",
+        "期望冷暖"
+      ],
+      "source_basis": "project_vocabulary_and_internal_taxonomy",
+      "review_status": "needs_image_examples"
+    },
+    {
+      "id": "alias_1uo8tlw",
+      "trend_name": "黑茶色",
+      "canonical_color_candidates": [
+        "soft_black_tea"
+      ],
+      "mapping_confidence": "medium",
+      "requires_image_confirmation": true,
+      "disambiguation_dimensions": [
+        "目标图片",
+        "室内或自然光",
+        "期望深浅",
+        "期望冷暖"
+      ],
+      "source_basis": "project_vocabulary_and_internal_taxonomy",
+      "review_status": "needs_image_examples"
+    },
+    {
+      "id": "alias_qmscrd",
+      "trend_name": "冷棕",
+      "canonical_color_candidates": [
+        "cool_brown",
+        "ash_brown"
+      ],
+      "mapping_confidence": "low",
+      "requires_image_confirmation": true,
+      "disambiguation_dimensions": [
+        "目标图片",
+        "室内或自然光",
+        "期望深浅",
+        "期望冷暖"
+      ],
+      "source_basis": "project_vocabulary_and_internal_taxonomy",
+      "review_status": "needs_image_examples"
+    },
+    {
+      "id": "alias_1i1u1ji",
+      "trend_name": "灰棕",
+      "canonical_color_candidates": [
+        "ash_brown",
+        "cool_brown"
+      ],
+      "mapping_confidence": "low",
+      "requires_image_confirmation": true,
+      "disambiguation_dimensions": [
+        "目标图片",
+        "室内或自然光",
+        "期望深浅",
+        "期望冷暖"
+      ],
+      "source_basis": "project_vocabulary_and_internal_taxonomy",
+      "review_status": "needs_image_examples"
+    },
+    {
+      "id": "alias_zevqn2",
+      "trend_name": "璀璨灰棕",
+      "canonical_color_candidates": [
+        "ash_brown"
+      ],
+      "mapping_confidence": "medium",
+      "requires_image_confirmation": true,
+      "disambiguation_dimensions": [
+        "目标图片",
+        "室内或自然光",
+        "期望深浅",
+        "期望冷暖"
+      ],
+      "source_basis": "project_vocabulary_and_internal_taxonomy",
+      "review_status": "needs_image_examples"
+    },
+    {
+      "id": "alias_6o4xig",
+      "trend_name": "奶茶棕",
+      "canonical_color_candidates": [
+        "milk_tea_brown",
+        "neutral_brown"
+      ],
+      "mapping_confidence": "low",
+      "requires_image_confirmation": true,
+      "disambiguation_dimensions": [
+        "目标图片",
+        "室内或自然光",
+        "期望深浅",
+        "期望冷暖"
+      ],
+      "source_basis": "project_vocabulary_and_internal_taxonomy",
+      "review_status": "needs_image_examples"
+    },
+    {
+      "id": "alias_1fyhwr4",
+      "trend_name": "玫瑰粉棕",
+      "canonical_color_candidates": [
+        "rose_pink_brown"
+      ],
+      "mapping_confidence": "medium",
+      "requires_image_confirmation": true,
+      "disambiguation_dimensions": [
+        "目标图片",
+        "室内或自然光",
+        "期望深浅",
+        "期望冷暖"
+      ],
+      "source_basis": "project_vocabulary_and_internal_taxonomy",
+      "review_status": "needs_image_examples"
+    },
+    {
+      "id": "alias_13xwt0j",
+      "trend_name": "粉棕",
+      "canonical_color_candidates": [
+        "rose_pink_brown",
+        "soft_rose_pink"
+      ],
+      "mapping_confidence": "low",
+      "requires_image_confirmation": true,
+      "disambiguation_dimensions": [
+        "目标图片",
+        "室内或自然光",
+        "期望深浅",
+        "期望冷暖"
+      ],
+      "source_basis": "project_vocabulary_and_internal_taxonomy",
+      "review_status": "needs_image_examples"
+    },
+    {
+      "id": "alias_nzggfz",
+      "trend_name": "海王红",
+      "canonical_color_candidates": [
+        "cool_cherry_red",
+        "vivid_warm_red",
+        "deep_wine_red"
+      ],
+      "mapping_confidence": "low",
+      "requires_image_confirmation": true,
+      "disambiguation_dimensions": [
+        "目标图片",
+        "室内或自然光",
+        "期望深浅",
+        "期望冷暖"
+      ],
+      "source_basis": "project_vocabulary_and_internal_taxonomy",
+      "review_status": "needs_image_examples"
+    },
+    {
+      "id": "alias_kzy1od",
+      "trend_name": "樱桃红",
+      "canonical_color_candidates": [
+        "cool_cherry_red",
+        "deep_wine_red"
+      ],
+      "mapping_confidence": "low",
+      "requires_image_confirmation": true,
+      "disambiguation_dimensions": [
+        "目标图片",
+        "室内或自然光",
+        "期望深浅",
+        "期望冷暖"
+      ],
+      "source_basis": "project_vocabulary_and_internal_taxonomy",
+      "review_status": "needs_image_examples"
+    },
+    {
+      "id": "alias_fe341h",
+      "trend_name": "酒红",
+      "canonical_color_candidates": [
+        "deep_wine_red",
+        "cool_cherry_red"
+      ],
+      "mapping_confidence": "low",
+      "requires_image_confirmation": true,
+      "disambiguation_dimensions": [
+        "目标图片",
+        "室内或自然光",
+        "期望深浅",
+        "期望冷暖"
+      ],
+      "source_basis": "project_vocabulary_and_internal_taxonomy",
+      "review_status": "needs_image_examples"
+    },
+    {
+      "id": "alias_1qht8yu",
+      "trend_name": "女团红",
+      "canonical_color_candidates": [
+        "cool_cherry_red",
+        "vivid_warm_red"
+      ],
+      "mapping_confidence": "low",
+      "requires_image_confirmation": true,
+      "disambiguation_dimensions": [
+        "目标图片",
+        "室内或自然光",
+        "期望深浅",
+        "期望冷暖"
+      ],
+      "source_basis": "project_vocabulary_and_internal_taxonomy",
+      "review_status": "needs_image_examples"
+    },
+    {
+      "id": "alias_iouid6",
+      "trend_name": "樱花粉",
+      "canonical_color_candidates": [
+        "soft_rose_pink"
+      ],
+      "mapping_confidence": "medium",
+      "requires_image_confirmation": true,
+      "disambiguation_dimensions": [
+        "目标图片",
+        "室内或自然光",
+        "期望深浅",
+        "期望冷暖"
+      ],
+      "source_basis": "project_vocabulary_and_internal_taxonomy",
+      "review_status": "needs_image_examples"
+    },
+    {
+      "id": "alias_15ne55g",
+      "trend_name": "薄藤粉",
+      "canonical_color_candidates": [
+        "soft_rose_pink",
+        "smoky_violet"
+      ],
+      "mapping_confidence": "low",
+      "requires_image_confirmation": true,
+      "disambiguation_dimensions": [
+        "目标图片",
+        "室内或自然光",
+        "期望深浅",
+        "期望冷暖"
+      ],
+      "source_basis": "project_vocabulary_and_internal_taxonomy",
+      "review_status": "needs_image_examples"
+    },
+    {
+      "id": "alias_w4o8pf",
+      "trend_name": "蜜桃粉",
+      "canonical_color_candidates": [
+        "soft_rose_pink",
+        "rose_pink_brown"
+      ],
+      "mapping_confidence": "low",
+      "requires_image_confirmation": true,
+      "disambiguation_dimensions": [
+        "目标图片",
+        "室内或自然光",
+        "期望深浅",
+        "期望冷暖"
+      ],
+      "source_basis": "project_vocabulary_and_internal_taxonomy",
+      "review_status": "needs_image_examples"
+    },
+    {
+      "id": "alias_1c90b2t",
+      "trend_name": "杏粉",
+      "canonical_color_candidates": [
+        "soft_rose_pink",
+        "rose_pink_brown"
+      ],
+      "mapping_confidence": "low",
+      "requires_image_confirmation": true,
+      "disambiguation_dimensions": [
+        "目标图片",
+        "室内或自然光",
+        "期望深浅",
+        "期望冷暖"
+      ],
+      "source_basis": "project_vocabulary_and_internal_taxonomy",
+      "review_status": "needs_image_examples"
+    },
+    {
+      "id": "alias_mwdhpz",
+      "trend_name": "芭比粉",
+      "canonical_color_candidates": [
+        "vivid_barbie_pink"
+      ],
+      "mapping_confidence": "medium",
+      "requires_image_confirmation": true,
+      "disambiguation_dimensions": [
+        "目标图片",
+        "室内或自然光",
+        "期望深浅",
+        "期望冷暖"
+      ],
+      "source_basis": "project_vocabulary_and_internal_taxonomy",
+      "review_status": "needs_image_examples"
+    },
+    {
+      "id": "alias_jbwbp",
+      "trend_name": "玫瑰粉",
+      "canonical_color_candidates": [
+        "soft_rose_pink",
+        "vivid_barbie_pink"
+      ],
+      "mapping_confidence": "low",
+      "requires_image_confirmation": true,
+      "disambiguation_dimensions": [
+        "目标图片",
+        "室内或自然光",
+        "期望深浅",
+        "期望冷暖"
+      ],
+      "source_basis": "project_vocabulary_and_internal_taxonomy",
+      "review_status": "needs_image_examples"
+    },
+    {
+      "id": "alias_laeefg",
+      "trend_name": "灰紫",
+      "canonical_color_candidates": [
+        "smoky_violet"
+      ],
+      "mapping_confidence": "medium",
+      "requires_image_confirmation": true,
+      "disambiguation_dimensions": [
+        "目标图片",
+        "室内或自然光",
+        "期望深浅",
+        "期望冷暖"
+      ],
+      "source_basis": "project_vocabulary_and_internal_taxonomy",
+      "review_status": "needs_image_examples"
+    },
+    {
+      "id": "alias_f3scbd",
+      "trend_name": "蓝紫",
+      "canonical_color_candidates": [
+        "blue_violet",
+        "smoky_violet"
+      ],
+      "mapping_confidence": "low",
+      "requires_image_confirmation": true,
+      "disambiguation_dimensions": [
+        "目标图片",
+        "室内或自然光",
+        "期望深浅",
+        "期望冷暖"
+      ],
+      "source_basis": "project_vocabulary_and_internal_taxonomy",
+      "review_status": "needs_image_examples"
+    },
+    {
+      "id": "alias_tpfk9n",
+      "trend_name": "蓝黑",
+      "canonical_color_candidates": [
+        "blue_black"
+      ],
+      "mapping_confidence": "medium",
+      "requires_image_confirmation": true,
+      "disambiguation_dimensions": [
+        "目标图片",
+        "室内或自然光",
+        "期望深浅",
+        "期望冷暖"
+      ],
+      "source_basis": "project_vocabulary_and_internal_taxonomy",
+      "review_status": "needs_image_examples"
+    },
+    {
+      "id": "alias_bg57qo",
+      "trend_name": "雾霾蓝",
+      "canonical_color_candidates": [
+        "smoky_blue"
+      ],
+      "mapping_confidence": "medium",
+      "requires_image_confirmation": true,
+      "disambiguation_dimensions": [
+        "目标图片",
+        "室内或自然光",
+        "期望深浅",
+        "期望冷暖"
+      ],
+      "source_basis": "project_vocabulary_and_internal_taxonomy",
+      "review_status": "needs_image_examples"
+    },
+    {
+      "id": "alias_7vmax6",
+      "trend_name": "克莱因蓝",
+      "canonical_color_candidates": [
+        "vivid_cobalt_blue"
+      ],
+      "mapping_confidence": "medium",
+      "requires_image_confirmation": true,
+      "disambiguation_dimensions": [
+        "目标图片",
+        "室内或自然光",
+        "期望深浅",
+        "期望冷暖"
+      ],
+      "source_basis": "project_vocabulary_and_internal_taxonomy",
+      "review_status": "needs_image_examples"
+    },
+    {
+      "id": "alias_1shzell",
+      "trend_name": "薄荷绿",
+      "canonical_color_candidates": [
+        "mint_green"
+      ],
+      "mapping_confidence": "medium",
+      "requires_image_confirmation": true,
+      "disambiguation_dimensions": [
+        "目标图片",
+        "室内或自然光",
+        "期望深浅",
+        "期望冷暖"
+      ],
+      "source_basis": "project_vocabulary_and_internal_taxonomy",
+      "review_status": "needs_image_examples"
+    },
+    {
+      "id": "alias_f4som3",
+      "trend_name": "抹茶绿",
+      "canonical_color_candidates": [
+        "mint_green"
+      ],
+      "mapping_confidence": "medium",
+      "requires_image_confirmation": true,
+      "disambiguation_dimensions": [
+        "目标图片",
+        "室内或自然光",
+        "期望深浅",
+        "期望冷暖"
+      ],
+      "source_basis": "project_vocabulary_and_internal_taxonomy",
+      "review_status": "needs_image_examples"
+    }
+  ]
+}

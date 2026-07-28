@@ -38,13 +38,11 @@ class ProductKB:
                 JOIN products AS p ON p.product_id = sku.product_id
                 LEFT JOIN product_usage AS u ON u.product_id = sku.product_id
                 WHERE sku.color_family = ?
-                  AND sku.selected_price >= ?
-                  AND sku.selected_price <= ?
                   AND p.product_type LIKE ?
                 ORDER BY CASE WHEN sku.shade_name = ? THEN 0 ELSE 1 END,
                          sku.selected_price ASC, sku.sku_id ASC
                 """,
-                (color_family, min_price, max_price, route_like, target_color.get("display_name", "")),
+                (color_family, route_like, target_color.get("display_name", "")),
             ).fetchall()
 
         result = []
@@ -55,6 +53,9 @@ class ProductKB:
             seen_products.add(row["product_id"])
             units, is_estimate = self._units_needed(row["quantity_policy_text"], hair_length, row["product_type"])
             unit_price = float(row["selected_price"])
+            total_price = round(unit_price * units, 2)
+            if total_price < min_price or total_price > max_price:
+                continue
             result.append(
                 {
                     "sku_id": row["sku_id"],
@@ -79,7 +80,7 @@ class ProductKB:
                     },
                     "price": {
                         "unit_price": unit_price,
-                        "total_price": round(unit_price * units, 2),
+                        "total_price": total_price,
                         "currency": "CNY",
                         "collected_at": row["collected_at"],
                         "selected_spec": row["selected_spec"],

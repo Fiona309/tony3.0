@@ -1,0 +1,20 @@
+{
+  "schema_version": 3,
+  "generated_at": "2026-07-14T12:02:11.477Z",
+  "migrated": {
+    "community_claims": 44,
+    "products": 23,
+    "prices": 23,
+    "cases": 3,
+    "sources": 33,
+    "canonical_colors": 20,
+    "trend_aliases": 25,
+    "official_fact_candidates": 15
+  },
+  "safety_review_required": 8,
+  "notes": [
+    "旧文件未删除，应用仍可继续读取 V2 数据。",
+    "V3 社媒内容均为低置信证据，不可直接生成安全结论或配方。",
+    "空规则库需要用官方资料、专业教材或 Tony 审核结果填充。"
+  ]
+}

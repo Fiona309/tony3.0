@@ -1,0 +1,85 @@
+{
+  "schema_version": 3,
+  "levels": [
+    {
+      "level": 1,
+      "name": "1度底色",
+      "visible_tone": null,
+      "underlying_pigments": [],
+      "reference_images": [],
+      "review_status": "awaiting_professional_source"
+    },
+    {
+      "level": 2,
+      "name": "2度底色",
+      "visible_tone": null,
+      "underlying_pigments": [],
+      "reference_images": [],
+      "review_status": "awaiting_professional_source"
+    },
+    {
+      "level": 3,
+      "name": "3度底色",
+      "visible_tone": null,
+      "underlying_pigments": [],
+      "reference_images": [],
+      "review_status": "awaiting_professional_source"
+    },
+    {
+      "level": 4,
+      "name": "4度底色",
+      "visible_tone": null,
+      "underlying_pigments": [],
+      "reference_images": [],
+      "review_status": "awaiting_professional_source"
+    },
+    {
+      "level": 5,
+      "name": "5度底色",
+      "visible_tone": null,
+      "underlying_pigments": [],
+      "reference_images": [],
+      "review_status": "awaiting_professional_source"
+    },
+    {
+      "level": 6,
+      "name": "6度底色",
+      "visible_tone": null,
+      "underlying_pigments": [],
+      "reference_images": [],
+      "review_status": "awaiting_professional_source"
+    },
+    {
+      "level": 7,
+      "name": "7度底色",
+      "visible_tone": null,
+      "underlying_pigments": [],
+      "reference_images": [],
+      "review_status": "awaiting_professional_source"
+    },
+    {
+      "level": 8,
+      "name": "8度底色",
+      "visible_tone": null,
+      "underlying_pigments": [],
+      "reference_images": [],
+      "review_status": "awaiting_professional_source"
+    },
+    {
+      "level": 9,
+      "name": "9度底色",
+      "visible_tone": null,
+      "underlying_pigments": [],
+      "reference_images": [],
+      "review_status": "awaiting_professional_source"
+    },
+    {
+      "level": 10,
+      "name": "10度底色",
+      "visible_tone": null,
+      "underlying_pigments": [],
+      "reference_images": [],
+      "review_status": "awaiting_professional_source"
+    }
+  ]
+}

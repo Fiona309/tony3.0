@@ -8,7 +8,7 @@ from .model_service import ModelService, TranscribeResult
 from ..kb.operation_qa_kb import OperationQAKB
 from ..mock_data import MockStore
 
-MIN_KB_ANSWER_SCORE = 0.42
+MIN_KB_ANSWER_SCORE = 0.30
 
 
 class TutorialService:
@@ -70,8 +70,8 @@ class TutorialService:
                     "source": "voice_guard",
                 }
             else:
-                hit = self.operation_qa_kb.search(
-                    query=query,
+                hit = self._best_kb_hit(
+                    queries=[transcribe_result.transcript, query],
                     current_step_id=str(context.get("step_id") or ""),
                     product_id=context.get("sku_id"),
                 )
@@ -111,6 +111,26 @@ class TutorialService:
             answer_meta=answer_meta,
             user_key=user_key,
         )
+
+    def _best_kb_hit(
+        self,
+        *,
+        queries: list[str],
+        current_step_id: str,
+        product_id: str | None,
+    ) -> dict | None:
+        best: dict | None = None
+        for query in dict.fromkeys(item.strip() for item in queries if item.strip()):
+            hit = self.operation_qa_kb.search(
+                query=query,
+                current_step_id=current_step_id,
+                product_id=product_id,
+            )
+            if hit is None:
+                continue
+            if best is None or float(hit.get("score") or 0.0) > float(best.get("score") or 0.0):
+                best = hit
+        return best
 
 
 def _looks_like_question(text: str) -> bool:

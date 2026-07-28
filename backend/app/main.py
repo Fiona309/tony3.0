@@ -5,6 +5,7 @@ from __future__ import annotations
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 import importlib
+import logging
 import os
 from pathlib import Path
 import sys
@@ -53,12 +54,14 @@ tutorial_service = TutorialService(
 transition_video_service = TransitionVideoService(settings)
 preview_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="preview-generator")
 after_video_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="after-video-generator")
+asr_prewarm_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="asr-prewarm")
 preview_task_lock = Lock()
 after_video_task_lock = Lock()
 active_preview_tasks: set[str] = set()
 active_after_video_tasks: set[str] = set()
 hair_full_generator_module: Any | None = None
 hair_full_engine_module: Any | None = None
+logger = logging.getLogger(__name__)
 
 
 def trace_id() -> str:
@@ -85,6 +88,20 @@ def user_key(request: Request) -> str:
     return request.headers.get("X-User-Key") or "anonymous"
 
 
+def prewarm_asr_model() -> None:
+    if settings.mock_models or settings.asr_provider != "sensevoice":
+        return
+    try:
+        from .services.sensevoice_service import SenseVoiceService
+
+        service = SenseVoiceService(settings)
+        service._load_model()
+        model_service._sensevoice = service
+        logger.info("SenseVoice ASR model prewarmed")
+    except Exception:
+        logger.exception("SenseVoice ASR model prewarm failed")
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     settings.media_dir.mkdir(parents=True, exist_ok=True)
@@ -94,6 +111,7 @@ async def lifespan(_: FastAPI):
     database.initialize()
     store.load_persistent_state()
     operation_qa_kb.initialize()
+    asr_prewarm_executor.submit(prewarm_asr_model)
     for preview_task_id, owner_user_key in store.pending_preview_tasks():
         enqueue_preview_generation(preview_task_id, owner_user_key)
     for after_task_id, owner_user_key in store.pending_after_video_tasks():
@@ -101,6 +119,7 @@ async def lifespan(_: FastAPI):
     yield
     preview_executor.shutdown(wait=False, cancel_futures=False)
     after_video_executor.shutdown(wait=False, cancel_futures=False)
+    asr_prewarm_executor.shutdown(wait=False, cancel_futures=False)
 
 
 app = FastAPI(title=settings.app_name, lifespan=lifespan)
@@ -253,6 +272,20 @@ async def update_hair_profile(profile_id: str, payload: dict[str, Any], request:
     return ok(store.update_profile(profile_id, payload, user_key=user_key(request)))
 
 
+@app.post("/api/demo-profiles")
+async def create_demo_profile(payload: dict[str, Any], request: Request):
+    for key in ("source_profile_id", "entry_video_id"):
+        if key not in payload:
+            return failure(f"缺少字段: {key}")
+    return ok(
+        store.create_demo_profile(
+            payload["source_profile_id"],
+            payload["entry_video_id"],
+            user_key=user_key(request),
+        )
+    )
+
+
 @app.post("/api/agent/plan-result")
 async def get_plan_result(payload: dict[str, Any], request: Request):
     current_user_key = user_key(request)
@@ -353,8 +386,6 @@ def generate_preview_images(
     rule_decision = rule_decision or {}
     color_rule = rule_decision.get("color_rule") or {}
     result_quality = color_rule.get("result_quality")
-    if rule_decision.get("feasibility") in {"not_reachable", "salon_required"}:
-        raise RuntimeError("hair_full_pipeline_generation_skipped_for_unreachable_plan")
 
     target_family = color_rule.get("matched_color_name") or target_color.get("display_name") or "目标色"
     target_level = _int_or_default(target_color.get("level"), 8)
@@ -366,7 +397,20 @@ def generate_preview_images(
         target_name=f"{target_family}{target_level}度",
     )
     if not pipeline_plan or not pipeline_plan.get("variants"):
-        raise RuntimeError("hair_full_pipeline_generation_plan_unavailable")
+        target_rgb = _rgb_tuple(target_color.get("rgb"))
+        if target_rgb is None:
+            raise RuntimeError("hair_full_pipeline_generation_plan_unavailable")
+        pipeline_plan = {
+            "base_color": {
+                "rgb": list(target_rgb),
+                "hex": _hex_from_rgb(target_rgb),
+            },
+            "variants": [
+                {"key": key}
+                for key in ("low", "cool", "standard", "warm", "high")
+            ],
+            "risk_variant": None,
+        }
     base_color = pipeline_plan.get("base_color") or {}
     target_rgb = _rgb_tuple(base_color.get("rgb")) or _rgb_tuple(target_color.get("rgb"))
     if target_rgb is None:

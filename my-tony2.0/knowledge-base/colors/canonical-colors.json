@@ -1,0 +1,791 @@
+{
+  "schema_version": 3,
+  "colors": [
+    {
+      "id": "natural_black",
+      "display_name": "自然黑",
+      "family": "黑色系",
+      "technical_profile": {
+        "primary_tone": "黑",
+        "secondary_tone": null,
+        "temperature": "中性",
+        "saturation": "低",
+        "lightness": "深",
+        "target_depth_range": {
+          "min": 1,
+          "max": 2
+        }
+      },
+      "recommended_base_level": {
+        "min": 1,
+        "max": 3
+      },
+      "appearance": {
+        "indoor": "整体较深，以黑为主可能只呈现为反光",
+        "daylight": "自然光下以黑为主通常更容易分辨",
+        "warm_light": "暖光可能增强其中的红、橙、金感，并削弱冷感",
+        "cool_light": "冷光可能增强其中的蓝、紫、灰感，并削弱暖感",
+        "evidence_status": "general_optical_hypothesis_needs_image_validation"
+      },
+      "typical_fade_direction": [
+        "深棕"
+      ],
+      "fade_evidence_status": "community_hypothesis_needs_case_validation",
+      "source_ids": [
+        "src_1mdx31s",
+        "src_4nz7dc",
+        "src_slp72h"
+      ],
+      "taxonomy_status": "internal_v1",
+      "feasibility_status": "provisional_needs_case_validation"
+    },
+    {
+      "id": "soft_black_tea",
+      "display_name": "柔和黑茶",
+      "family": "棕色系",
+      "technical_profile": {
+        "primary_tone": "棕",
+        "secondary_tone": "灰",
+        "temperature": "中性偏冷",
+        "saturation": "低",
+        "lightness": "深",
+        "target_depth_range": {
+          "min": 2,
+          "max": 4
+        }
+      },
+      "recommended_base_level": {
+        "min": 2,
+        "max": 5
+      },
+      "appearance": {
+        "indoor": "整体较深，棕中带灰可能只呈现为反光",
+        "daylight": "自然光下棕中带灰通常更容易分辨",
+        "warm_light": "暖光可能增强其中的红、橙、金感，并削弱冷感",
+        "cool_light": "冷光可能增强其中的蓝、紫、灰感，并削弱暖感",
+        "evidence_status": "general_optical_hypothesis_needs_image_validation"
+      },
+      "typical_fade_direction": [
+        "自然棕",
+        "暖棕"
+      ],
+      "fade_evidence_status": "community_hypothesis_needs_case_validation",
+      "source_ids": [
+        "src_1mdx31s",
+        "src_4nz7dc",
+        "src_slp72h"
+      ],
+      "taxonomy_status": "internal_v1",
+      "feasibility_status": "provisional_needs_case_validation"
+    },
+    {
+      "id": "deep_chocolate_brown",
+      "display_name": "深巧克力棕",
+      "family": "棕色系",
+      "technical_profile": {
+        "primary_tone": "棕",
+        "secondary_tone": "红",
+        "temperature": "偏暖",
+        "saturation": "中低",
+        "lightness": "深",
+        "target_depth_range": {
+          "min": 3,
+          "max": 5
+        }
+      },
+      "recommended_base_level": {
+        "min": 3,
+        "max": 6
+      },
+      "appearance": {
+        "indoor": "整体较深，棕中带红可能只呈现为反光",
+        "daylight": "自然光下棕中带红通常更容易分辨",
+        "warm_light": "暖光可能增强其中的红、橙、金感，并削弱冷感",
+        "cool_light": "冷光可能增强其中的蓝、紫、灰感，并削弱暖感",
+        "evidence_status": "general_optical_hypothesis_needs_image_validation"
+      },
+      "typical_fade_direction": [
+        "暖棕",
+        "浅棕"
+      ],
+      "fade_evidence_status": "community_hypothesis_needs_case_validation",
+      "source_ids": [
+        "src_1mdx31s",
+        "src_4nz7dc",
+        "src_slp72h"
+      ],
+      "taxonomy_status": "internal_v1",
+      "feasibility_status": "provisional_needs_case_validation"
+    },
+    {
+      "id": "neutral_brown",
+      "display_name": "自然棕",
+      "family": "棕色系",
+      "technical_profile": {
+        "primary_tone": "棕",
+        "secondary_tone": null,
+        "temperature": "中性",
+        "saturation": "中低",
+        "lightness": "中深",
+        "target_depth_range": {
+          "min": 4,
+          "max": 6
+        }
+      },
+      "recommended_base_level": {
+        "min": 4,
+        "max": 7
+      },
+      "appearance": {
+        "indoor": "可见以棕为主，视觉上比强光环境更深",
+        "daylight": "自然光下以棕为主通常更容易分辨",
+        "warm_light": "暖光可能增强其中的红、橙、金感，并削弱冷感",
+        "cool_light": "冷光可能增强其中的蓝、紫、灰感，并削弱暖感",
+        "evidence_status": "general_optical_hypothesis_needs_image_validation"
+      },
+      "typical_fade_direction": [
+        "浅棕",
+        "偏暖棕"
+      ],
+      "fade_evidence_status": "community_hypothesis_needs_case_validation",
+      "source_ids": [
+        "src_1mdx31s",
+        "src_4nz7dc",
+        "src_slp72h"
+      ],
+      "taxonomy_status": "internal_v1",
+      "feasibility_status": "provisional_needs_case_validation"
+    },
+    {
+      "id": "cool_brown",
+      "display_name": "冷棕",
+      "family": "棕色系",
+      "technical_profile": {
+        "primary_tone": "棕",
+        "secondary_tone": "灰",
+        "temperature": "偏冷",
+        "saturation": "中低",
+        "lightness": "中",
+        "target_depth_range": {
+          "min": 4,
+          "max": 7
+        }
+      },
+      "recommended_base_level": {
+        "min": 5,
+        "max": 8
+      },
+      "appearance": {
+        "indoor": "可见棕中带灰，视觉上比强光环境更深",
+        "daylight": "自然光下棕中带灰通常更容易分辨",
+        "warm_light": "暖光可能增强其中的红、橙、金感，并削弱冷感",
+        "cool_light": "冷光可能增强其中的蓝、紫、灰感，并削弱暖感",
+        "evidence_status": "general_optical_hypothesis_needs_image_validation"
+      },
+      "typical_fade_direction": [
+        "自然棕",
+        "偏暖棕"
+      ],
+      "fade_evidence_status": "community_hypothesis_needs_case_validation",
+      "source_ids": [
+        "src_1mdx31s",
+        "src_4nz7dc",
+        "src_slp72h"
+      ],
+      "taxonomy_status": "internal_v1",
+      "feasibility_status": "provisional_needs_case_validation"
+    },
+    {
+      "id": "ash_brown",
+      "display_name": "灰棕",
+      "family": "棕色系",
+      "technical_profile": {
+        "primary_tone": "棕",
+        "secondary_tone": "灰",
+        "temperature": "偏冷",
+        "saturation": "低",
+        "lightness": "中浅",
+        "target_depth_range": {
+          "min": 5,
+          "max": 8
+        }
+      },
+      "recommended_base_level": {
+        "min": 6,
+        "max": 9
+      },
+      "appearance": {
+        "indoor": "可见棕中带灰，视觉上比强光环境更深",
+        "daylight": "自然光下棕中带灰通常更容易分辨",
+        "warm_light": "暖光可能增强其中的红、橙、金感，并削弱冷感",
+        "cool_light": "冷光可能增强其中的蓝、紫、灰感，并削弱暖感",
+        "evidence_status": "general_optical_hypothesis_needs_image_validation"
+      },
+      "typical_fade_direction": [
+        "自然棕",
+        "偏黄棕"
+      ],
+      "fade_evidence_status": "community_hypothesis_needs_case_validation",
+      "source_ids": [
+        "src_1mdx31s",
+        "src_4nz7dc",
+        "src_slp72h"
+      ],
+      "taxonomy_status": "internal_v1",
+      "feasibility_status": "provisional_needs_case_validation"
+    },
+    {
+      "id": "milk_tea_brown",
+      "display_name": "奶茶棕",
+      "family": "棕色系",
+      "technical_profile": {
+        "primary_tone": "棕",
+        "secondary_tone": "金灰",
+        "temperature": "中性偏冷",
+        "saturation": "低",
+        "lightness": "浅",
+        "target_depth_range": {
+          "min": 6,
+          "max": 9
+        }
+      },
+      "recommended_base_level": {
+        "min": 7,
+        "max": 10
+      },
+      "appearance": {
+        "indoor": "可见棕中带金灰，视觉上比强光环境更深",
+        "daylight": "自然光下棕中带金灰通常更容易分辨",
+        "warm_light": "暖光可能增强其中的红、橙、金感，并削弱冷感",
+        "cool_light": "冷光可能增强其中的蓝、紫、灰感，并削弱暖感",
+        "evidence_status": "general_optical_hypothesis_needs_image_validation"
+      },
+      "typical_fade_direction": [
+        "浅金棕",
+        "偏黄"
+      ],
+      "fade_evidence_status": "community_hypothesis_needs_case_validation",
+      "source_ids": [
+        "src_1mdx31s",
+        "src_4nz7dc",
+        "src_slp72h"
+      ],
+      "taxonomy_status": "internal_v1",
+      "feasibility_status": "provisional_needs_case_validation"
+    },
+    {
+      "id": "rose_pink_brown",
+      "display_name": "玫瑰粉棕",
+      "family": "棕色系",
+      "technical_profile": {
+        "primary_tone": "棕",
+        "secondary_tone": "粉红",
+        "temperature": "中性偏暖",
+        "saturation": "中",
+        "lightness": "中浅",
+        "target_depth_range": {
+          "min": 5,
+          "max": 8
+        }
+      },
+      "recommended_base_level": {
+        "min": 6,
+        "max": 9
+      },
+      "appearance": {
+        "indoor": "可见棕中带粉红，视觉上比强光环境更深",
+        "daylight": "自然光下棕中带粉红通常更容易分辨",
+        "warm_light": "暖光可能增强其中的红、橙、金感，并削弱冷感",
+        "cool_light": "冷光可能增强其中的蓝、紫、灰感，并削弱暖感",
+        "evidence_status": "general_optical_hypothesis_needs_image_validation"
+      },
+      "typical_fade_direction": [
+        "暖棕",
+        "浅棕"
+      ],
+      "fade_evidence_status": "community_hypothesis_needs_case_validation",
+      "source_ids": [
+        "src_1mdx31s",
+        "src_4nz7dc",
+        "src_slp72h"
+      ],
+      "taxonomy_status": "internal_v1",
+      "feasibility_status": "provisional_needs_case_validation"
+    },
+    {
+      "id": "warm_copper_brown",
+      "display_name": "暖铜棕",
+      "family": "棕色系",
+      "technical_profile": {
+        "primary_tone": "棕",
+        "secondary_tone": "铜橙",
+        "temperature": "偏暖",
+        "saturation": "中高",
+        "lightness": "中浅",
+        "target_depth_range": {
+          "min": 5,
+          "max": 8
+        }
+      },
+      "recommended_base_level": {
+        "min": 5,
+        "max": 9
+      },
+      "appearance": {
+        "indoor": "可见棕中带铜橙，视觉上比强光环境更深",
+        "daylight": "自然光下棕中带铜橙通常更容易分辨",
+        "warm_light": "暖光可能增强其中的红、橙、金感，并削弱冷感",
+        "cool_light": "冷光可能增强其中的蓝、紫、灰感，并削弱暖感",
+        "evidence_status": "general_optical_hypothesis_needs_image_validation"
+      },
+      "typical_fade_direction": [
+        "橙棕",
+        "浅暖棕"
+      ],
+      "fade_evidence_status": "community_hypothesis_needs_case_validation",
+      "source_ids": [
+        "src_1mdx31s",
+        "src_4nz7dc",
+        "src_slp72h"
+      ],
+      "taxonomy_status": "internal_v1",
+      "feasibility_status": "provisional_needs_case_validation"
+    },
+    {
+      "id": "deep_wine_red",
+      "display_name": "深酒红",
+      "family": "红色系",
+      "technical_profile": {
+        "primary_tone": "红",
+        "secondary_tone": "紫",
+        "temperature": "偏冷",
+        "saturation": "中高",
+        "lightness": "深",
+        "target_depth_range": {
+          "min": 3,
+          "max": 6
+        }
+      },
+      "recommended_base_level": {
+        "min": 4,
+        "max": 7
+      },
+      "appearance": {
+        "indoor": "整体较深，红中带紫可能只呈现为反光",
+        "daylight": "自然光下红中带紫通常更容易分辨",
+        "warm_light": "暖光可能增强其中的红、橙、金感，并削弱冷感",
+        "cool_light": "冷光可能增强其中的蓝、紫、灰感，并削弱暖感",
+        "evidence_status": "general_optical_hypothesis_needs_image_validation"
+      },
+      "typical_fade_direction": [
+        "红棕",
+        "暖棕"
+      ],
+      "fade_evidence_status": "community_hypothesis_needs_case_validation",
+      "source_ids": [
+        "src_1mdx31s",
+        "src_4nz7dc",
+        "src_slp72h"
+      ],
+      "taxonomy_status": "internal_v1",
+      "feasibility_status": "provisional_needs_case_validation"
+    },
+    {
+      "id": "cool_cherry_red",
+      "display_name": "冷调樱桃红",
+      "family": "红色系",
+      "technical_profile": {
+        "primary_tone": "红",
+        "secondary_tone": "紫",
+        "temperature": "偏冷",
+        "saturation": "高",
+        "lightness": "中浅",
+        "target_depth_range": {
+          "min": 5,
+          "max": 8
+        }
+      },
+      "recommended_base_level": {
+        "min": 6,
+        "max": 9
+      },
+      "appearance": {
+        "indoor": "可见红中带紫，视觉上比强光环境更深",
+        "daylight": "自然光下红中带紫通常更容易分辨",
+        "warm_light": "暖光可能增强其中的红、橙、金感，并削弱冷感",
+        "cool_light": "冷光可能增强其中的蓝、紫、灰感，并削弱暖感",
+        "evidence_status": "general_optical_hypothesis_needs_image_validation"
+      },
+      "typical_fade_direction": [
+        "红紫",
+        "粉红",
+        "暖棕"
+      ],
+      "fade_evidence_status": "community_hypothesis_needs_case_validation",
+      "source_ids": [
+        "src_1mdx31s",
+        "src_4nz7dc",
+        "src_slp72h"
+      ],
+      "taxonomy_status": "internal_v1",
+      "feasibility_status": "provisional_needs_case_validation"
+    },
+    {
+      "id": "vivid_warm_red",
+      "display_name": "鲜暖红",
+      "family": "红色系",
+      "technical_profile": {
+        "primary_tone": "红",
+        "secondary_tone": "橙",
+        "temperature": "偏暖",
+        "saturation": "高",
+        "lightness": "中浅",
+        "target_depth_range": {
+          "min": 5,
+          "max": 8
+        }
+      },
+      "recommended_base_level": {
+        "min": 6,
+        "max": 9
+      },
+      "appearance": {
+        "indoor": "可见红中带橙，视觉上比强光环境更深",
+        "daylight": "自然光下红中带橙通常更容易分辨",
+        "warm_light": "暖光可能增强其中的红、橙、金感，并削弱冷感",
+        "cool_light": "冷光可能增强其中的蓝、紫、灰感，并削弱暖感",
+        "evidence_status": "general_optical_hypothesis_needs_image_validation"
+      },
+      "typical_fade_direction": [
+        "橙红",
+        "暖棕"
+      ],
+      "fade_evidence_status": "community_hypothesis_needs_case_validation",
+      "source_ids": [
+        "src_1mdx31s",
+        "src_4nz7dc",
+        "src_slp72h"
+      ],
+      "taxonomy_status": "internal_v1",
+      "feasibility_status": "provisional_needs_case_validation"
+    },
+    {
+      "id": "soft_rose_pink",
+      "display_name": "柔和玫瑰粉",
+      "family": "粉色系",
+      "technical_profile": {
+        "primary_tone": "粉",
+        "secondary_tone": "红紫",
+        "temperature": "中性偏冷",
+        "saturation": "中",
+        "lightness": "浅",
+        "target_depth_range": {
+          "min": 7,
+          "max": 10
+        }
+      },
+      "recommended_base_level": {
+        "min": 8,
+        "max": 10
+      },
+      "appearance": {
+        "indoor": "可见粉中带红紫，视觉上比强光环境更深",
+        "daylight": "自然光下粉中带红紫通常更容易分辨",
+        "warm_light": "暖光可能增强其中的红、橙、金感，并削弱冷感",
+        "cool_light": "冷光可能增强其中的蓝、紫、灰感，并削弱暖感",
+        "evidence_status": "general_optical_hypothesis_needs_image_validation"
+      },
+      "typical_fade_direction": [
+        "浅粉",
+        "暖金"
+      ],
+      "fade_evidence_status": "community_hypothesis_needs_case_validation",
+      "source_ids": [
+        "src_1mdx31s",
+        "src_4nz7dc",
+        "src_slp72h"
+      ],
+      "taxonomy_status": "internal_v1",
+      "feasibility_status": "provisional_needs_case_validation"
+    },
+    {
+      "id": "vivid_barbie_pink",
+      "display_name": "高饱和芭比粉",
+      "family": "粉色系",
+      "technical_profile": {
+        "primary_tone": "粉",
+        "secondary_tone": "紫",
+        "temperature": "偏冷",
+        "saturation": "高",
+        "lightness": "浅",
+        "target_depth_range": {
+          "min": 8,
+          "max": 10
+        }
+      },
+      "recommended_base_level": {
+        "min": 9,
+        "max": 10
+      },
+      "appearance": {
+        "indoor": "可见粉中带紫，视觉上比强光环境更深",
+        "daylight": "自然光下粉中带紫通常更容易分辨",
+        "warm_light": "暖光可能增强其中的红、橙、金感，并削弱冷感",
+        "cool_light": "冷光可能增强其中的蓝、紫、灰感，并削弱暖感",
+        "evidence_status": "general_optical_hypothesis_needs_image_validation"
+      },
+      "typical_fade_direction": [
+        "浅粉",
+        "粉紫",
+        "暖金"
+      ],
+      "fade_evidence_status": "community_hypothesis_needs_case_validation",
+      "source_ids": [
+        "src_1mdx31s",
+        "src_4nz7dc",
+        "src_slp72h"
+      ],
+      "taxonomy_status": "internal_v1",
+      "feasibility_status": "provisional_needs_case_validation"
+    },
+    {
+      "id": "smoky_violet",
+      "display_name": "烟灰紫",
+      "family": "紫色系",
+      "technical_profile": {
+        "primary_tone": "紫",
+        "secondary_tone": "灰",
+        "temperature": "偏冷",
+        "saturation": "中低",
+        "lightness": "浅",
+        "target_depth_range": {
+          "min": 7,
+          "max": 10
+        }
+      },
+      "recommended_base_level": {
+        "min": 8,
+        "max": 10
+      },
+      "appearance": {
+        "indoor": "可见紫中带灰，视觉上比强光环境更深",
+        "daylight": "自然光下紫中带灰通常更容易分辨",
+        "warm_light": "暖光可能增强其中的红、橙、金感，并削弱冷感",
+        "cool_light": "冷光可能增强其中的蓝、紫、灰感，并削弱暖感",
+        "evidence_status": "general_optical_hypothesis_needs_image_validation"
+      },
+      "typical_fade_direction": [
+        "浅紫",
+        "灰",
+        "偏黄"
+      ],
+      "fade_evidence_status": "community_hypothesis_needs_case_validation",
+      "source_ids": [
+        "src_1mdx31s",
+        "src_4nz7dc",
+        "src_slp72h"
+      ],
+      "taxonomy_status": "internal_v1",
+      "feasibility_status": "provisional_needs_case_validation"
+    },
+    {
+      "id": "blue_violet",
+      "display_name": "蓝紫",
+      "family": "紫色系",
+      "technical_profile": {
+        "primary_tone": "紫",
+        "secondary_tone": "蓝",
+        "temperature": "偏冷",
+        "saturation": "高",
+        "lightness": "中浅",
+        "target_depth_range": {
+          "min": 6,
+          "max": 9
+        }
+      },
+      "recommended_base_level": {
+        "min": 8,
+        "max": 10
+      },
+      "appearance": {
+        "indoor": "可见紫中带蓝，视觉上比强光环境更深",
+        "daylight": "自然光下紫中带蓝通常更容易分辨",
+        "warm_light": "暖光可能增强其中的红、橙、金感，并削弱冷感",
+        "cool_light": "冷光可能增强其中的蓝、紫、灰感，并削弱暖感",
+        "evidence_status": "general_optical_hypothesis_needs_image_validation"
+      },
+      "typical_fade_direction": [
+        "紫",
+        "灰蓝",
+        "偏绿风险"
+      ],
+      "fade_evidence_status": "community_hypothesis_needs_case_validation",
+      "source_ids": [
+        "src_1mdx31s",
+        "src_4nz7dc",
+        "src_slp72h"
+      ],
+      "taxonomy_status": "internal_v1",
+      "feasibility_status": "provisional_needs_case_validation"
+    },
+    {
+      "id": "blue_black",
+      "display_name": "蓝黑",
+      "family": "黑色系",
+      "technical_profile": {
+        "primary_tone": "黑",
+        "secondary_tone": "蓝",
+        "temperature": "偏冷",
+        "saturation": "中",
+        "lightness": "深",
+        "target_depth_range": {
+          "min": 2,
+          "max": 5
+        }
+      },
+      "recommended_base_level": {
+        "min": 3,
+        "max": 6
+      },
+      "appearance": {
+        "indoor": "整体较深，黑中带蓝可能只呈现为反光",
+        "daylight": "自然光下黑中带蓝通常更容易分辨",
+        "warm_light": "暖光可能增强其中的红、橙、金感，并削弱冷感",
+        "cool_light": "冷光可能增强其中的蓝、紫、灰感，并削弱暖感",
+        "evidence_status": "general_optical_hypothesis_needs_image_validation"
+      },
+      "typical_fade_direction": [
+        "黑茶",
+        "深棕"
+      ],
+      "fade_evidence_status": "community_hypothesis_needs_case_validation",
+      "source_ids": [
+        "src_1mdx31s",
+        "src_4nz7dc",
+        "src_slp72h"
+      ],
+      "taxonomy_status": "internal_v1",
+      "feasibility_status": "provisional_needs_case_validation"
+    },
+    {
+      "id": "smoky_blue",
+      "display_name": "雾霾蓝",
+      "family": "蓝色系",
+      "technical_profile": {
+        "primary_tone": "蓝",
+        "secondary_tone": "灰",
+        "temperature": "偏冷",
+        "saturation": "中低",
+        "lightness": "浅",
+        "target_depth_range": {
+          "min": 7,
+          "max": 10
+        }
+      },
+      "recommended_base_level": {
+        "min": 9,
+        "max": 10
+      },
+      "appearance": {
+        "indoor": "可见蓝中带灰，视觉上比强光环境更深",
+        "daylight": "自然光下蓝中带灰通常更容易分辨",
+        "warm_light": "暖光可能增强其中的红、橙、金感，并削弱冷感",
+        "cool_light": "冷光可能增强其中的蓝、紫、灰感，并削弱暖感",
+        "evidence_status": "general_optical_hypothesis_needs_image_validation"
+      },
+      "typical_fade_direction": [
+        "灰蓝",
+        "灰绿",
+        "偏黄"
+      ],
+      "fade_evidence_status": "community_hypothesis_needs_case_validation",
+      "source_ids": [
+        "src_1mdx31s",
+        "src_4nz7dc",
+        "src_slp72h"
+      ],
+      "taxonomy_status": "internal_v1",
+      "feasibility_status": "provisional_needs_case_validation"
+    },
+    {
+      "id": "vivid_cobalt_blue",
+      "display_name": "高饱和钴蓝",
+      "family": "蓝色系",
+      "technical_profile": {
+        "primary_tone": "蓝",
+        "secondary_tone": null,
+        "temperature": "偏冷",
+        "saturation": "高",
+        "lightness": "浅",
+        "target_depth_range": {
+          "min": 7,
+          "max": 10
+        }
+      },
+      "recommended_base_level": {
+        "min": 9,
+        "max": 10
+      },
+      "appearance": {
+        "indoor": "可见以蓝为主，视觉上比强光环境更深",
+        "daylight": "自然光下以蓝为主通常更容易分辨",
+        "warm_light": "暖光可能增强其中的红、橙、金感，并削弱冷感",
+        "cool_light": "冷光可能增强其中的蓝、紫、灰感，并削弱暖感",
+        "evidence_status": "general_optical_hypothesis_needs_image_validation"
+      },
+      "typical_fade_direction": [
+        "浅蓝",
+        "蓝绿",
+        "偏绿风险"
+      ],
+      "fade_evidence_status": "community_hypothesis_needs_case_validation",
+      "source_ids": [
+        "src_1mdx31s",
+        "src_4nz7dc",
+        "src_slp72h"
+      ],
+      "taxonomy_status": "internal_v1",
+      "feasibility_status": "provisional_needs_case_validation"
+    },
+    {
+      "id": "mint_green",
+      "display_name": "薄荷绿",
+      "family": "绿色系",
+      "technical_profile": {
+        "primary_tone": "绿",
+        "secondary_tone": "蓝",
+        "temperature": "偏冷",
+        "saturation": "中",
+        "lightness": "浅",
+        "target_depth_range": {
+          "min": 8,
+          "max": 10
+        }
+      },
+      "recommended_base_level": {
+        "min": 9,
+        "max": 10
+      },
+      "appearance": {
+        "indoor": "可见绿中带蓝，视觉上比强光环境更深",
+        "daylight": "自然光下绿中带蓝通常更容易分辨",
+        "warm_light": "暖光可能增强其中的红、橙、金感，并削弱冷感",
+        "cool_light": "冷光可能增强其中的蓝、紫、灰感，并削弱暖感",
+        "evidence_status": "general_optical_hypothesis_needs_image_validation"
+      },
+      "typical_fade_direction": [
+        "浅绿",
+        "灰绿",
+        "偏黄"
+      ],
+      "fade_evidence_status": "community_hypothesis_needs_case_validation",
+      "source_ids": [
+        "src_1mdx31s",
+        "src_4nz7dc",
+        "src_slp72h"
+      ],
+      "taxonomy_status": "internal_v1",
+      "feasibility_status": "provisional_needs_case_validation"
+    }
+  ]
+}

@@ -442,6 +442,65 @@ PREVIEW_IMAGE_URLS = [
 ]
 
 
+DEMO_CURRENT_COLORS = {
+    "blue": {
+        **_color("gray", 8, "light", "8 度银灰演示底", 0.8),
+        "rgb": {"r": 178, "g": 184, "b": 190},
+    },
+    "purple": {
+        **_color("blue", 8, "medium", "8 度蓝紫演示底", 0.8),
+        "rgb": {"r": 98, "g": 112, "b": 170},
+    },
+    "red": {
+        **_color("yellow", 8, "medium", "8 度暖金演示底", 0.78),
+        "rgb": {"r": 218, "g": 185, "b": 115},
+    },
+    "pink": {
+        **_color("yellow", 9, "light", "9 度浅金演示底", 0.78),
+        "rgb": {"r": 232, "g": 205, "b": 142},
+    },
+    "cold_tea": {
+        **_color("natural_black", 3, "dark", "3 度自然黑演示底", 0.78),
+        "rgb": {"r": 38, "g": 31, "b": 27},
+    },
+    "cold_brown": {
+        **_color("yellow", 8, "medium", "8 度暖金演示底", 0.78),
+        "rgb": {"r": 218, "g": 185, "b": 115},
+    },
+}
+
+
+def _demo_current_color(target_key: str) -> dict:
+    return deepcopy(DEMO_CURRENT_COLORS.get(target_key) or CURRENT_GOLD)
+
+
+def _demo_current_color_options(target_key: str) -> list[dict]:
+    primary = _demo_current_color(target_key)
+    if target_key == "blue":
+        return [
+            primary,
+            _color("silver", 9, "light", "9 度银色演示底"),
+            _color("blue", 8, "medium", "8 度蓝色演示底"),
+        ]
+    if target_key == "purple":
+        return [
+            primary,
+            _color("purple", 8, "medium", "8 度紫色演示底"),
+            _color("red", 7, "medium", "7 度红色演示底"),
+        ]
+    if target_key == "cold_tea":
+        return [
+            primary,
+            _color("brown", 5, "dark", "5 度棕色演示底"),
+            _color("purple", 6, "medium", "6 度紫色演示底"),
+        ]
+    return [
+        primary,
+        _color("yellow_orange", 7, "medium", "7 度橘金演示底"),
+        _color("yellow", 9, "light", "9 度浅金演示底"),
+    ]
+
+
 class MockStore:
     def __init__(self, media_dir: Path, database: Any | None = None) -> None:
         self.media_dir = media_dir
@@ -531,6 +590,18 @@ class MockStore:
         folder = "current" if media_type == "current_hair" else "after"
         matches = list((self.media_dir / "uploads" / folder).glob(f"{image_id}.*"))
         return matches[0] if matches else None
+
+    def _image_url(self, image_id: str | None, *, media_type: str = "current_hair") -> str | None:
+        if not image_id:
+            return None
+        path = self.image_path(image_id, media_type=media_type)
+        if path is None:
+            return None
+        try:
+            storage_key = path.relative_to(self.media_dir).as_posix()
+        except ValueError:
+            return None
+        return f"/media/{storage_key}"
 
     def target_reference_path(self, entry_video_id: str) -> Path | None:
         media_item = MOCK_MEDIA_BY_VIDEO_ID.get(entry_video_id)
@@ -630,6 +701,82 @@ class MockStore:
         self._persist("profile", profile_id, profile, user_key)
         return self._public_profile(profile)
 
+    def create_demo_profile(
+        self,
+        source_profile_id: str,
+        entry_video_id: str,
+        user_key: str | None = None,
+    ) -> dict:
+        source = self._require_owned(
+            self.profiles,
+            source_profile_id,
+            "发色画像不存在",
+            "profile",
+            user_key,
+        )
+        media_item = MOCK_MEDIA_BY_VIDEO_ID.get(entry_video_id) or MOCK_MEDIA_BY_VIDEO_ID.get(
+            source.get("entry_video_id")
+        )
+        target_color = deepcopy((media_item or {}).get("target_color") or source.get("target_color") or TARGET_BLUE)
+        target_key = next(
+            (
+                key
+                for key, item in MOCK_MEDIA_LIBRARY.items()
+                if item.get("video_id") == (media_item or {}).get("video_id")
+            ),
+            "blue",
+        )
+        current_color = _demo_current_color(target_key)
+        current_color_options = _demo_current_color_options(target_key)
+        if target_key in {"blue", "purple"}:
+            current_hair = {
+                "region_mode": "root_mid_end",
+                "regions": {
+                    "root": {
+                        "color": _color("natural_black", 3, "dark", "3 度自然黑新根", 0.88),
+                    },
+                    "mid": {
+                        "color": current_color_options[1],
+                    },
+                    "end": {
+                        "color": current_color,
+                        "color_options": deepcopy(current_color_options),
+                    },
+                },
+            }
+        else:
+            current_hair = {
+                "region_mode": "single",
+                "color": current_color,
+                "color_options": deepcopy(current_color_options),
+            }
+
+        profile_id = _id("profile_demo")
+        profile = {
+            "profile_id": profile_id,
+            "status": "confirmed",
+            "entry_video_id": (media_item or {}).get("video_id") or entry_video_id,
+            "current_image_id": source["current_image_id"],
+            "target_color": target_color,
+            "current_hair": current_hair,
+            "hair_length": "chest",
+            "hair_volume": "medium",
+            "dye_history": "dyed_no_bleach",
+            "attribute_confidences": {
+                "hair_length": 0.85,
+                "hair_volume": 0.72,
+                "dye_history": 0.68,
+                "current_color": float(current_color.get("confidence", 0.78)),
+                "target_color": float(target_color.get("confidence", 0.92)),
+            },
+            "editable_options": deepcopy(EDITABLE_OPTIONS),
+            "demo_mode": True,
+            "source_profile_id": source_profile_id,
+        }
+        self.profiles[profile_id] = profile
+        self._persist("profile", profile_id, profile, user_key)
+        return self._public_profile(profile)
+
     def update_profile(self, profile_id: str, update: dict, user_key: str | None = None) -> dict:
         profile = self._require_owned(self.profiles, profile_id, "发色画像不存在", "profile", user_key)
         for field in ("current_hair", "hair_length", "hair_volume", "dye_history", "target_color"):
@@ -687,7 +834,7 @@ class MockStore:
             for index, label in enumerate(labels)
         ]
         preview_unavailable = not decision["can_recommend_product"]
-        preview_unavailable_message = "当前方案不建议居家操作，已停止生成 AI 效果图；下方仅展示参考档位。"
+        preview_unavailable_message = "当前方案不建议居家操作，已停止生成真实效果图；可使用演示底色继续查看目标色效果。"
         result = {
             "profile_id": profile_id,
             "plan_id": plan_id,
@@ -889,10 +1036,21 @@ class MockStore:
             "recommendation",
             user_key,
         )
-        product = recommendation["primary_product"]
+        products = [
+            item
+            for item in [recommendation.get("primary_product"), *recommendation.get("other_products", [])]
+            if item
+        ]
+        product = next((item for item in products if item.get("sku_id") == request["sku_id"]), None)
         if not product:
             raise ValueError("当前没有可保存的商品推荐")
         media_item = MOCK_MEDIA_BY_VIDEO_ID.get(profile["entry_video_id"])
+        selected_preview_level = request.get("selected_preview_level", plan["default_preview_level"])
+        selected_preview_image = self._selected_preview_image(
+            plan,
+            int(selected_preview_level),
+            user_key=user_key,
+        )
         archive_id = _id("archive")
         detail = {
             "archive_id": archive_id,
@@ -901,6 +1059,8 @@ class MockStore:
             "entry_video_id": profile["entry_video_id"],
             "profile_id": profile["profile_id"],
             "current_image_id": profile["current_image_id"],
+            "current_image_url": self._image_url(profile["current_image_id"], media_type="current_hair"),
+            "selected_preview_image_url": (selected_preview_image or {}).get("url"),
             "profile_snapshot": {
                 key: deepcopy(profile[key])
                 for key in ("current_hair", "target_color", "hair_length", "hair_volume", "dye_history")
@@ -911,9 +1071,7 @@ class MockStore:
                 "summary": plan["summary"],
                 "reachability_score": plan["reachability_score"],
                 "selected_route": request.get("selected_route", plan["default_route"]),
-                "selected_preview_level": request.get(
-                    "selected_preview_level", plan["default_preview_level"]
-                ),
+                "selected_preview_level": selected_preview_level,
                 "default_preview_level": plan["default_preview_level"],
                 "risks": deepcopy(plan["risks"]),
             },
@@ -948,13 +1106,76 @@ class MockStore:
         return {"archives": archives}
 
     def archive(self, archive_id: str, user_key: str | None = None) -> dict:
-        return deepcopy(self._require_owned(self.archives, archive_id, "染发档案不存在", "archive", user_key))
+        detail = deepcopy(self._require_owned(self.archives, archive_id, "染发档案不存在", "archive", user_key))
+        return self._archive_with_media_urls(detail, user_key=user_key)
+
+    def _archive_with_media_urls(self, detail: dict, user_key: str | None = None) -> dict:
+        if not detail.get("current_image_url"):
+            detail["current_image_url"] = self._image_url(detail.get("current_image_id"), media_type="current_hair")
+        if not detail.get("selected_preview_image_url"):
+            plan_id = detail.get("plan_snapshot", {}).get("plan_id")
+            preview_level = int(detail.get("plan_snapshot", {}).get("selected_preview_level") or 0)
+            plan_record = self.plans.get(plan_id) if plan_id else None
+            if plan_record:
+                selected_preview = self._selected_preview_image(
+                    plan_record["result"],
+                    preview_level,
+                    user_key=user_key,
+                )
+                detail["selected_preview_image_url"] = (selected_preview or {}).get("url")
+        return detail
+
+    def _selected_preview_image(
+        self,
+        plan: dict,
+        preview_level: int,
+        user_key: str | None = None,
+    ) -> dict | None:
+        preview_images = list(plan.get("preview_images") or [])
+        task_id = plan.get("preview_task_id")
+        if task_id and self._owned_by("preview_task", task_id, user_key):
+            task = self.preview_tasks.get(task_id) or {}
+            preview_images = list(task.get("images") or preview_images)
+        return next(
+            (
+                item
+                for item in preview_images
+                if int(item.get("preview_level") or 0) == preview_level and item.get("url")
+            ),
+            None,
+        )
 
     def create_session(self, archive_id: str, user_key: str | None = None) -> dict:
         archive = self._require_owned(self.archives, archive_id, "染发档案不存在", "archive", user_key)
         tutorial_video_id = archive.get("tutorial_video_id") or "tutorial_001"
         media_item = MOCK_MEDIA_BY_TUTORIAL_ID.get(tutorial_video_id)
         tutorial_steps = _tutorial_steps_for_video_id(tutorial_video_id)
+        for session in sorted(self.sessions.values(), key=lambda item: item.get("created_at") or "", reverse=True):
+            session_id = session.get("tutorial_session_id")
+            if (
+                session.get("archive_id") == archive_id
+                and session.get("status") not in {"completed", "aborted"}
+                and session_id
+                and self._owned_by("session", session_id, user_key)
+            ):
+                session["tutorial_video"] = {
+                    "video_id": tutorial_video_id,
+                    "url": (media_item or {}).get("tutorial_url", TUTORIAL_VIDEO_URL),
+                    "title": _tutorial_display_title(media_item),
+                    "color_name": (media_item or {}).get("color_name"),
+                    "brand": (media_item or {}).get("brand"),
+                    "tutorial_type": (media_item or {}).get("tutorial_type"),
+                }
+                current_step_no = int(session.get("current_step", {}).get("step_no") or 1)
+                current_index = min(max(current_step_no - 1, 0), len(tutorial_steps) - 1)
+                session["tutorial_steps"] = deepcopy(tutorial_steps)
+                session["current_step"] = deepcopy(tutorial_steps[current_index])
+                session["completed_step_count"] = min(
+                    int(session.get("completed_step_count") or current_index),
+                    max(0, len(tutorial_steps) - 1),
+                )
+                self._persist("session", session_id, session, user_key)
+                return deepcopy(session)
         session_id = _id("tutorial_session")
         created_at = _now()
         session = {
@@ -1021,6 +1242,15 @@ class MockStore:
         if event_key in self.voice_events:
             return deepcopy(self.voice_events[event_key])
         session = self._require_owned(self.sessions, session_id, "教程会话不存在", "session", user_key)
+        tutorial_steps = session.get("tutorial_steps") or _tutorial_steps_for_video_id(
+            session.get("tutorial_video", {}).get("video_id")
+        )
+        current_index = next(
+            (item["step_no"] - 1 for item in tutorial_steps if item["step_id"] == current_step_id),
+            0,
+        )
+        if intent == "finish" and current_index < len(tutorial_steps) - 1:
+            intent = "next"
         if intent == "silence":
             session["awaiting_voice_input"] = True
             result = {
@@ -1046,14 +1276,7 @@ class MockStore:
                 "tts_audio_url": tts_audio_url,
             }
         elif intent == "next":
-            tutorial_steps = session.get("tutorial_steps") or _tutorial_steps_for_video_id(
-                session.get("tutorial_video", {}).get("video_id")
-            )
-            index = next(
-                (item["step_no"] - 1 for item in tutorial_steps if item["step_id"] == current_step_id),
-                0,
-            )
-            if index >= len(tutorial_steps) - 1:
+            if current_index >= len(tutorial_steps) - 1:
                 session["status"] = "completed"
                 result = {
                     "action": "capture_after_photo",
@@ -1062,8 +1285,8 @@ class MockStore:
                     "tts_audio_url": tts_audio_url,
                 }
             else:
-                session["current_step"] = deepcopy(tutorial_steps[index + 1])
-                session["completed_step_count"] = index + 1
+                session["current_step"] = deepcopy(tutorial_steps[current_index + 1])
+                session["completed_step_count"] = current_index + 1
                 session["awaiting_voice_input"] = False
                 result = {
                     "action": "play_next_step",

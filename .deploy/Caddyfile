@@ -1,0 +1,15 @@
+47.85.88.209.sslip.io {
+	encode zstd gzip
+
+	handle /api/* {
+		reverse_proxy 8.138.40.33:8000
+	}
+
+	handle /media/* {
+		reverse_proxy 8.138.40.33:8000
+	}
+
+	handle {
+		reverse_proxy 8.138.40.33:3000
+	}
+}

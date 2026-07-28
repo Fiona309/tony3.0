@@ -1,0 +1,258 @@
+{
+  "schema_version": 3,
+  "prices": [
+    {
+      "id": "price_1mqkoqq",
+      "product_id": "prd_mm7zyj",
+      "amount_cny": 99,
+      "listing_title": "卡洛美粉色固色发膜 300ml",
+      "sales_text": "月销 5000+",
+      "seller_type": "unknown",
+      "source_id": "src_1k0t3u9",
+      "captured_at": "2026-05-23T12:29:20.238Z",
+      "status": "historical_unverified"
+    },
+    {
+      "id": "price_g0y3xw",
+      "product_id": "prd_x8vxvq",
+      "amount_cny": null,
+      "listing_title": null,
+      "sales_text": null,
+      "seller_type": "unknown",
+      "source_id": "src_1wuw17b",
+      "captured_at": "2026-05-23T12:29:20.238Z",
+      "status": "historical_unverified"
+    },
+    {
+      "id": "price_daag72",
+      "product_id": "prd_1qjp2dn",
+      "amount_cny": 89,
+      "listing_title": "NV粉色固色发膜 300ml",
+      "sales_text": "月销 1万+",
+      "seller_type": "unknown",
+      "source_id": "src_1k0t3u9",
+      "captured_at": "2026-05-23T12:29:20.238Z",
+      "status": "historical_unverified"
+    },
+    {
+      "id": "price_v0kp7v",
+      "product_id": "prd_5t5hd7",
+      "amount_cny": 79,
+      "listing_title": "uyee粉色固色发膜 300ml",
+      "sales_text": "月销 800+",
+      "seller_type": "unknown",
+      "source_id": "src_1k0t3u9",
+      "captured_at": "2026-05-23T12:29:20.238Z",
+      "status": "historical_unverified"
+    },
+    {
+      "id": "price_dqb56m",
+      "product_id": "prd_a1h28h",
+      "amount_cny": 118,
+      "listing_title": "RENATA蕾娜塔粉玫瑰固色洗发水 200ml",
+      "sales_text": "月销 1000+",
+      "seller_type": "unknown",
+      "source_id": "src_1k0t3u9",
+      "captured_at": "2026-05-23T12:29:20.238Z",
+      "status": "historical_unverified"
+    },
+    {
+      "id": "price_v45ijh",
+      "product_id": "prd_tx2p43",
+      "amount_cny": 49,
+      "listing_title": "bela固色洗发水 300ml",
+      "sales_text": "月销 300+",
+      "seller_type": "unknown",
+      "source_id": "src_1k0t3u9",
+      "captured_at": "2026-05-23T12:29:20.238Z",
+      "status": "historical_unverified"
+    },
+    {
+      "id": "price_85brc7",
+      "product_id": "prd_ewsqat",
+      "amount_cny": 158,
+      "listing_title": "fanola固色洗发水 350ml",
+      "sales_text": "月销 1500+",
+      "seller_type": "unknown",
+      "source_id": "src_1k0t3u9",
+      "captured_at": "2026-05-23T12:29:20.238Z",
+      "status": "historical_unverified"
+    },
+    {
+      "id": "price_gl3pxt",
+      "product_id": "prd_xao56r",
+      "amount_cny": 68,
+      "listing_title": "七色师固色洗发水 300ml",
+      "sales_text": "月销 1200+",
+      "seller_type": "unknown",
+      "source_id": "src_1k0t3u9",
+      "captured_at": "2026-05-23T12:29:20.238Z",
+      "status": "historical_unverified"
+    },
+    {
+      "id": "price_b63xrx",
+      "product_id": "prd_dpdcvp",
+      "amount_cny": 99,
+      "listing_title": "colorlomo固色 300ml",
+      "sales_text": "月销 5000+",
+      "seller_type": "unknown",
+      "source_id": "src_1k0t3u9",
+      "captured_at": "2026-05-23T12:29:20.238Z",
+      "status": "historical_unverified"
+    },
+    {
+      "id": "price_454cjx",
+      "product_id": "prd_xneu5",
+      "amount_cny": 139,
+      "listing_title": "annadonna固色 300ml",
+      "sales_text": "月销 600+",
+      "seller_type": "unknown",
+      "source_id": "src_1k0t3u9",
+      "captured_at": "2026-05-23T12:29:20.238Z",
+      "status": "historical_unverified"
+    },
+    {
+      "id": "price_1u2oxl9",
+      "product_id": "prd_ud9urb",
+      "amount_cny": 59,
+      "listing_title": "去黄洗发水 300ml",
+      "sales_text": "月销 3000+",
+      "seller_type": "unknown",
+      "source_id": "src_1k0t3u9",
+      "captured_at": "2026-05-23T12:29:20.238Z",
+      "status": "historical_unverified"
+    },
+    {
+      "id": "price_20552y",
+      "product_id": "prd_13h38ur",
+      "amount_cny": 99,
+      "listing_title": "卡洛美固色洗发水 300ml",
+      "sales_text": "月销 5000+",
+      "seller_type": "unknown",
+      "source_id": "src_1k0t3u9",
+      "captured_at": "2026-05-23T12:29:20.238Z",
+      "status": "historical_unverified"
+    },
+    {
+      "id": "price_hb77wf",
+      "product_id": "prd_dyu1ou",
+      "amount_cny": 99,
+      "listing_title": "卡洛美固色发膜（粉色） 300ml",
+      "sales_text": "月销 5000+",
+      "seller_type": "unknown",
+      "source_id": "src_1k0t3u9",
+      "captured_at": "2026-05-23T12:29:20.238Z",
+      "status": "historical_unverified"
+    },
+    {
+      "id": "price_gxj3tz",
+      "product_id": "prd_1929iiz",
+      "amount_cny": 69,
+      "listing_title": "独角兽固色洗发水 300ml",
+      "sales_text": "月销 2000+",
+      "seller_type": "unknown",
+      "source_id": "src_1k0t3u9",
+      "captured_at": "2026-05-23T12:29:20.238Z",
+      "status": "historical_unverified"
+    },
+    {
+      "id": "price_1hkkm4b",
+      "product_id": "prd_13rkj06",
+      "amount_cny": 199,
+      "listing_title": "玫丽盼染发膏 100ml",
+      "sales_text": "月销 3000+",
+      "seller_type": "unknown",
+      "source_id": "src_1k0t3u9",
+      "captured_at": "2026-05-23T12:29:20.238Z",
+      "status": "historical_unverified"
+    },
+    {
+      "id": "price_zld07m",
+      "product_id": "prd_3u9h1h",
+      "amount_cny": 99,
+      "listing_title": "欧莱雅染发剂 60ml",
+      "sales_text": "月销 1万+",
+      "seller_type": "unknown",
+      "source_id": "src_1k0t3u9",
+      "captured_at": "2026-05-23T12:29:20.238Z",
+      "status": "historical_unverified"
+    },
+    {
+      "id": "price_9ng58x",
+      "product_id": "prd_1vkkkzq",
+      "amount_cny": 158,
+      "listing_title": "资生堂染发膏 60ml",
+      "sales_text": "月销 5000+",
+      "seller_type": "unknown",
+      "source_id": "src_1k0t3u9",
+      "captured_at": "2026-05-23T12:29:20.238Z",
+      "status": "historical_unverified"
+    },
+    {
+      "id": "price_p78yot",
+      "product_id": "prd_1xttqyv",
+      "amount_cny": 119,
+      "listing_title": "施华蔻璀璨灰棕染发膏 60ml",
+      "sales_text": "月销 8000+",
+      "seller_type": "unknown",
+      "source_id": "src_1k0t3u9",
+      "captured_at": "2026-05-23T12:29:20.238Z",
+      "status": "historical_unverified"
+    },
+    {
+      "id": "price_yxjj22",
+      "product_id": "prd_bz2hyi",
+      "amount_cny": 158,
+      "listing_title": "Directions染发膏 100ml",
+      "sales_text": "月销 800+",
+      "seller_type": "unknown",
+      "source_id": "src_1k0t3u9",
+      "captured_at": "2026-05-23T12:29:20.238Z",
+      "status": "historical_unverified"
+    },
+    {
+      "id": "price_i13zah",
+      "product_id": "prd_n8ozc1",
+      "amount_cny": 119,
+      "listing_title": "施华蔻芬郁金醇棕 60ml",
+      "sales_text": "月销 6000+",
+      "seller_type": "unknown",
+      "source_id": "src_1k0t3u9",
+      "captured_at": "2026-05-23T12:29:20.238Z",
+      "status": "historical_unverified"
+    },
+    {
+      "id": "price_10vp9we",
+      "product_id": "prd_1r14rwe",
+      "amount_cny": 58,
+      "listing_title": "vikada漂发剂 60ml",
+      "sales_text": "月销 2000+",
+      "seller_type": "unknown",
+      "source_id": "src_1k0t3u9",
+      "captured_at": "2026-05-23T12:29:20.238Z",
+      "status": "historical_unverified"
+    },
+    {
+      "id": "price_1rwy75g",
+      "product_id": "prd_1cs5jfv",
+      "amount_cny": 39,
+      "listing_title": "H5玫瑰粉棕染发膏 100ml",
+      "sales_text": "月销 1500+",
+      "seller_type": "unknown",
+      "source_id": "src_1k0t3u9",
+      "captured_at": "2026-05-23T12:29:20.238Z",
+      "status": "historical_unverified"
+    },
+    {
+      "id": "price_1swg1gk",
+      "product_id": "prd_3khxou",
+      "amount_cny": 45,
+      "listing_title": "忆丝芸染发膏 100ml",
+      "sales_text": "月销 800+",
+      "seller_type": "unknown",
+      "source_id": "src_1k0t3u9",
+      "captured_at": "2026-05-23T12:29:20.238Z",
+      "status": "historical_unverified"
+    }
+  ]
+}

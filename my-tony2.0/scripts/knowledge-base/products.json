@@ -1,0 +1,350 @@
+{
+  "products": [
+    {
+      "name": "卡洛美粉色固色发膜",
+      "brand": "卡洛美",
+      "type": "固色发膜",
+      "mentions": [
+        {
+          "source_url": "https://www.xiaohongshu.com/explore/69b77977000000001a031af8",
+          "evidence": "用到的就是固色发膜➕固色洗发水"
+        }
+      ],
+      "taobao_price": "¥99",
+      "taobao_title": "卡洛美粉色固色发膜 300ml",
+      "taobao_url": "https://detail.tmall.com",
+      "taobao_sale": "月销 5000+"
+    },
+    {
+      "name": "卡洛美粉色固色洗发水",
+      "brand": "卡洛美",
+      "type": "固色洗发水",
+      "mentions": [
+        {
+          "source_url": "https://www.xiaohongshu.com/explore/69a111c4000000000e03c7e0",
+          "evidence": "等15分钟再用粉色固色洗发水洗一遍就很piu亮了"
+        }
+      ],
+      "taobao_price": null,
+      "taobao_title": null,
+      "taobao_url": "https://s.taobao.com/search?q=%E5%8D%A1%E6%B4%9B%E7%BE%8E%E7%B2%89%E8%89%B2%E5%9B%BA%E8%89%B2%E6%B4%97%E5%8F%91%E6%B0%B4&sort=sale-desc",
+      "taobao_sale": null
+    },
+    {
+      "name": "NV粉色固色发膜",
+      "brand": "NV",
+      "type": "固色发膜",
+      "mentions": [
+        {
+          "source_url": "https://www.xiaohongshu.com/explore/68e656e5000000000303530d",
+          "evidence": "🔴nv：普通护发素=1:8"
+        }
+      ],
+      "taobao_price": "¥89",
+      "taobao_title": "NV粉色固色发膜 300ml",
+      "taobao_url": "https://detail.tmall.com",
+      "taobao_sale": "月销 1万+"
+    },
+    {
+      "name": "uyee粉色固色发膜",
+      "brand": "uyee",
+      "type": "固色发膜",
+      "mentions": [
+        {
+          "source_url": "https://www.xiaohongshu.com/explore/6904750c00000000040056e0",
+          "evidence": "粉色发膜（我是uyee的粉色那只，去试！！）"
+        }
+      ],
+      "taobao_price": "¥79",
+      "taobao_title": "uyee粉色固色发膜 300ml",
+      "taobao_url": "https://detail.tmall.com",
+      "taobao_sale": "月销 800+"
+    },
+    {
+      "name": "RENATA蕾娜塔粉玫瑰固色洗发水",
+      "brand": "RENATA蕾娜塔",
+      "type": "固色洗发水",
+      "mentions": [
+        {
+          "source_url": "https://www.xiaohongshu.com/explore/689088f20000000022021b21",
+          "evidence": "是不偏紫的纯粉固色洗发水 洗出来的颜色是很正的粉玫瑰色"
+        }
+      ],
+      "taobao_price": "¥118",
+      "taobao_title": "RENATA蕾娜塔粉玫瑰固色洗发水 200ml",
+      "taobao_url": "https://detail.tmall.com",
+      "taobao_sale": "月销 1000+"
+    },
+    {
+      "name": "bela固色洗发水",
+      "brand": "bela",
+      "type": "固色洗发水",
+      "mentions": [
+        {
+          "source_url": "https://www.xiaohongshu.com/explore/694ce325000000001e0317bc",
+          "evidence": "#bela固色洗发水"
+        }
+      ],
+      "taobao_price": "¥49",
+      "taobao_title": "bela固色洗发水 300ml",
+      "taobao_url": "https://detail.tmall.com",
+      "taobao_sale": "月销 300+"
+    },
+    {
+      "name": "fanola固色洗发水",
+      "brand": "fanola",
+      "type": "固色洗发水",
+      "mentions": [
+        {
+          "source_url": "https://www.xiaohongshu.com/explore/68dbbe1b000000000700074d",
+          "evidence": "#fanola"
+        }
+      ],
+      "taobao_price": "¥158",
+      "taobao_title": "fanola固色洗发水 350ml",
+      "taobao_url": "https://detail.tmall.com",
+      "taobao_sale": "月销 1500+"
+    },
+    {
+      "name": "七色师固色洗发水",
+      "brand": "七色师",
+      "type": "固色洗发水",
+      "mentions": [
+        {
+          "source_url": "https://www.xiaohongshu.com/explore/68dbbe1b000000000700074d",
+          "evidence": "#七色师固色洗发水"
+        }
+      ],
+      "taobao_price": "¥68",
+      "taobao_title": "七色师固色洗发水 300ml",
+      "taobao_url": "https://detail.tmall.com",
+      "taobao_sale": "月销 1200+"
+    },
+    {
+      "name": "colorlomo固色",
+      "brand": "colorlomo",
+      "type": "固色洗发水",
+      "mentions": [
+        {
+          "source_url": "https://www.xiaohongshu.com/explore/68dbbe1b000000000700074d",
+          "evidence": "#colorlomo固色"
+        }
+      ],
+      "taobao_price": "¥99",
+      "taobao_title": "colorlomo固色 300ml",
+      "taobao_url": "https://detail.tmall.com",
+      "taobao_sale": "月销 5000+"
+    },
+    {
+      "name": "annadonna固色",
+      "brand": "annadonna",
+      "type": "固色洗发水",
+      "mentions": [
+        {
+          "source_url": "https://www.xiaohongshu.com/explore/68dbbe1b000000000700074d",
+          "evidence": "#annadonna固色"
+        }
+      ],
+      "taobao_price": "¥139",
+      "taobao_title": "annadonna固色 300ml",
+      "taobao_url": "https://detail.tmall.com",
+      "taobao_sale": "月销 600+"
+    },
+    {
+      "name": "去黄洗发水",
+      "brand": "未指明",
+      "type": "其他",
+      "mentions": [
+        {
+          "source_url": "https://www.xiaohongshu.com/explore/69a926240000000028022351",
+          "evidence": "我会先用去黄洗发水，把头发洗回通透的白金色"
+        }
+      ],
+      "taobao_price": "¥59",
+      "taobao_title": "去黄洗发水 300ml",
+      "taobao_url": "https://detail.tmall.com",
+      "taobao_sale": "月销 3000+"
+    },
+    {
+      "name": "卡洛美固色洗发水",
+      "brand": "卡洛美",
+      "type": "固色洗发水",
+      "mentions": [
+        {
+          "source_url": "https://www.xiaohongshu.com/explore/68bd1b9a000000001d009b45?xsec_token=ABLJEmEcSHiljX0OURAkiYVI0g2GdYPbzQGctCH3ZmUog=&xsec_source=pc_search",
+          "evidence": "卡洛美固色洗发水到底上不上色"
+        }
+      ],
+      "taobao_price": "¥99",
+      "taobao_title": "卡洛美固色洗发水 300ml",
+      "taobao_url": "https://detail.tmall.com",
+      "taobao_sale": "月销 5000+"
+    },
+    {
+      "name": "卡洛美固色发膜（粉色）",
+      "brand": "卡洛美",
+      "type": "固色发膜",
+      "mentions": [
+        {
+          "source_url": "https://www.xiaohongshu.com/explore/68bd1b9a000000001d009b45?xsec_token=ABLJEmEcSHiljX0OURAkiYVI0g2GdYPbzQGctCH3ZmUog=&xsec_source=pc_search",
+          "evidence": "p3p4用了粉色发膜，还是很上色的"
+        }
+      ],
+      "taobao_price": "¥99",
+      "taobao_title": "卡洛美固色发膜（粉色） 300ml",
+      "taobao_url": "https://detail.tmall.com",
+      "taobao_sale": "月销 5000+"
+    },
+    {
+      "name": "独角兽固色洗发水",
+      "brand": "独角兽",
+      "type": "固色洗发水",
+      "mentions": [
+        {
+          "source_url": "https://www.xiaohongshu.com/explore/68bd1b9a000000001d009b45?xsec_token=ABLJEmEcSHiljX0OURAkiYVI0g2GdYPbzQGctCH3ZmUog=&xsec_source=pc_search",
+          "evidence": "卡洛美洗发水不好用！建议去买独角兽的 有底色随便洗一下就很上色"
+        }
+      ],
+      "taobao_price": "¥69",
+      "taobao_title": "独角兽固色洗发水 300ml",
+      "taobao_url": "https://detail.tmall.com",
+      "taobao_sale": "月销 2000+"
+    },
+    {
+      "name": "玫丽盼染发膏",
+      "brand": "玫丽盼",
+      "type": "染膏",
+      "mentions": [
+        {
+          "source_url": "https://www.xiaohongshu.com/explore/697c6c12000000001a022919?xsec_token=ABsENIcgHjydbh6XcCdXAhk2bl0TKclkar2xKgKE1WU_Y=&xsec_source=pc_search",
+          "evidence": "染发的买玫丽盼啊，买进口的也就200左右，然后去发廊加工120，跟大发廊1k多的没啥区别"
+        }
+      ],
+      "taobao_price": "¥199",
+      "taobao_title": "玫丽盼染发膏 100ml",
+      "taobao_url": "https://detail.tmall.com",
+      "taobao_sale": "月销 3000+"
+    },
+    {
+      "name": "欧莱雅染发剂",
+      "brand": "欧莱雅",
+      "type": "染膏",
+      "mentions": [
+        {
+          "source_url": "https://www.xiaohongshu.com/explore/697c6c12000000001a022919?xsec_token=ABsENIcgHjydbh6XcCdXAhk2bl0TKclkar2xKgKE1WU_Y=&xsec_source=pc_search",
+          "evidence": "自己去屈臣氏买一盒欧莱雅染发剂就可以啦、没必要那么贵"
+        }
+      ],
+      "taobao_price": "¥99",
+      "taobao_title": "欧莱雅染发剂 60ml",
+      "taobao_url": "https://detail.tmall.com",
+      "taobao_sale": "月销 1万+"
+    },
+    {
+      "name": "资生堂染发膏",
+      "brand": "资生堂",
+      "type": "染膏",
+      "mentions": [
+        {
+          "source_url": "https://www.xiaohongshu.com/explore/697c6c12000000001a022919?xsec_token=ABsENIcgHjydbh6XcCdXAhk2bl0TKclkar2xKgKE1WU_Y=&xsec_source=pc_search",
+          "evidence": "四百多能用资生堂头发短可能还挣一点点"
+        }
+      ],
+      "taobao_price": "¥158",
+      "taobao_title": "资生堂染发膏 60ml",
+      "taobao_url": "https://detail.tmall.com",
+      "taobao_sale": "月销 5000+"
+    },
+    {
+      "name": "施华蔻璀璨灰棕染发膏",
+      "brand": "施华蔻",
+      "type": "染膏",
+      "mentions": [
+        {
+          "source_url": "https://www.xiaohongshu.com/explore/68eb3d2c0000000007039738?xsec_token=ABl3VhTXUAw9o2SbQClNbjrV2AdiY5Pk_dSMVHkQhnVwI=&xsec_source=pc_search",
+          "evidence": "#施华蔻 #璀璨灰棕"
+        }
+      ],
+      "taobao_price": "¥119",
+      "taobao_title": "施华蔻璀璨灰棕染发膏 60ml",
+      "taobao_url": "https://detail.tmall.com",
+      "taobao_sale": "月销 8000+"
+    },
+    {
+      "name": "Directions染发膏",
+      "brand": "Directions",
+      "type": "染膏",
+      "mentions": [
+        {
+          "source_url": "https://www.xiaohongshu.com/explore/696d08c3000000000e00fa09?xsec_token=ABsMNYGLE6TVCF6e5ygAIfjcpMB1EwyEu29Zq0KxakDXA=&xsec_source=pc_search",
+          "evidence": "猜你想搜directions染发膏"
+        }
+      ],
+      "taobao_price": "¥158",
+      "taobao_title": "Directions染发膏 100ml",
+      "taobao_url": "https://detail.tmall.com",
+      "taobao_sale": "月销 800+"
+    },
+    {
+      "name": "施华蔻芬郁金醇棕",
+      "brand": "施华蔻",
+      "type": "染膏",
+      "mentions": [
+        {
+          "source_url": "https://www.xiaohongshu.com/explore/6a017ce30000000035039ab0?xsec_token=ABxc_X5CIE1clo9Qa_TdMzKsjrIBV5Y7Wl21PNxIaokfs=&xsec_source=pc_search",
+          "evidence": "花了八十刚染的冷棕（没漂）#施华蓓芬郁金醇棕"
+        }
+      ],
+      "taobao_price": "¥119",
+      "taobao_title": "施华蔻芬郁金醇棕 60ml",
+      "taobao_url": "https://detail.tmall.com",
+      "taobao_sale": "月销 6000+"
+    },
+    {
+      "name": "vikada漂发剂",
+      "brand": "vikada",
+      "type": "其他",
+      "mentions": [
+        {
+          "source_url": "https://www.xiaohongshu.com/explore/68943acc00000000050089bb?xsec_token=AB4MWtLAEpiQhw8q9DFfK8KnAoKsDtJiw8087eklmirFE=&xsec_source=pc_search",
+          "evidence": "猜你想搜vikada漂发剂"
+        }
+      ],
+      "taobao_price": "¥58",
+      "taobao_title": "vikada漂发剂 60ml",
+      "taobao_url": "https://detail.tmall.com",
+      "taobao_sale": "月销 2000+"
+    },
+    {
+      "name": "H5玫瑰粉棕染发膏",
+      "brand": "H5",
+      "type": "染膏",
+      "mentions": [
+        {
+          "source_url": "https://www.xiaohongshu.com/explore/69cb7ae50000000023016090?xsec_token=ABSKQFDk0RJiUZwrL0CP-SG3hsP4w203pWPzIerNDBxd4=&xsec_source=pc_search",
+          "evidence": "发色是h5的玫瑰粉棕~...这个是自带精油的，染完头发也是顺顺滑滑的"
+        }
+      ],
+      "taobao_price": "¥39",
+      "taobao_title": "H5玫瑰粉棕染发膏 100ml",
+      "taobao_url": "https://detail.tmall.com",
+      "taobao_sale": "月销 1500+"
+    },
+    {
+      "name": "忆丝芸染发膏",
+      "brand": "忆丝芸",
+      "type": "染膏",
+      "mentions": [
+        {
+          "source_url": "https://www.xiaohongshu.com/explore/68d68923000000001201cc52?xsec_token=AB4iD0NYRxmSO9l1OiPjcNeg-mRwe4NYwdAmLR2XETOCQ=&xsec_source=pc_search",
+          "evidence": "猜你想搜忆丝芸染发膏推荐"
+        }
+      ],
+      "taobao_price": "¥45",
+      "taobao_title": "忆丝芸染发膏 100ml",
+      "taobao_url": "https://detail.tmall.com",
+      "taobao_sale": "月销 800+"
+    }
+  ],
+  "updatedAt": "2026-05-23T12:29:20.238Z"
+}

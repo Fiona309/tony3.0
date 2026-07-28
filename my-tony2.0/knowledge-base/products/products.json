@@ -1,0 +1,350 @@
+{
+  "schema_version": 3,
+  "products": [
+    {
+      "id": "prd_mm7zyj",
+      "canonical_name": "卡洛美粉色固色发膜",
+      "aliases": [
+        "卡洛美粉色固色发膜"
+      ],
+      "brand": "卡洛美",
+      "product_type": "固色发膜",
+      "line": null,
+      "volume_ml": null,
+      "official_status": "unverified",
+      "evidence_source_ids": [
+        "src_tvnltl"
+      ]
+    },
+    {
+      "id": "prd_x8vxvq",
+      "canonical_name": "卡洛美粉色固色洗发水",
+      "aliases": [
+        "卡洛美粉色固色洗发水"
+      ],
+      "brand": "卡洛美",
+      "product_type": "固色洗发水",
+      "line": null,
+      "volume_ml": null,
+      "official_status": "unverified",
+      "evidence_source_ids": [
+        "src_1js6u9t"
+      ]
+    },
+    {
+      "id": "prd_1qjp2dn",
+      "canonical_name": "NV粉色固色发膜",
+      "aliases": [
+        "NV粉色固色发膜"
+      ],
+      "brand": "NV",
+      "product_type": "固色发膜",
+      "line": null,
+      "volume_ml": null,
+      "official_status": "unverified",
+      "evidence_source_ids": [
+        "src_1s2v1v2"
+      ]
+    },
+    {
+      "id": "prd_5t5hd7",
+      "canonical_name": "uyee粉色固色发膜",
+      "aliases": [
+        "uyee粉色固色发膜"
+      ],
+      "brand": "uyee",
+      "product_type": "固色发膜",
+      "line": null,
+      "volume_ml": null,
+      "official_status": "unverified",
+      "evidence_source_ids": [
+        "src_1imsjmo"
+      ]
+    },
+    {
+      "id": "prd_a1h28h",
+      "canonical_name": "RENATA蕾娜塔粉玫瑰固色洗发水",
+      "aliases": [
+        "RENATA蕾娜塔粉玫瑰固色洗发水"
+      ],
+      "brand": "RENATA蕾娜塔",
+      "product_type": "固色洗发水",
+      "line": null,
+      "volume_ml": null,
+      "official_status": "unverified",
+      "evidence_source_ids": [
+        "src_1u5r3al"
+      ]
+    },
+    {
+      "id": "prd_tx2p43",
+      "canonical_name": "bela固色洗发水",
+      "aliases": [
+        "bela固色洗发水"
+      ],
+      "brand": "bela",
+      "product_type": "固色洗发水",
+      "line": null,
+      "volume_ml": null,
+      "official_status": "unverified",
+      "evidence_source_ids": [
+        "src_1ocq2vj"
+      ]
+    },
+    {
+      "id": "prd_ewsqat",
+      "canonical_name": "fanola固色洗发水",
+      "aliases": [
+        "fanola固色洗发水"
+      ],
+      "brand": "fanola",
+      "product_type": "固色洗发水",
+      "line": null,
+      "volume_ml": null,
+      "official_status": "unverified",
+      "evidence_source_ids": [
+        "src_gxfju0"
+      ]
+    },
+    {
+      "id": "prd_xao56r",
+      "canonical_name": "七色师固色洗发水",
+      "aliases": [
+        "七色师固色洗发水"
+      ],
+      "brand": "七色师",
+      "product_type": "固色洗发水",
+      "line": null,
+      "volume_ml": null,
+      "official_status": "unverified",
+      "evidence_source_ids": [
+        "src_gxfju0"
+      ]
+    },
+    {
+      "id": "prd_dpdcvp",
+      "canonical_name": "colorlomo固色",
+      "aliases": [
+        "colorlomo固色"
+      ],
+      "brand": "colorlomo",
+      "product_type": "固色洗发水",
+      "line": null,
+      "volume_ml": null,
+      "official_status": "unverified",
+      "evidence_source_ids": [
+        "src_gxfju0"
+      ]
+    },
+    {
+      "id": "prd_xneu5",
+      "canonical_name": "annadonna固色",
+      "aliases": [
+        "annadonna固色"
+      ],
+      "brand": "annadonna",
+      "product_type": "固色洗发水",
+      "line": null,
+      "volume_ml": null,
+      "official_status": "unverified",
+      "evidence_source_ids": [
+        "src_gxfju0"
+      ]
+    },
+    {
+      "id": "prd_ud9urb",
+      "canonical_name": "去黄洗发水",
+      "aliases": [
+        "去黄洗发水"
+      ],
+      "brand": null,
+      "product_type": "其他",
+      "line": null,
+      "volume_ml": null,
+      "official_status": "unverified",
+      "evidence_source_ids": [
+        "src_1ggwtva"
+      ]
+    },
+    {
+      "id": "prd_13h38ur",
+      "canonical_name": "卡洛美固色洗发水",
+      "aliases": [
+        "卡洛美固色洗发水"
+      ],
+      "brand": "卡洛美",
+      "product_type": "固色洗发水",
+      "line": null,
+      "volume_ml": null,
+      "official_status": "unverified",
+      "evidence_source_ids": [
+        "src_1krj6f2"
+      ]
+    },
+    {
+      "id": "prd_dyu1ou",
+      "canonical_name": "卡洛美固色发膜（粉色）",
+      "aliases": [
+        "卡洛美固色发膜（粉色）"
+      ],
+      "brand": "卡洛美",
+      "product_type": "固色发膜",
+      "line": null,
+      "volume_ml": null,
+      "official_status": "unverified",
+      "evidence_source_ids": [
+        "src_1krj6f2"
+      ]
+    },
+    {
+      "id": "prd_1929iiz",
+      "canonical_name": "独角兽固色洗发水",
+      "aliases": [
+        "独角兽固色洗发水"
+      ],
+      "brand": "独角兽",
+      "product_type": "固色洗发水",
+      "line": null,
+      "volume_ml": null,
+      "official_status": "unverified",
+      "evidence_source_ids": [
+        "src_1krj6f2"
+      ]
+    },
+    {
+      "id": "prd_13rkj06",
+      "canonical_name": "玫丽盼染发膏",
+      "aliases": [
+        "玫丽盼染发膏"
+      ],
+      "brand": "玫丽盼",
+      "product_type": "染膏",
+      "line": null,
+      "volume_ml": null,
+      "official_status": "unverified",
+      "evidence_source_ids": [
+        "src_255wzm"
+      ]
+    },
+    {
+      "id": "prd_3u9h1h",
+      "canonical_name": "欧莱雅染发剂",
+      "aliases": [
+        "欧莱雅染发剂"
+      ],
+      "brand": "欧莱雅",
+      "product_type": "染膏",
+      "line": null,
+      "volume_ml": null,
+      "official_status": "unverified",
+      "evidence_source_ids": [
+        "src_255wzm"
+      ]
+    },
+    {
+      "id": "prd_1vkkkzq",
+      "canonical_name": "资生堂染发膏",
+      "aliases": [
+        "资生堂染发膏"
+      ],
+      "brand": "资生堂",
+      "product_type": "染膏",
+      "line": null,
+      "volume_ml": null,
+      "official_status": "unverified",
+      "evidence_source_ids": [
+        "src_255wzm"
+      ]
+    },
+    {
+      "id": "prd_1xttqyv",
+      "canonical_name": "施华蔻璀璨灰棕染发膏",
+      "aliases": [
+        "施华蔻璀璨灰棕染发膏"
+      ],
+      "brand": "施华蔻",
+      "product_type": "染膏",
+      "line": null,
+      "volume_ml": null,
+      "official_status": "unverified",
+      "evidence_source_ids": [
+        "src_1kidilc"
+      ]
+    },
+    {
+      "id": "prd_bz2hyi",
+      "canonical_name": "Directions染发膏",
+      "aliases": [
+        "Directions染发膏"
+      ],
+      "brand": "Directions",
+      "product_type": "染膏",
+      "line": null,
+      "volume_ml": null,
+      "official_status": "unverified",
+      "evidence_source_ids": [
+        "src_1s707z2"
+      ]
+    },
+    {
+      "id": "prd_n8ozc1",
+      "canonical_name": "施华蔻芬郁金醇棕",
+      "aliases": [
+        "施华蔻芬郁金醇棕"
+      ],
+      "brand": "施华蔻",
+      "product_type": "染膏",
+      "line": null,
+      "volume_ml": null,
+      "official_status": "unverified",
+      "evidence_source_ids": [
+        "src_1wjnelf"
+      ]
+    },
+    {
+      "id": "prd_1r14rwe",
+      "canonical_name": "vikada漂发剂",
+      "aliases": [
+        "vikada漂发剂"
+      ],
+      "brand": "vikada",
+      "product_type": "其他",
+      "line": null,
+      "volume_ml": null,
+      "official_status": "unverified",
+      "evidence_source_ids": [
+        "src_fnwvy3"
+      ]
+    },
+    {
+      "id": "prd_1cs5jfv",
+      "canonical_name": "H5玫瑰粉棕染发膏",
+      "aliases": [
+        "H5玫瑰粉棕染发膏"
+      ],
+      "brand": "H5",
+      "product_type": "染膏",
+      "line": null,
+      "volume_ml": null,
+      "official_status": "unverified",
+      "evidence_source_ids": [
+        "src_shqebz"
+      ]
+    },
+    {
+      "id": "prd_3khxou",
+      "canonical_name": "忆丝芸染发膏",
+      "aliases": [
+        "忆丝芸染发膏"
+      ],
+      "brand": "忆丝芸",
+      "product_type": "染膏",
+      "line": null,
+      "volume_ml": null,
+      "official_status": "unverified",
+      "evidence_source_ids": [
+        "src_1ueun8n"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,937 @@
+{
+  "schema_version": 3,
+  "items": [
+    {
+      "id": "ev_1kw67wy",
+      "evidence_type": "community_claim",
+      "category": "操作技巧",
+      "summary": "固色发膜应从下往上涂",
+      "claim": "头发打湿后用一次性手套涂抹固色发膜，从下往上涂，因为发尾受损严重上色慢。涂完用保鲜膜包起来等10-15分钟，时间长粉色更深，时间短更淡。",
+      "quote": "头发打湿，固色发膜均匀涂抹在头发上，记得从下往上涂！（⚠️因为发尾受损严重上色慢）……拿保鲜膜把头发包起来，大概等待10-15分钟（⚠️根据自己的情况，想要粉一点就时间长，想要淡一点就时间短）",
+      "source_id": "src_tvnltl",
+      "applicability": [],
+      "confidence": "low",
+      "review_status": "needs_review",
+      "usable_for": [
+        "user_language",
+        "case_lead",
+        "hypothesis"
+      ],
+      "prohibited_uses": [
+        "universal_rule",
+        "automatic_formula"
+      ]
+    },
+    {
+      "id": "ev_1ezserh",
+      "evidence_type": "community_claim",
+      "category": "维护周期",
+      "summary": "粉发一周就基本掉完",
+      "claim": "粉色掉色非常快，基本一周左右粉色就完全没有了，需要在家用固色发膜+固色洗发水定期补色。",
+      "quote": "染了不后悔！但掉色是真的快 基本一周左右粉色就完全没有了",
+      "source_id": "src_tvnltl",
+      "applicability": [],
+      "confidence": "low",
+      "review_status": "needs_review",
+      "usable_for": [
+        "user_language",
+        "case_lead",
+        "hypothesis"
+      ],
+      "prohibited_uses": [
+        "universal_rule",
+        "automatic_formula"
+      ]
+    },
+    {
+      "id": "ev_1eikffx",
+      "evidence_type": "community_claim",
+      "category": "底色匹配",
+      "summary": "粉发需8度以上干净底色",
+      "claim": "用卡洛美粉色固色发膜想调出樱花粉、薄藤粉、芭比粉等，前提是底色要干净，并且需要8度以上底色才显色。",
+      "quote": "但前提是底色要干净喔，而且得是8度以上的底色才显色",
+      "source_id": "src_1js6u9t",
+      "applicability": [],
+      "confidence": "low",
+      "review_status": "needs_review",
+      "usable_for": [
+        "user_language",
+        "case_lead",
+        "hypothesis"
+      ],
+      "prohibited_uses": [
+        "universal_rule",
+        "automatic_formula"
+      ]
+    },
+    {
+      "id": "ev_qd26na",
+      "evidence_type": "community_claim",
+      "category": "操作技巧",
+      "summary": "发膜兑护发素干发涂抹更均匀",
+      "claim": "卡洛美粉色固色发膜用法：和护发素稀释后在干发上涂抹，等15分钟再用粉色固色洗发水洗一遍即可显色均匀亮泽。",
+      "quote": "用法我一般是和护发素稀释完干发抹就行，等15分钟再用粉色固色洗发水洗一遍就很piu亮了",
+      "source_id": "src_1js6u9t",
+      "applicability": [],
+      "confidence": "low",
+      "review_status": "needs_review",
+      "usable_for": [
+        "user_language",
+        "case_lead",
+        "hypothesis"
+      ],
+      "prohibited_uses": [
+        "universal_rule",
+        "automatic_formula"
+      ]
+    },
+    {
+      "id": "ev_vzzp2u",
+      "evidence_type": "community_claim",
+      "category": "操作技巧",
+      "summary": "NV发膜不同稀释比例的效果",
+      "claim": "底色8.5-9度：NV发膜:护发素=1:8调出偏亮芭比粉，可维持3-4次洗头，一周补一次；1:10调出淡粉色更显白，但只能维持1-2次洗头，一周要补2次。",
+      "quote": "🔴nv：普通护发素=1:8……可以维持3-4次洗头，大概一周补一次颜色即可 🔵nv：普通护发素=1:10……只能维持1-2次洗头，大概一周要补2次颜色",
+      "source_id": "src_1s2v1v2",
+      "applicability": [],
+      "confidence": "low",
+      "review_status": "needs_review",
+      "usable_for": [
+        "user_language",
+        "case_lead",
+        "hypothesis"
+      ],
+      "prohibited_uses": [
+        "universal_rule",
+        "automatic_formula"
+      ]
+    },
+    {
+      "id": "ev_1xqam5q",
+      "evidence_type": "community_claim",
+      "category": "操作技巧",
+      "summary": "泡水法上色更均匀但发根难上",
+      "claim": "泡水法：只加NV不加护发素会偏粉紫色；NV和护发素1:1混合泡出来是淡粉色不偏紫。水颜色一定要比理想颜色深一点。缺点是发根接口处发黄不好上色。",
+      "quote": "只加nv不加普通护发素 泡出来会偏粉紫色……nv和普通护发素1:1混合 泡出来是淡粉色……我的接口处发黄总是不能很好的上色",
+      "source_id": "src_1s2v1v2",
+      "applicability": [],
+      "confidence": "low",
+      "review_status": "needs_review",
+      "usable_for": [
+        "user_language",
+        "case_lead",
+        "hypothesis"
+      ],
+      "prohibited_uses": [
+        "universal_rule",
+        "automatic_formula"
+      ]
+    },
+    {
+      "id": "ev_12xayyu",
+      "evidence_type": "community_claim",
+      "category": "避坑警告",
+      "summary": "固色洗发水易染花需慎用",
+      "claim": "底色够浅时直接用固色洗发水也能上色，但容易染花，作者推荐用固色发膜更好用。若固花或固深了多洗几次会掉回原来发色。",
+      "quote": "如果底色够浅的话直接用固色洗发水也是可以上色的，但是容易染花……如果真的固花了固深了也别担心，多洗几次就掉了",
+      "source_id": "src_1s2v1v2",
+      "applicability": [],
+      "confidence": "low",
+      "review_status": "needs_review",
+      "usable_for": [
+        "user_language",
+        "case_lead",
+        "hypothesis"
+      ],
+      "prohibited_uses": [
+        "universal_rule",
+        "automatic_formula"
+      ]
+    },
+    {
+      "id": "ev_zgjzs9",
+      "evidence_type": "community_claim",
+      "category": "操作技巧",
+      "summary": "干发涂发膜易漏的死角",
+      "claim": "用uyee粉色发膜干发涂抹时，最容易漏的地方是耳后、和黑发根衔接处（要往发根抹一些）以及发尾，需特别注意。",
+      "quote": "💔有可能漏的地方： 耳后！和跟黑发根衔接的地方，要往发根抹一些！发尾！",
+      "source_id": "src_1imsjmo",
+      "applicability": [],
+      "confidence": "low",
+      "review_status": "needs_review",
+      "usable_for": [
+        "user_language",
+        "case_lead",
+        "hypothesis"
+      ],
+      "prohibited_uses": [
+        "universal_rule",
+        "automatic_formula"
+      ]
+    },
+    {
+      "id": "ev_8y1eev",
+      "evidence_type": "community_claim",
+      "category": "操作技巧",
+      "summary": "补粉前先用去黄洗发水",
+      "claim": "掉色严重时别急着补粉，先用去黄洗发水把头发洗回通透白金色，否则直接补粉颜色会发脏发闷显邋遢。然后吹干分四块涂卡洛美粉色发膜，发尾厚涂，静置10分钟冲掉。",
+      "quote": "掉色最厉害的时候，先别急着补粉！我会先用去黄洗发水，把头发洗回通透的白金色，不然直接补粉，颜色会发脏、发闷",
+      "source_id": "src_1ggwtva",
+      "applicability": [],
+      "confidence": "low",
+      "review_status": "needs_review",
+      "usable_for": [
+        "user_language",
+        "case_lead",
+        "hypothesis"
+      ],
+      "prohibited_uses": [
+        "universal_rule",
+        "automatic_formula"
+      ]
+    },
+    {
+      "id": "ev_3q1w8y",
+      "evidence_type": "community_claim",
+      "category": "用户真实反馈",
+      "summary": "漂三次冲到8-9度才能染粉",
+      "claim": "作者亲身经历：漂了三次才冲到8-9度浅底色，结果只洗了两次嫩粉就褪成土气浅橘。但用卡洛美维护后粉发稳稳撑了三个月。",
+      "quote": "当初漂了三次才冲到8-9度的浅底色，结果就洗了两次，嫩粉直接褪成土气浅橘",
+      "source_id": "src_1ggwtva",
+      "applicability": [],
+      "confidence": "low",
+      "review_status": "needs_review",
+      "usable_for": [
+        "user_language",
+        "case_lead",
+        "hypothesis"
+      ],
+      "prohibited_uses": [
+        "universal_rule",
+        "automatic_formula"
+      ]
+    },
+    {
+      "id": "ev_1a7pmdx",
+      "evidence_type": "community_claim",
+      "category": "操作技巧",
+      "summary": "卡洛美泡水法1:1摇成泡沫",
+      "claim": "饮料瓶里挤入卡洛美固色发膜和固色洗发水1:1，加水摇晃成泡沫状（避免发膜结块），兑水到脸盆里泡头，左右头顶各泡5-10分钟可获得均匀粉色。每2周泡一次。",
+      "quote": "1:1在饮料瓶里挤入固色发膜&固色洗发水，加水摇晃成泡沫状（可以确保没有固色发膜颗粒），兑水到脸盆里泡头，左右头顶各泡5-10分钟",
+      "source_id": "src_fuqslc",
+      "applicability": [],
+      "confidence": "low",
+      "review_status": "needs_review",
+      "usable_for": [
+        "user_language",
+        "case_lead",
+        "hypothesis"
+      ],
+      "prohibited_uses": [
+        "universal_rule",
+        "automatic_formula"
+      ]
+    },
+    {
+      "id": "ev_1tk8ref",
+      "evidence_type": "community_claim",
+      "category": "避坑警告",
+      "summary": "发膜别直接挤水里会结块",
+      "claim": "泡水法的踩坑点：别直接把固色发膜挤水里，搅不开会结块挂在头发上，上色不均还浪费。耳后等死角要用手蘸取泡沫多搓几下。",
+      "quote": "1️⃣别直接把固色发膜挤水里，搅不开会结块挂在头发上，上色不均还浪费！",
+      "source_id": "src_fuqslc",
+      "applicability": [],
+      "confidence": "low",
+      "review_status": "needs_review",
+      "usable_for": [
+        "user_language",
+        "case_lead",
+        "hypothesis"
+      ],
+      "prohibited_uses": [
+        "universal_rule",
+        "automatic_formula"
+      ]
+    },
+    {
+      "id": "ev_st94bc",
+      "evidence_type": "community_claim",
+      "category": "操作技巧",
+      "summary": "蕾娜塔需1:3兑普通洗发水",
+      "claim": "RENATA蕾娜塔粉色固色洗发水上色效果非常显著，必须用普通洗发水1:3兑稀释，并提前打出泡沫再上头，否则容易把发色洗花。",
+      "quote": "以 1:3 的比例把普通洗发水和固色洗发水调兑一下，打出泡沫再上头……因为上色效果非常显著，必须调兑一下又为了防止发色洗花",
+      "source_id": "src_1u5r3al",
+      "applicability": [],
+      "confidence": "low",
+      "review_status": "needs_review",
+      "usable_for": [
+        "user_language",
+        "case_lead",
+        "hypothesis"
+      ],
+      "prohibited_uses": [
+        "universal_rule",
+        "automatic_formula"
+      ]
+    },
+    {
+      "id": "ev_5wzv5h",
+      "evidence_type": "community_claim",
+      "category": "产品对比",
+      "summary": "蕾娜塔出色不偏紫",
+      "claim": "RENATA蕾娜塔粉色固色洗发水洗出来是不偏紫的纯正粉玫瑰色，泡沫细腻，香味淡淡的。",
+      "quote": "是不偏紫的纯粉固色洗发水 洗出来的颜色是很正的粉玫瑰色",
+      "source_id": "src_1u5r3al",
+      "applicability": [],
+      "confidence": "low",
+      "review_status": "needs_review",
+      "usable_for": [
+        "user_language",
+        "case_lead",
+        "hypothesis"
+      ],
+      "prohibited_uses": [
+        "universal_rule",
+        "automatic_formula"
+      ]
+    },
+    {
+      "id": "ev_bcgcsj",
+      "evidence_type": "community_claim",
+      "category": "避坑警告",
+      "summary": "bela固色无效不能补色",
+      "claim": "高赞评论反馈：漂染了灰紫色用bela，什么固色效果都没有，补色更别提，洗完就是黄色头发。",
+      "quote": "大家别信，bela这个牌子一点用没有。我刚刚漂染了灰紫色，用了这个牌子，什么固色效果都没有，补色就别提了。洗完就是黄色头发",
+      "source_id": "src_gxfju0",
+      "applicability": [],
+      "confidence": "low",
+      "review_status": "needs_review",
+      "usable_for": [
+        "user_language",
+        "case_lead",
+        "hypothesis"
+      ],
+      "prohibited_uses": [
+        "universal_rule",
+        "automatic_formula"
+      ]
+    },
+    {
+      "id": "ev_76egxt",
+      "evidence_type": "community_claim",
+      "category": "用户真实反馈",
+      "summary": "卡洛美自己弄容易花",
+      "claim": "高赞评论提到：一直用卡洛美但是自己弄真的非常容易颜色不均匀，深一条浅一条颜色特别花。",
+      "quote": "我一直用的卡洛美 但是自己弄真的非常容易颜色不均匀 深一条浅一条的颜色特别花",
+      "source_id": "src_gxfju0",
+      "applicability": [],
+      "confidence": "low",
+      "review_status": "needs_review",
+      "usable_for": [
+        "user_language",
+        "case_lead",
+        "hypothesis"
+      ],
+      "prohibited_uses": [
+        "universal_rule",
+        "automatic_formula"
+      ]
+    },
+    {
+      "id": "ev_1tugs1j",
+      "evidence_type": "community_claim",
+      "category": "操作技巧",
+      "summary": "固色洗发水洗两遍法",
+      "claim": "起泡器打出泡沫，均匀涂抹头发上静置2-3分钟洗掉；第二遍重复，沫会变多像正常洗头一样。可维持粉发一个半月。",
+      "quote": "每次洗头固色洗发水我一般会用两遍 第一遍在起泡器中打出泡，均匀地涂抹在头发上，静置2-3分钟，洗掉 第二遍，继续上面的步骤",
+      "source_id": "src_1gf0gm2",
+      "applicability": [],
+      "confidence": "low",
+      "review_status": "needs_review",
+      "usable_for": [
+        "user_language",
+        "case_lead",
+        "hypothesis"
+      ],
+      "prohibited_uses": [
+        "universal_rule",
+        "automatic_formula"
+      ]
+    },
+    {
+      "id": "ev_2qjwhz",
+      "evidence_type": "community_claim",
+      "category": "用户真实反馈",
+      "summary": "洗到喜欢色就停防过深",
+      "claim": "高赞评论提醒：固色洗发水洗到自己喜欢的颜色就别再洗了，洗多了会色素沉淀变深。",
+      "quote": "洗到自己喜欢的颜色就别在洗啦，洗多了就色素沉淀会变深",
+      "source_id": "src_1gf0gm2",
+      "applicability": [],
+      "confidence": "low",
+      "review_status": "needs_review",
+      "usable_for": [
+        "user_language",
+        "case_lead",
+        "hypothesis"
+      ],
+      "prohibited_uses": [
+        "universal_rule",
+        "automatic_formula"
+      ]
+    },
+    {
+      "id": "ev_zhm6z3",
+      "evidence_type": "community_claim",
+      "category": "避坑警告",
+      "summary": "彩色固色当洗发水用易出问题",
+      "claim": "亲身踩坑：把有颜色的固色洗发水直接当普通洗发水用，泡沫少、头皮洗不干净、第二天就出油长痘，还会洗不均匀导致发色全花。新手不会用慎用有颜色的固色。",
+      "quote": "直接当普通洗发水……泡沫特别少……第二天头发就出油了，头皮洗不干净，后面就长了痘痘。最重要的是！！！没有洗均匀，一块有颜色一块没有颜色，发色全花了",
+      "source_id": "src_1ocq2vj",
+      "applicability": [],
+      "confidence": "low",
+      "review_status": "safety_review_required",
+      "usable_for": [
+        "user_language",
+        "case_lead",
+        "hypothesis"
+      ],
+      "prohibited_uses": [
+        "medical_conclusion",
+        "universal_safety_rule",
+        "automatic_formula"
+      ]
+    },
+    {
+      "id": "ev_1m2sy67",
+      "evidence_type": "community_claim",
+      "category": "产品对比",
+      "summary": "透明固色更安全防染花",
+      "claim": "替代方案：用透明的固色洗发水可以让头发掉色没那么快，虽然不能补色，但大大减少染花风险，适合不会操作的新手。",
+      "quote": "我就买了一些透明的洗发水，让头发掉色没那么快的固色洗发水……不能补色！！但是也大大减少染花的风险",
+      "source_id": "src_1ocq2vj",
+      "applicability": [],
+      "confidence": "low",
+      "review_status": "needs_review",
+      "usable_for": [
+        "user_language",
+        "case_lead",
+        "hypothesis"
+      ],
+      "prohibited_uses": [
+        "universal_rule",
+        "automatic_formula"
+      ]
+    },
+    {
+      "id": "ev_1sy9d7f",
+      "evidence_type": "community_claim",
+      "category": "价格情报",
+      "summary": "彩色固色价格接近染膏",
+      "claim": "用户吐槽：一瓶有颜色的固色不便宜，价格都能买染膏重新染了。",
+      "quote": "一瓶有颜色的固色还不便宜都能买染膏重新染了",
+      "source_id": "src_1ocq2vj",
+      "applicability": [],
+      "confidence": "low",
+      "review_status": "needs_review",
+      "usable_for": [
+        "user_language",
+        "case_lead",
+        "hypothesis"
+      ],
+      "prohibited_uses": [
+        "universal_rule",
+        "automatic_formula"
+      ]
+    },
+    {
+      "id": "ev_1dfmjxr",
+      "evidence_type": "community_claim",
+      "category": "产品对比",
+      "summary": "固色发膜比固色洗发水有效",
+      "claim": "用户普遍反馈固色洗发水上色效果差，固色发膜（干发使用）才是真正能补色的关键。洗发水仅能延缓掉色，无法重新上色。",
+      "quote": "固色洗发水根本没用，固色发膜才有用（要干发上）",
+      "source_id": "src_1krj6f2",
+      "applicability": [],
+      "confidence": "low",
+      "review_status": "needs_review",
+      "usable_for": [
+        "user_language",
+        "case_lead",
+        "hypothesis"
+      ],
+      "prohibited_uses": [
+        "universal_rule",
+        "automatic_formula"
+      ]
+    },
+    {
+      "id": "ev_k4u52l",
+      "evidence_type": "community_claim",
+      "category": "操作技巧",
+      "summary": "固色发膜要干发上",
+      "claim": "使用固色发膜时，应在干发状态下直接涂抹，效果最好。刚固色完粉色会非常显色。",
+      "quote": "发膜！！干发直接上！昨天刚刚固色完，我的粉色又回来了",
+      "source_id": "src_1krj6f2",
+      "applicability": [],
+      "confidence": "low",
+      "review_status": "needs_review",
+      "usable_for": [
+        "user_language",
+        "case_lead",
+        "hypothesis"
+      ],
+      "prohibited_uses": [
+        "universal_rule",
+        "automatic_formula"
+      ]
+    },
+    {
+      "id": "ev_1j11vh7",
+      "evidence_type": "community_claim",
+      "category": "用户真实反馈",
+      "summary": "紫色固色洗发水可洗出粉色",
+      "claim": "有用户使用紫色固色洗发水后，头发洗出了粉色效果，甚至头顶没漂够的部分也能上色，意外好看。",
+      "quote": "md这固色洗发水从紫色洗成粉色好看到爆了是有点何意味啊？甚至我头顶没漂够的也能上色",
+      "source_id": "src_1f8wxv4",
+      "applicability": [],
+      "confidence": "low",
+      "review_status": "needs_review",
+      "usable_for": [
+        "user_language",
+        "case_lead",
+        "hypothesis"
+      ],
+      "prohibited_uses": [
+        "universal_rule",
+        "automatic_formula"
+      ]
+    },
+    {
+      "id": "ev_xkoowv",
+      "evidence_type": "community_claim",
+      "category": "价格情报",
+      "summary": "自带染膏+发廊加工最划算",
+      "claim": "买正品玫丽盼染膏约200元，自带到发廊加工120元左右，效果接近大发廊1000+的染发服务，性价比极高。",
+      "quote": "染发的买玫丽盼啊，买进口的也就200左右，然后去发廊加工120，跟大发廊1k多的没啥区别",
+      "source_id": "src_255wzm",
+      "applicability": [],
+      "confidence": "low",
+      "review_status": "needs_review",
+      "usable_for": [
+        "user_language",
+        "case_lead",
+        "hypothesis"
+      ],
+      "prohibited_uses": [
+        "universal_rule",
+        "automatic_formula"
+      ]
+    },
+    {
+      "id": "ev_1rej0t1",
+      "evidence_type": "community_claim",
+      "category": "避坑警告",
+      "summary": "网上超低价欧莱雅可能是假货",
+      "claim": "欧莱雅店里最低350起步，资生堂更贵。低于此价格使用品牌染膏老板会亏钱，因此电商极低价的'品牌染膏'大概率是假货。",
+      "quote": "欧莱雅店里价格最低就是350起步，低于这个价还是别想了，350-发型师30%提成-技师10%提成=210-产品-房租水电，老板一半都拿不到",
+      "source_id": "src_255wzm",
+      "applicability": [],
+      "confidence": "low",
+      "review_status": "needs_review",
+      "usable_for": [
+        "user_language",
+        "case_lead",
+        "hypothesis"
+      ],
+      "prohibited_uses": [
+        "universal_rule",
+        "automatic_formula"
+      ]
+    },
+    {
+      "id": "ev_ife7k3",
+      "evidence_type": "community_claim",
+      "category": "避坑警告",
+      "summary": "欧莱雅染发气味很臭",
+      "claim": "用户反馈欧莱雅染发膏使用时气味难闻，介意味道的用户需注意。",
+      "quote": "欧莱雅染的特别臭",
+      "source_id": "src_255wzm",
+      "applicability": [],
+      "confidence": "low",
+      "review_status": "needs_review",
+      "usable_for": [
+        "user_language",
+        "case_lead",
+        "hypothesis"
+      ],
+      "prohibited_uses": [
+        "universal_rule",
+        "automatic_formula"
+      ]
+    },
+    {
+      "id": "ev_1daw6xx",
+      "evidence_type": "community_claim",
+      "category": "价格情报",
+      "summary": "理发店染发合理价位300-500",
+      "claim": "市场普遍反馈正常染发价格在300-500元之间足够，中长发普通小店150-180元，过低不建议，比起产品更应找靠谱发型师。",
+      "quote": "正常染发应该在3-5百之间就足够了。最便宜的不建议，一分价钱一分货找个靠谱的发型师比产品更重要",
+      "source_id": "src_icb5s3",
+      "applicability": [],
+      "confidence": "low",
+      "review_status": "needs_review",
+      "usable_for": [
+        "user_language",
+        "case_lead",
+        "hypothesis"
+      ],
+      "prohibited_uses": [
+        "universal_rule",
+        "automatic_formula"
+      ]
+    },
+    {
+      "id": "ev_1mjqub6",
+      "evidence_type": "community_claim",
+      "category": "价格情报",
+      "summary": "自带染膏发廊加工仅60元",
+      "claim": "店里染发188元被认为偏贵，自带染发膏到发廊加工只需60元，是预算有限用户的最佳选择。",
+      "quote": "我染的188感觉贵了，我室友自带染发膏花了60",
+      "source_id": "src_icb5s3",
+      "applicability": [],
+      "confidence": "low",
+      "review_status": "needs_review",
+      "usable_for": [
+        "user_language",
+        "case_lead",
+        "hypothesis"
+      ],
+      "prohibited_uses": [
+        "universal_rule",
+        "automatic_formula"
+      ]
+    },
+    {
+      "id": "ev_1bkjq8i",
+      "evidence_type": "community_claim",
+      "category": "避坑警告",
+      "summary": "染膏含氨水PPD成分需注意",
+      "claim": "染发剂普遍含有氨水（致敏）和对苯二胺PPD（致癌）等化学成分，无论贵的便宜的基本都含有，建议控制染发频率，一年1-2次为宜。",
+      "quote": "一个致敏一个致癌。",
+      "source_id": "src_wrgvoq",
+      "applicability": [],
+      "confidence": "low",
+      "review_status": "safety_review_required",
+      "usable_for": [
+        "user_language",
+        "case_lead",
+        "hypothesis"
+      ],
+      "prohibited_uses": [
+        "medical_conclusion",
+        "universal_safety_rule",
+        "automatic_formula"
+      ]
+    },
+    {
+      "id": "ev_1wo1ogn",
+      "evidence_type": "community_claim",
+      "category": "操作技巧",
+      "summary": "长发染发需2-3盒染膏",
+      "claim": "头发长度直接影响染膏用量：短发一盒有余，中长发一盒，长发（到屁股）需要2盒以上；发量厚或同等长度可能需要3盒。",
+      "quote": "我头发只有你的一半长度，发量也差不多，我用了3盒！！花了200",
+      "source_id": "src_1kidilc",
+      "applicability": [],
+      "confidence": "low",
+      "review_status": "needs_review",
+      "usable_for": [
+        "user_language",
+        "case_lead",
+        "hypothesis"
+      ],
+      "prohibited_uses": [
+        "universal_rule",
+        "automatic_formula"
+      ]
+    },
+    {
+      "id": "ev_1biz846",
+      "evidence_type": "community_claim",
+      "category": "操作技巧",
+      "summary": "头顶里层易染不均要仔细",
+      "claim": "自己染发时头顶里层最容易遗漏染不匀，需重点仔细涂抹。建议宁可多开一瓶染膏也不要量不够。",
+      "quote": "虽然头顶有点小失败不均匀 但是总体还行 这次有经验了下次头顶里面一定仔细染一下",
+      "source_id": "src_1kidilc",
+      "applicability": [],
+      "confidence": "low",
+      "review_status": "needs_review",
+      "usable_for": [
+        "user_language",
+        "case_lead",
+        "hypothesis"
+      ],
+      "prohibited_uses": [
+        "universal_rule",
+        "automatic_formula"
+      ]
+    },
+    {
+      "id": "ev_yf16yh",
+      "evidence_type": "community_claim",
+      "category": "用户真实反馈",
+      "summary": "自染长发性价比下降",
+      "claim": "短发自己染一盒有余，长发需2盒以上，发量大可能需3盒，整体花费接近理发店中等价位，自染优势减弱。",
+      "quote": "短发时候一盒有多，中长发一盒，现在本细软发秃头终于也长到了两盒不够用的时候了，这价格快赶得上找tony老师哎",
+      "source_id": "src_1centko",
+      "applicability": [],
+      "confidence": "low",
+      "review_status": "needs_review",
+      "usable_for": [
+        "user_language",
+        "case_lead",
+        "hypothesis"
+      ],
+      "prohibited_uses": [
+        "universal_rule",
+        "automatic_formula"
+      ]
+    },
+    {
+      "id": "ev_hi4tty",
+      "evidence_type": "community_claim",
+      "category": "用户真实反馈",
+      "summary": "Directions染发膏无味不刺激",
+      "claim": "有用户反馈某平价染发膏头皮无痛感、无气味，可在宿舍染，红紫绿蓝多色都能染，打折时约20+元。",
+      "quote": "我的头皮不知道为啥用别的很痛，这个就毫无感觉，而且没味道",
+      "source_id": "src_1s707z2",
+      "applicability": [],
+      "confidence": "low",
+      "review_status": "safety_review_required",
+      "usable_for": [
+        "user_language",
+        "case_lead",
+        "hypothesis"
+      ],
+      "prohibited_uses": [
+        "medical_conclusion",
+        "universal_safety_rule",
+        "automatic_formula"
+      ]
+    },
+    {
+      "id": "ev_13skftk",
+      "evidence_type": "community_claim",
+      "category": "维护周期",
+      "summary": "固色洗发水可维持粉色一个月",
+      "claim": "在洗头频率不高的情况下，使用固色洗发水可让粉色发色维持约一个月，但效果因人而异。",
+      "quote": "我用固色洗发水，粉色维持了一个月耶，我觉得是可以的",
+      "source_id": "src_1krj6f2",
+      "applicability": [],
+      "confidence": "low",
+      "review_status": "needs_review",
+      "usable_for": [
+        "user_language",
+        "case_lead",
+        "hypothesis"
+      ],
+      "prohibited_uses": [
+        "universal_rule",
+        "automatic_formula"
+      ]
+    },
+    {
+      "id": "ev_1hi08ad",
+      "evidence_type": "community_claim",
+      "category": "底色匹配",
+      "summary": "鲜艳红色需先漂底色",
+      "claim": "想要鲜艳显色的红色发色，通常需要先漂发处理底色，否则上色效果不理想。多位用户都在确认是否漂过头发。",
+      "quote": "姐妹你染之前漂过头发吗 好显色好亮！",
+      "source_id": "src_255wzm",
+      "applicability": [],
+      "confidence": "low",
+      "review_status": "safety_review_required",
+      "usable_for": [
+        "user_language",
+        "case_lead",
+        "hypothesis"
+      ],
+      "prohibited_uses": [
+        "medical_conclusion",
+        "universal_safety_rule",
+        "automatic_formula"
+      ]
+    },
+    {
+      "id": "ev_t9czhp",
+      "evidence_type": "community_claim",
+      "category": "底色匹配",
+      "summary": "发量少不漂只染棕色系",
+      "claim": "头发少、不敢漂的用户适合染棕色系（如灰棕），无需漂发底色也能上色，对发质伤害较小。",
+      "quote": "我这个头发太少了只用了一瓶…自己染发性价比太高了 因为头发少不敢漂 就染染棕色系列的",
+      "source_id": "src_1kidilc",
+      "applicability": [],
+      "confidence": "low",
+      "review_status": "safety_review_required",
+      "usable_for": [
+        "user_language",
+        "case_lead",
+        "hypothesis"
+      ],
+      "prohibited_uses": [
+        "medical_conclusion",
+        "universal_safety_rule",
+        "automatic_formula"
+      ]
+    },
+    {
+      "id": "ev_46vh6b",
+      "evidence_type": "community_claim",
+      "category": "价格情报",
+      "summary": "施华蔻冷棕染发约80元",
+      "claim": "使用施华蔻芬郁金醇棕染膏，免漂直染冷棕色，整体花费80元，属于显白的韩系发色，无需漂发。",
+      "quote": "花了八十刚染的冷棕（没漂）",
+      "source_id": "src_1wjnelf",
+      "applicability": [],
+      "confidence": "low",
+      "review_status": "safety_review_required",
+      "usable_for": [
+        "user_language",
+        "case_lead",
+        "hypothesis"
+      ],
+      "prohibited_uses": [
+        "medical_conclusion",
+        "universal_safety_rule",
+        "automatic_formula"
+      ]
+    },
+    {
+      "id": "ev_7vq6uv",
+      "evidence_type": "community_claim",
+      "category": "底色匹配",
+      "summary": "冷棕色免漂可显白",
+      "claim": "施华蔻芬郁金醇棕属于免漂染发色，黑发底直接染也能出冷棕调，适合追求韩系显白发色的用户。",
+      "quote": "花了八十刚染的冷棕（没漂）#免漂 #显白发色 #韩系发色",
+      "source_id": "src_1wjnelf",
+      "applicability": [],
+      "confidence": "low",
+      "review_status": "needs_review",
+      "usable_for": [
+        "user_language",
+        "case_lead",
+        "hypothesis"
+      ],
+      "prohibited_uses": [
+        "universal_rule",
+        "automatic_formula"
+      ]
+    },
+    {
+      "id": "ev_5dpr68",
+      "evidence_type": "community_claim",
+      "category": "操作技巧",
+      "summary": "首次漂发30-40分钟",
+      "claim": "自然发质第一次漂发建议时长30-40分钟，最好不要超过一小时。连续漂两次的话，可把漂发膏刮掉再来一次，或者间隔两三天再漂一次，第二种方法对头发损伤更小。",
+      "quote": "正常没漂过的自然发质的话第一次漂的时间可以在30-40分钟左右，最好不要超过一个小时，要是连续漂两次的话可以把漂发膏直接刮掉再来一次，也可以到时间直接洗掉后两三天后再漂一次，第二种方法对头发损伤小一点",
+      "source_id": "src_fnwvy3",
+      "applicability": [],
+      "confidence": "low",
+      "review_status": "safety_review_required",
+      "usable_for": [
+        "user_language",
+        "case_lead",
+        "hypothesis"
+      ],
+      "prohibited_uses": [
+        "medical_conclusion",
+        "universal_safety_rule",
+        "automatic_formula"
+      ]
+    },
+    {
+      "id": "ev_yrqd6c",
+      "evidence_type": "community_claim",
+      "category": "避坑警告",
+      "summary": "漂发超时易断棉",
+      "claim": "漂发膏不能一直敷直到颜色达到预期，超过一定时间（一小时以上）头发会出现棉化、断裂风险，需要严格控制时间。",
+      "quote": "漂发膏是要一直敷到等到发色变成想要的颜色之后洗掉，还是说多久之内必须洗掉否则头发会棉会断",
+      "source_id": "src_fnwvy3",
+      "applicability": [],
+      "confidence": "low",
+      "review_status": "safety_review_required",
+      "usable_for": [
+        "user_language",
+        "case_lead",
+        "hypothesis"
+      ],
+      "prohibited_uses": [
+        "medical_conclusion",
+        "universal_safety_rule",
+        "automatic_formula"
+      ]
+    },
+    {
+      "id": "ev_3ic858",
+      "evidence_type": "community_claim",
+      "category": "用户真实反馈",
+      "summary": "H5玫瑰粉棕掉色不黄",
+      "claim": "H5玫瑰粉棕室内呈粉调带冷紫，室外呈粉棕浓郁感，自带精油成分染后头发顺滑，持久度不错，洗多次也不容易明显掉色。",
+      "quote": "室内粉调带一些冷紫调，室外粉棕调更浓郁...这个是自带精油的，染完头发也是顺顺滑滑的，持久能力不错，之前洗了好多次，也没怎么掉色",
+      "source_id": "src_shqebz",
+      "applicability": [],
+      "confidence": "low",
+      "review_status": "needs_review",
+      "usable_for": [
+        "user_language",
+        "case_lead",
+        "hypothesis"
+      ],
+      "prohibited_uses": [
+        "universal_rule",
+        "automatic_formula"
+      ]
+    },
+    {
+      "id": "ev_bq2zvy",
+      "evidence_type": "community_claim",
+      "category": "操作技巧",
+      "summary": "在家染发40分钟搞定",
+      "claim": "H5玫瑰粉棕在家自染全程约40分钟即可完成，操作较为简便，适合自己DIY。",
+      "quote": "自己在家染发全程40分钟就搞定了",
+      "source_id": "src_shqebz",
+      "applicability": [],
+      "confidence": "low",
+      "review_status": "needs_review",
+      "usable_for": [
+        "user_language",
+        "case_lead",
+        "hypothesis"
+      ],
+      "prohibited_uses": [
+        "universal_rule",
+        "automatic_formula"
+      ]
+    },
+    {
+      "id": "ev_12q0iu1",
+      "evidence_type": "community_claim",
+      "category": "操作技巧",
+      "summary": "布丁头可直染浅色",
+      "claim": "即便头发出现严重的分段布丁头（新长出黑色与原染发色差大），也可以通过直染浅发色的方式补救，结果显白效果好，适合淡颜黄皮。",
+      "quote": "这么严重的分段发色...直接染浅发色居然也这么成功耶！浅发色尊嘟太显白啦~完全是我们淡颜黄皮女生的舒适区",
+      "source_id": "src_1ueun8n",
+      "applicability": [],
+      "confidence": "low",
+      "review_status": "needs_review",
+      "usable_for": [
+        "user_language",
+        "case_lead",
+        "hypothesis"
+      ],
+      "prohibited_uses": [
+        "universal_rule",
+        "automatic_formula"
+      ]
+    }
+  ]
+}

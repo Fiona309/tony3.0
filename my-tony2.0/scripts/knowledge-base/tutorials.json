@@ -1,0 +1,95 @@
+{
+  "tutorials": [
+    {
+      "title": "染粉色固色洗发水使用教程",
+      "source_url": "https://www.xiaohongshu.com/explore/697348e7000000002800a3ad?xsec_token=AB3BDRjS12W12lzDs49mDraCzpAv6mSay36_YA_pcxCRA=&xsec_source=pc_search",
+      "author": "",
+      "hair_type": "粉色染后发",
+      "method": "固色洗发水固色",
+      "steps": [
+        {
+          "step": 1,
+          "action": "起泡器中打出泡沫，均匀涂抹在头发上，静置后冲洗",
+          "duration_min": 3
+        },
+        {
+          "step": 2,
+          "action": "第二次涂抹固色洗发水，像平时正常洗头发那样起泡冲洗",
+          "duration_min": 0
+        }
+      ],
+      "products_used": [
+        "首品固色洗发水",
+        "卡洛美固色发膜"
+      ],
+      "tips": [
+        "每次洗头用两遍固色洗发水效果更好",
+        "掉色后用固色发膜补色效果加倍"
+      ],
+      "result_desc": "粉色维持一个半月仍好看"
+    },
+    {
+      "title": "NV紫瓶粉毛固色教程",
+      "source_url": "https://www.xiaohongshu.com/explore/69d785fa000000001a022e4a?xsec_token=ABEfZBTPkmicIqNsnmueE8mXCvE-KRme3p5-W4qzYY7Cs=&xsec_source=pc_search",
+      "author": "",
+      "hair_type": "漂过的白金色底色",
+      "method": "固色发膜上色（泡水法）",
+      "steps": [
+        {
+          "step": 1,
+          "action": "发膜和护发素混合调成想要的深浅度，分层涂抹于头发",
+          "duration_min": 0
+        },
+        {
+          "step": 2,
+          "action": "等待发膜上色",
+          "duration_min": 15
+        },
+        {
+          "step": 3,
+          "action": "紫瓶发膜兑温水泡发",
+          "duration_min": 7
+        },
+        {
+          "step": 4,
+          "action": "用紫瓶洗发水冲洗干净",
+          "duration_min": 0
+        }
+      ],
+      "products_used": [
+        "NV紫瓶固色发膜",
+        "NV紫瓶洗发水",
+        "护发素"
+      ],
+      "tips": [
+        "发膜兑护发素调浓淡，分层涂抹更均匀",
+        "泡水法上色更均匀",
+        "植物固色不伤发质"
+      ],
+      "result_desc": "均匀淡粉色，不毛躁不打结"
+    },
+    {
+      "title": "黑发一次性喷雾使用教程",
+      "source_url": "https://www.xiaohongshu.com/explore/689828840000000023033593?xsec_token=ABWEGLb0ELW1SwS2LrIJyPnUJPHjBR4PBuynvBZbGfKbo=&xsec_source=pc_search",
+      "author": "",
+      "hair_type": "需要临时变黑发（如证件照）",
+      "method": "一次性染发喷雾",
+      "steps": [
+        {
+          "step": 1,
+          "action": "使用一次性黑发喷雾喷涂头发",
+          "duration_min": 0
+        }
+      ],
+      "products_used": [
+        "黑发一次性喷雾"
+      ],
+      "tips": [
+        "手残党也能成功",
+        "适合证件照临时变黑"
+      ],
+      "result_desc": "自然的黑发效果"
+    }
+  ],
+  "updatedAt": "2026-05-23T11:29:24.008Z"
+}

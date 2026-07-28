@@ -1,0 +1,311 @@
+{
+  "schema_version": 3,
+  "facts": [
+    {
+      "id": "fact_wella_color_touch_ratio",
+      "domain": "product_usage",
+      "subject": "Wella Color Touch",
+      "claim": "Color Touch 与 Color Touch Emulsion 的官方调配比例为 1:2。",
+      "structured_value": {
+        "ratio": "1:2",
+        "developer": "Color Touch Emulsion"
+      },
+      "conditions": [
+        "仅限 Wella Color Touch 产品线"
+      ],
+      "source_id": "src_xrxybv",
+      "evidence_type": "official_fact_candidate",
+      "confidence": "high_source_quality",
+      "review_status": "awaiting_schema_and_locale_review",
+      "collected_at": "2026-07-14",
+      "promoted_to_rule_id": null
+    },
+    {
+      "id": "fact_wella_color_touch_time",
+      "domain": "product_usage",
+      "subject": "Wella Color Touch",
+      "claim": "Color Touch 官方技术指南列出的标准作用时间为 20 分钟。",
+      "structured_value": {
+        "processing_minutes": 20
+      },
+      "conditions": [
+        "仅限 Wella Color Touch 产品线",
+        "具体操作仍以当地包装说明为准"
+      ],
+      "source_id": "src_xrxybv",
+      "evidence_type": "official_fact_candidate",
+      "confidence": "high_source_quality",
+      "review_status": "awaiting_schema_and_locale_review",
+      "collected_at": "2026-07-14",
+      "promoted_to_rule_id": null
+    },
+    {
+      "id": "fact_wella_color_touch_emulsion",
+      "domain": "product_usage",
+      "subject": "Wella Color Touch",
+      "claim": "Color Touch 官方指南指定搭配 1.9% 或 4% Color Touch Emulsion。",
+      "structured_value": {
+        "developer_percent_options": [
+          1.9,
+          4
+        ]
+      },
+      "conditions": [
+        "仅限 Wella Color Touch 产品线"
+      ],
+      "source_id": "src_xrxybv",
+      "evidence_type": "official_fact_candidate",
+      "confidence": "high_source_quality",
+      "review_status": "awaiting_schema_and_locale_review",
+      "collected_at": "2026-07-14",
+      "promoted_to_rule_id": null
+    },
+    {
+      "id": "fact_loreal_majirel_ratio",
+      "domain": "product_usage",
+      "subject": "L’Oréal Professionnel Majirel",
+      "claim": "Majirel 常规系列的官方调配比例为 1:1.5。",
+      "structured_value": {
+        "ratio": "1:1.5",
+        "color_oz": 2,
+        "developer_oz": 3
+      },
+      "conditions": [
+        "Majirel、Majirel Cool Inforced、Majirouge 常规系列",
+        "不适用于 Majirel High Lift"
+      ],
+      "source_id": "src_upnoyl",
+      "evidence_type": "official_fact_candidate",
+      "confidence": "high_source_quality",
+      "review_status": "awaiting_schema_and_locale_review",
+      "collected_at": "2026-07-14",
+      "promoted_to_rule_id": null
+    },
+    {
+      "id": "fact_loreal_majirel_time",
+      "domain": "product_usage",
+      "subject": "L’Oréal Professionnel Majirel",
+      "claim": "Majirel 常规系列官方作用时间为 35 分钟。",
+      "structured_value": {
+        "processing_minutes": 35
+      },
+      "conditions": [
+        "常规 Majirel 系列",
+        "不适用于 Majirel High Lift"
+      ],
+      "source_id": "src_upnoyl",
+      "evidence_type": "official_fact_candidate",
+      "confidence": "high_source_quality",
+      "review_status": "awaiting_schema_and_locale_review",
+      "collected_at": "2026-07-14",
+      "promoted_to_rule_id": null
+    },
+    {
+      "id": "fact_loreal_majirel_highlift",
+      "domain": "product_usage",
+      "subject": "L’Oréal Professionnel Majirel High Lift",
+      "claim": "Majirel High Lift 官方调配比例为 1:2，作用时间为 50 分钟。",
+      "structured_value": {
+        "ratio": "1:2",
+        "processing_minutes": 50,
+        "developer_vol_options": [
+          30,
+          40
+        ]
+      },
+      "conditions": [
+        "仅限 Majirel High Lift 或 Majiblond Ultra",
+        "属于专业高提浅产品信息"
+      ],
+      "source_id": "src_upnoyl",
+      "evidence_type": "official_fact_candidate",
+      "confidence": "high_source_quality",
+      "review_status": "awaiting_schema_and_locale_review",
+      "collected_at": "2026-07-14",
+      "promoted_to_rule_id": null
+    },
+    {
+      "id": "fact_loreal_inoa_ratio",
+      "domain": "product_usage",
+      "subject": "L’Oréal Professionnel iNOA",
+      "claim": "iNOA 官方要求与专用 iNOA Oil Developer 按 1:1 调配。",
+      "structured_value": {
+        "ratio": "1:1",
+        "color_g": 60,
+        "developer_g": 60
+      },
+      "conditions": [
+        "仅限 iNOA 与专用 iNOA Oil Developer"
+      ],
+      "source_id": "src_bvwasb",
+      "evidence_type": "official_fact_candidate",
+      "confidence": "high_source_quality",
+      "review_status": "awaiting_schema_and_locale_review",
+      "collected_at": "2026-07-14",
+      "promoted_to_rule_id": null
+    },
+    {
+      "id": "fact_loreal_inoa_time",
+      "domain": "product_usage",
+      "subject": "L’Oréal Professionnel iNOA",
+      "claim": "iNOA 官方技术指南给出的作用时间为 35 分钟。",
+      "structured_value": {
+        "processing_minutes": 35
+      },
+      "conditions": [
+        "仅限 iNOA 产品线"
+      ],
+      "source_id": "src_bvwasb",
+      "evidence_type": "official_fact_candidate",
+      "confidence": "high_source_quality",
+      "review_status": "awaiting_schema_and_locale_review",
+      "collected_at": "2026-07-14",
+      "promoted_to_rule_id": null
+    },
+    {
+      "id": "fact_loreal_inoa_lift",
+      "domain": "product_usage",
+      "subject": "L’Oréal Professionnel iNOA",
+      "claim": "iNOA 官方指南区分 10、20、30 vol：分别用于至多约 1、2、3 级提浅的不同目标。",
+      "structured_value": {
+        "lift_by_developer": [
+          {
+            "vol": 10,
+            "levels_up_to": 1
+          },
+          {
+            "vol": 20,
+            "levels_up_to": 2
+          },
+          {
+            "vol": 30,
+            "levels_up_to": 3
+          }
+        ]
+      },
+      "conditions": [
+        "仅限 iNOA 官方体系",
+        "实际结果受起始底色和发质影响"
+      ],
+      "source_id": "src_bvwasb",
+      "evidence_type": "official_fact_candidate",
+      "confidence": "high_source_quality",
+      "review_status": "awaiting_schema_and_locale_review",
+      "collected_at": "2026-07-14",
+      "promoted_to_rule_id": null
+    },
+    {
+      "id": "fact_color_opposites_neutralize",
+      "domain": "color_theory",
+      "subject": "互补色中和",
+      "claim": "欧莱雅专业色卡说明，色轮上的相对色可相互中和。",
+      "structured_value": {
+        "principle": "opposite_colors_neutralize"
+      },
+      "conditions": [
+        "作为色彩原理使用",
+        "具体用量必须绑定产品线与配方"
+      ],
+      "source_id": "src_4nz7dc",
+      "evidence_type": "official_fact_candidate",
+      "confidence": "high_source_quality",
+      "review_status": "awaiting_schema_and_locale_review",
+      "collected_at": "2026-07-14",
+      "promoted_to_rule_id": null
+    },
+    {
+      "id": "fact_fda_follow_package",
+      "domain": "safety",
+      "subject": "染发剂包装说明",
+      "claim": "FDA 建议严格遵循包装说明，并注意所有警告信息。",
+      "structured_value": {
+        "action": "follow_product_label"
+      },
+      "conditions": [
+        "所有家用染发产品"
+      ],
+      "source_id": "src_1p1cog0",
+      "evidence_type": "official_fact_candidate",
+      "confidence": "high_source_quality",
+      "review_status": "awaiting_schema_and_locale_review",
+      "collected_at": "2026-07-14",
+      "promoted_to_rule_id": null
+    },
+    {
+      "id": "fact_fda_patch_test",
+      "domain": "safety",
+      "subject": "染发前皮肤测试",
+      "claim": "FDA 建议每次染发前都按说明进行皮肤测试；出现皮疹则不要使用该染发剂。",
+      "structured_value": {
+        "action": "patch_test_each_use",
+        "stop_if": "rash"
+      },
+      "conditions": [
+        "遵循具体产品包装规定的测试方法和等待时间"
+      ],
+      "source_id": "src_1p1cog0",
+      "evidence_type": "official_fact_candidate",
+      "confidence": "high_source_quality",
+      "review_status": "awaiting_schema_and_locale_review",
+      "collected_at": "2026-07-14",
+      "promoted_to_rule_id": null
+    },
+    {
+      "id": "fact_fda_processing_time",
+      "domain": "safety",
+      "subject": "染发剂停留时间",
+      "claim": "FDA 提醒不要让染发剂停留超过产品说明规定的时间。",
+      "structured_value": {
+        "action": "do_not_exceed_label_time"
+      },
+      "conditions": [
+        "所有家用染发产品"
+      ],
+      "source_id": "src_1p1cog0",
+      "evidence_type": "official_fact_candidate",
+      "confidence": "high_source_quality",
+      "review_status": "awaiting_schema_and_locale_review",
+      "collected_at": "2026-07-14",
+      "promoted_to_rule_id": null
+    },
+    {
+      "id": "fact_fda_gloves_rinse",
+      "domain": "safety",
+      "subject": "染发操作防护",
+      "claim": "FDA 建议涂抹染发剂时戴手套，并在染后用水充分冲洗头皮。",
+      "structured_value": {
+        "actions": [
+          "wear_gloves",
+          "rinse_scalp_thoroughly"
+        ]
+      },
+      "conditions": [
+        "所有家用染发产品"
+      ],
+      "source_id": "src_1p1cog0",
+      "evidence_type": "official_fact_candidate",
+      "confidence": "high_source_quality",
+      "review_status": "awaiting_schema_and_locale_review",
+      "collected_at": "2026-07-14",
+      "promoted_to_rule_id": null
+    },
+    {
+      "id": "fact_fda_no_mixing_products",
+      "domain": "safety",
+      "subject": "不同染发产品混用",
+      "claim": "FDA 建议不要混合不同的染发产品，以免伤害头发和头皮。",
+      "structured_value": {
+        "prohibited_action": "mix_different_hair_dye_products"
+      },
+      "conditions": [
+        "除非产品制造商的同一体系官方说明明确允许组合"
+      ],
+      "source_id": "src_1p1cog0",
+      "evidence_type": "official_fact_candidate",
+      "confidence": "high_source_quality",
+      "review_status": "awaiting_schema_and_locale_review",
+      "collected_at": "2026-07-14",
+      "promoted_to_rule_id": null
+    }
+  ]
+}

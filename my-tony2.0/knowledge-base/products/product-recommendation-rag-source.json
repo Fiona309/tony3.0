@@ -1,0 +1,3476 @@
+{
+  "schema_version": "1.0",
+  "captured_at": "2026-07-26T01:18:00+08:00",
+  "currency": "CNY",
+  "source_platform": "douyin_mall",
+  "ingestion_rule": {
+    "collection": "product_recommendation",
+    "parent_record_type": "product_master",
+    "child_record_type": "color_variant",
+    "split_instruction": "每个 products[] 生成一条 product_master；每个 colors[] 生成一条 color_variant，并通过 parent_product_id 关联。检索先召回 color_variant，再回查 product_master。",
+    "price_rule": "regular_price 为截图中未使用优惠券、会员折扣、App专享、直播满减或新人优惠前的原价/售价；所有 discount_prices_ignored 仅作审计，不参与推荐预算。",
+    "missing_rule": "页面没有公开的信息使用 null、空数组或 not_disclosed，禁止由模型补成商品事实。"
+  },
+  "quantity_policies": [
+    {
+      "id": "official_colorlomo_180ml_dry",
+      "scope": "仅卡洛美180ml固色发膜干发补色",
+      "source_type": "merchant_detail",
+      "purchase_quantity_by_hair_length": {
+        "齐耳短发": 1,
+        "齐肩发": 2,
+        "齐胸中长发": 3,
+        "齐腰长发": 3,
+        "腰部以下超长发": 4
+      },
+      "notes": "官方原图给出齐耳短发1支、齐肩中发1–1.5支、过肩长发2–3支；购买数量向上取整。齐腰及超长发为MVP兜底值，不属于官方事实。"
+    },
+    {
+      "id": "official_okcs_box_count",
+      "scope": "仅OKCS盒装染发膏",
+      "source_type": "merchant_detail",
+      "purchase_quantity_by_hair_length": {
+        "齐耳短发": 1,
+        "齐肩发": 1,
+        "齐胸中长发": 1,
+        "齐腰长发": 2,
+        "腰部以下超长发": 2
+      },
+      "notes": "官方图显示短发、齐肩中发、齐胸长发各1盒，齐腰发2盒；发量多且浓密、发质粗硬时多备1盒。"
+    },
+    {
+      "id": "mvp_dye_kit_fallback",
+      "scope": "没有公开用量的盒装染发膏或泡泡染",
+      "source_type": "mvp_fallback_not_product_fact",
+      "purchase_quantity_by_hair_length": {
+        "齐耳短发": 1,
+        "齐肩发": 1,
+        "齐胸中长发": 2,
+        "齐腰长发": 2,
+        "腰部以下超长发": 3
+      },
+      "notes": "仅用于黑客松计算兜底。前端必须标注“按通用用量估算”，不得包装成品牌官方建议。发量多时加1盒。"
+    },
+    {
+      "id": "mvp_color_care_one_unit",
+      "scope": "固色洗发水、固色发膜、护色套装的首次购买",
+      "source_type": "mvp_fallback_not_product_fact",
+      "purchase_quantity_by_hair_length": {
+        "齐耳短发": 1,
+        "齐肩发": 1,
+        "齐胸中长发": 1,
+        "齐腰长发": 1,
+        "腰部以下超长发": 1
+      },
+      "notes": "固色护理品按整瓶购买，发长影响单次用量和使用次数，但通常不应把首次购买数量机械放大。"
+    },
+    {
+      "id": "official_kao_bubble_box_count",
+      "scope": "仅花王Liese泡泡染",
+      "source_type": "merchant_detail",
+      "purchase_quantity_by_hair_length": {
+        "齐耳短发": 1,
+        "齐肩发": 2,
+        "齐胸中长发": 3,
+        "齐腰长发": 3,
+        "腰部以下超长发": 3
+      },
+      "notes": "官方详情图给出短发1盒、中发2盒、长发3盒。齐腰及超长发按“长发3盒”映射；发量很大时应额外预留，不把推测写成官方精确值。"
+    },
+    {
+      "id": "official_schwarzkopf_cream_box_count",
+      "scope": "仅施华蔻斐丝丽黑发直染染发霜",
+      "source_type": "merchant_detail",
+      "purchase_quantity_by_hair_length": {
+        "齐耳短发": 1,
+        "齐肩发": 2,
+        "齐胸中长发": 3,
+        "齐腰长发": 3,
+        "腰部以下超长发": 3
+      },
+      "notes": "官方详情图给出头发及耳1盒、及肩2盒、过肩3盒。齐胸及更长统一映射到“过肩3盒”，超长或发量大应另行提醒多备。"
+    },
+    {
+      "id": "official_schwarzkopf_bubble_box_count",
+      "scope": "仅施华蔻斐丝丽泡泡染",
+      "source_type": "merchant_detail",
+      "purchase_quantity_by_hair_length": {
+        "齐耳短发": 1,
+        "齐肩发": 2,
+        "齐胸中长发": 3,
+        "齐腰长发": 3,
+        "腰部以下超长发": 3
+      },
+      "notes": "官方详情图给出头发及耳1盒、及肩2盒、过肩3盒及以上，并建议可多加1盒补染。超长发返回3盒时必须同时展示“3盒及以上”。"
+    }
+  ],
+  "products": [
+    {
+      "product_id": "douyin_3761010079294423154",
+      "brand_name": "UYEE",
+      "brand_aliases": [
+        "uyee"
+      ],
+      "product_name": "UYEE固色洗发水锁色补色护发素发膜染后护发氨基酸温和延长发色",
+      "product_type": "color_deposit_care_set",
+      "shop_name": "UYEE海外旗舰店",
+      "douyin_url": "https://v.douyin.com/IhlMUBH_IQo/",
+      "product_image_url": "https://p3-item.ecombdimg.com/img/ecom-shop-material/jpeg_m_dc8c41a9846dbd14f2ad6b417f016e45_sx_476527_www800-800~tplv-5mmsx3fupr-image.png",
+      "listing_price": {
+        "min": 85,
+        "max": 89,
+        "scope": "regular_original_price_range",
+        "basis": "regular_price_before_discount"
+      },
+      "sales_count": 1146,
+      "capacity_text": "详情图展示固色洗发水280ml＋固色护发素200ml套装；下单SKU需再次确认",
+      "quantity_policy_id": "mvp_color_care_one_unit",
+      "official_params": {
+        "applicable_hair": "各类发质",
+        "functions": [
+          "染后护色",
+          "补色",
+          "护发"
+        ],
+        "special_use_cosmetic": false
+      },
+      "merchant_claims": [
+        "清洁、护色、护发三效合一",
+        "详情图展示无硫酸盐配方",
+        "详情图展示水解蛋白和多种氨基酸"
+      ],
+      "known_risks": [
+        "具体颜色、套装组合和价格对应关系未在公开网页中展开",
+        "不同底色显色不同"
+      ],
+      "colors": [
+        {
+          "color_name": "红色",
+          "color_family": "red",
+          "aliases": [],
+          "levels": [
+            5,
+            6,
+            7,
+            8,
+            9
+          ],
+          "level_status": "effect_chart_visible",
+          "product_image_path": "/product-assets/color-variants/douyin_3761010079294423154/01-红色.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/01-uyee/002-NfA1bj8fqo52TdxuS9hcJs3jnJf.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3761010079294423154/01-红色.jpg"
+        },
+        {
+          "color_name": "粉色",
+          "color_family": "pink",
+          "aliases": [],
+          "levels": [
+            5,
+            6,
+            7,
+            8,
+            9
+          ],
+          "level_status": "effect_chart_visible",
+          "product_image_path": "/product-assets/color-variants/douyin_3761010079294423154/02-粉色.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/01-uyee/002-NfA1bj8fqo52TdxuS9hcJs3jnJf.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3761010079294423154/02-粉色.jpg"
+        },
+        {
+          "color_name": "蓝色",
+          "color_family": "blue",
+          "aliases": [
+            "深蓝",
+            "宝蓝"
+          ],
+          "levels": [
+            5,
+            6,
+            7,
+            8,
+            9
+          ],
+          "level_status": "effect_chart_visible",
+          "product_image_path": "/product-assets/color-variants/douyin_3761010079294423154/03-蓝色.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/01-uyee/004-R1trbmwENoFRnRxCdtHcB2X3n9d.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3761010079294423154/03-蓝色.jpg"
+        },
+        {
+          "color_name": "紫色",
+          "color_family": "purple",
+          "aliases": [],
+          "levels": [
+            5,
+            6,
+            7,
+            8,
+            9
+          ],
+          "level_status": "effect_chart_visible",
+          "product_image_path": "/product-assets/color-variants/douyin_3761010079294423154/04-紫色.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/01-uyee/006-KZPHbYCAOoX5Wzxl3DYcpu31nqd.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3761010079294423154/04-紫色.jpg"
+        },
+        {
+          "color_name": "灰色",
+          "color_family": "gray",
+          "aliases": [
+            "ASH",
+            "灰"
+          ],
+          "levels": [
+            5,
+            6,
+            7,
+            8,
+            9
+          ],
+          "level_status": "effect_chart_visible",
+          "product_image_path": "/product-assets/color-variants/douyin_3761010079294423154/05-灰色.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/01-uyee/005-K44uboDZSoVvFAxpZgccKnMin7b.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3761010079294423154/05-灰色.jpg"
+        }
+      ],
+      "discount_prices_ignored": [
+        "抖音商城App专享¥79"
+      ],
+      "source_screenshots": [
+        "knowledge-base/products/source-assets/01-uyee/001-P4r1b4adkot0xfxNyIFcer7SnUf.jpg",
+        "knowledge-base/products/source-assets/01-uyee/002-NfA1bj8fqo52TdxuS9hcJs3jnJf.jpg",
+        "knowledge-base/products/source-assets/01-uyee/003-LloxbPtTco968axibQncNaewntb.jpg",
+        "knowledge-base/products/source-assets/01-uyee/004-R1trbmwENoFRnRxCdtHcB2X3n9d.jpg",
+        "knowledge-base/products/source-assets/01-uyee/005-K44uboDZSoVvFAxpZgccKnMin7b.jpg",
+        "knowledge-base/products/source-assets/01-uyee/006-KZPHbYCAOoX5Wzxl3DYcpu31nqd.jpg",
+        "knowledge-base/products/source-assets/01-uyee/007-IqnabciIOoq2kixv1o9cbYTNnEh.jpg",
+        "knowledge-base/products/source-assets/01-uyee/008-JpV7bYnMoo3Ujgx3Isjc5OWJnUe.jpg",
+        "knowledge-base/products/source-assets/01-uyee/009-HrwYbQJmkottA6xUafOcdkDuneg.jpg",
+        "knowledge-base/products/source-assets/01-uyee/010-VbT2brixHo2hejxzyD8cGcNYnBo.jpg",
+        "knowledge-base/products/source-assets/01-uyee/011-KoTlbEX2ZolmSOxyegdc6eYln4R.jpg",
+        "knowledge-base/products/source-assets/01-uyee/012-SkWobiGPJo9cecxnrhlcasZin4b.jpg"
+      ],
+      "product_image_path": "/product-assets/product-masters/douyin_3761010079294423154.jpg",
+      "product_image_source_screenshot": "knowledge-base/products/source-assets/01-uyee/001-P4r1b4adkot0xfxNyIFcer7SnUf.jpg",
+      "usage_guide": {
+        "text": "00；使用方法；16/18；—日常护理—；STEP 1；清洁：使用固色洗发水清洁；头发。；STEP 2；护色：如已开始轻微掉色，；可以使用固色护发素涂抹均；匀发丝，停留5分钟，并用；清水冲洗干净。；—掉色护理—；STEP1；补色：干发状态下使用固色；拒发素，均匀涂抹发丝并停；留10分钟。；STEP 2；清洁锁色：清水冲洗干净后；使用固色洗发水清洁头发，；冲洗干净后吹干即可。；建议染后48h使用洗发水进行头发清洁。",
+        "image_paths": [
+          "/product-assets/usage/douyin_3761010079294423154/01.jpg"
+        ],
+        "source_screenshots": [
+          "knowledge-base/products/source-assets/01-uyee/010-VbT2brixHo2hejxzyD8cGcNYnBo.jpg"
+        ]
+      },
+      "product_image_library_path": "knowledge-base/products/derived-assets/product-masters/douyin_3761010079294423154.jpg"
+    },
+    {
+      "product_id": "douyin_3798662807734583533",
+      "brand_name": "LITI/俪缇",
+      "brand_aliases": [
+        "LITI",
+        "俪缇"
+      ],
+      "product_name": "LITI/俪缇固色洗发水灰棕色奶茶色浅棕色补色护色锁色持久不掉黄",
+      "product_type": "color_deposit_shampoo",
+      "shop_name": "俪缇LITI洗护清洁旗舰店",
+      "douyin_url": "https://v.douyin.com/peBAovguRYA/",
+      "product_image_url": "https://p26-item.ecombdimg.com/img/ecom-shop-material/jpeg_m_22a2973d8f0fd9d111ab28b344a0da34_sx_248134_www1080-1080~tplv-5mmsx3fupr-image.png",
+      "listing_price": {
+        "min": 44,
+        "max": 44,
+        "scope": "regular_original_price",
+        "basis": "regular_price_before_discount"
+      },
+      "sales_count": 510,
+      "capacity_text": null,
+      "quantity_policy_id": "mvp_color_care_one_unit",
+      "official_params": {
+        "applicable_season": "各季通用"
+      },
+      "merchant_claims": [
+        "补色",
+        "护色",
+        "锁色",
+        "不易掉黄"
+      ],
+      "known_risks": [
+        "容量和各色SKU价格未在公开网页中确认",
+        "底色适用范围未公开"
+      ],
+      "colors": [
+        {
+          "color_name": "灰棕色",
+          "color_family": "gray_brown",
+          "aliases": [
+            "灰棕"
+          ],
+          "levels": [],
+          "level_status": "not_disclosed",
+          "product_image_path": "/product-assets/color-variants/douyin_3798662807734583533/01-灰棕色.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/02-俪缇/001-M8mBbFtloocYDvxUnYPcWMH5nMh.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3798662807734583533/01-灰棕色.jpg"
+        },
+        {
+          "color_name": "奶茶色",
+          "color_family": "brown",
+          "aliases": [
+            "奶茶棕"
+          ],
+          "levels": [],
+          "level_status": "not_disclosed",
+          "product_image_path": "/product-assets/color-variants/douyin_3798662807734583533/02-奶茶色.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/02-俪缇/001-M8mBbFtloocYDvxUnYPcWMH5nMh.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3798662807734583533/02-奶茶色.jpg"
+        },
+        {
+          "color_name": "浅棕色",
+          "color_family": "brown",
+          "aliases": [
+            "浅棕"
+          ],
+          "levels": [],
+          "level_status": "not_disclosed",
+          "product_image_path": "/product-assets/color-variants/douyin_3798662807734583533/03-浅棕色.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/02-俪缇/001-M8mBbFtloocYDvxUnYPcWMH5nMh.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3798662807734583533/03-浅棕色.jpg"
+        }
+      ],
+      "discount_prices_ignored": [
+        "券后价¥36",
+        "抖音商城App专享¥30"
+      ],
+      "source_screenshots": [
+        "knowledge-base/products/source-assets/02-俪缇/001-M8mBbFtloocYDvxUnYPcWMH5nMh.jpg",
+        "knowledge-base/products/source-assets/02-俪缇/002-MTMpb7TKIohyWZx5t3qccFHknuh.jpg",
+        "knowledge-base/products/source-assets/02-俪缇/003-DPS1bmj3hos22CxQR1WcBSaonid.jpg",
+        "knowledge-base/products/source-assets/02-俪缇/004-G37rbQ5DmoN6uaxPjTbcXHvunUc.jpg",
+        "knowledge-base/products/source-assets/02-俪缇/005-ZCAMbphVgoLSMcx0BpRcivzKnPf.jpg",
+        "knowledge-base/products/source-assets/02-俪缇/006-GgBUblwN5oiZtbx81yLcqVf5n2c.jpg",
+        "knowledge-base/products/source-assets/02-俪缇/007-Yw5fbEFQ2o5MpqxAsTTcy6SUnhd.jpg",
+        "knowledge-base/products/source-assets/02-俪缇/008-IawyblF33ogXjex5LhFcXJEQnHd.jpg",
+        "knowledge-base/products/source-assets/02-俪缇/009-AuBFbKTbOow7ddx0oRAc2t8pn2c.jpg",
+        "knowledge-base/products/source-assets/02-俪缇/010-QKU3b8xvnouQLqxpxAocSbJinTd.jpg",
+        "knowledge-base/products/source-assets/02-俪缇/011-Sno1bT837omERwxjsSQcI8e4ngc.jpg",
+        "knowledge-base/products/source-assets/02-俪缇/012-OwbObThN7oQGYfxSR1TcFmlEnCe.jpg"
+      ],
+      "product_image_path": "/product-assets/product-masters/douyin_3798662807734583533.jpg",
+      "product_image_source_screenshot": "knowledge-base/products/source-assets/02-俪缇/001-M8mBbFtloocYDvxUnYPcWMH5nMh.jpg",
+      "usage_guide": {
+        "text": "00:54；<；Q；俪缇固色洗发水；5G；只；65；•••；详情；Liti Color Protection Shampoo；++0%；简单好执行；3步在家做出沙龙发色；每周使用2-3次发色更持久鲜艳；STEP1；用温水淋湿头发，擦；干水分取适量洗发水至；手掌加水揉搓出现泡沫；STEP2；揉搓均匀出现丰富；泡沫后用指腹轻柔；按摩头发；进店逛逛〉；STEP3；按摩3-5分钟用温水洗；干净即可；〔注意；使用浅请做皮肤敏感测试：取少许涂抹涂抹于耳后做皮肤过敏测试；确定四十八小时内无红肿、瘙痒等任何过敏现象方可使用产品；B；145人正在看；进店；券后价¥36；领券购买",
+        "image_paths": [
+          "/product-assets/usage/douyin_3798662807734583533/01.jpg"
+        ],
+        "source_screenshots": [
+          "knowledge-base/products/source-assets/02-俪缇/010-QKU3b8xvnouQLqxpxAocSbJinTd.jpg"
+        ]
+      },
+      "product_image_library_path": "knowledge-base/products/derived-assets/product-masters/douyin_3798662807734583533.jpg"
+    },
+    {
+      "product_id": "douyin_3704045569417806103",
+      "brand_name": "Schwarzkopf/施华蔻",
+      "brand_aliases": [
+        "Schwarzkopf",
+        "施华蔻"
+      ],
+      "product_name": "施华蔻固色洗发水发膜护理锁色固色护发素洗头水",
+      "product_type": "color_protect_care",
+      "shop_name": "Tumei海外专营店",
+      "douyin_url": "https://v.douyin.com/GFVYoTYIEdE/",
+      "product_image_url": "https://p3-item.ecombdimg.com/img/ecom-shop-material/jpeg_m_5189ae22b33367b2d9e0a70996cce1ea_sx_348928_www800-800~tplv-5mmsx3fupr-image.png",
+      "listing_price": {
+        "min": 99,
+        "max": 99,
+        "scope": "regular_original_price",
+        "basis": "regular_price_before_discount"
+      },
+      "sales_count": 4523,
+      "capacity_text": null,
+      "quantity_policy_id": "mvp_color_care_one_unit",
+      "official_params": {
+        "applicable_hair": "普通发质",
+        "functions": [
+          "染后护色",
+          "锁色"
+        ]
+      },
+      "merchant_claims": [
+        "染后护理",
+        "护色锁色"
+      ],
+      "known_risks": [
+        "已从商品图录入蓝、粉、红、紫、灰和去黄方向，但具体网红色名、底色度数和容量仍待确认",
+        "属于固色护色商品，不应与永久染发膏混合推荐"
+      ],
+      "colors": [
+        {
+          "color_name": "蓝色",
+          "color_family": "blue",
+          "aliases": [],
+          "levels": [],
+          "level_status": "visible_in_source_screenshot",
+          "product_image_path": "/product-assets/color-variants/douyin_3704045569417806103/01-蓝色.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/03-施华蔻固色/001-WU2vbpKohovrOzxixZucJJJrnye.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3704045569417806103/01-蓝色.jpg"
+        },
+        {
+          "color_name": "粉色",
+          "color_family": "pink",
+          "aliases": [],
+          "levels": [],
+          "level_status": "visible_in_source_screenshot",
+          "product_image_path": "/product-assets/color-variants/douyin_3704045569417806103/02-粉色.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/03-施华蔻固色/003-BTulb71qrouBcaxYaefcJiyOnTd.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3704045569417806103/02-粉色.jpg"
+        },
+        {
+          "color_name": "红色",
+          "color_family": "red",
+          "aliases": [],
+          "levels": [],
+          "level_status": "visible_in_source_screenshot",
+          "product_image_path": "/product-assets/color-variants/douyin_3704045569417806103/03-红色.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/03-施华蔻固色/003-BTulb71qrouBcaxYaefcJiyOnTd.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3704045569417806103/03-红色.jpg"
+        },
+        {
+          "color_name": "紫色",
+          "color_family": "purple",
+          "aliases": [],
+          "levels": [],
+          "level_status": "visible_in_source_screenshot",
+          "product_image_path": "/product-assets/color-variants/douyin_3704045569417806103/04-紫色.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/03-施华蔻固色/005-JQXMbx7M5o4XM7xeyLectOnGnqh.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3704045569417806103/04-紫色.jpg"
+        },
+        {
+          "color_name": "灰色",
+          "color_family": "gray",
+          "aliases": [],
+          "levels": [],
+          "level_status": "visible_in_source_screenshot",
+          "product_image_path": "/product-assets/color-variants/douyin_3704045569417806103/05-灰色.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/03-施华蔻固色/002-QoKTbQClho8C1Vx4krAcTp76nPc.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3704045569417806103/05-灰色.jpg"
+        },
+        {
+          "color_name": "去黄色",
+          "color_family": "yellow",
+          "aliases": [],
+          "levels": [],
+          "level_status": "visible_in_source_screenshot",
+          "product_image_path": "/product-assets/color-variants/douyin_3704045569417806103/06-去黄色.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/03-施华蔻固色/001-WU2vbpKohovrOzxixZucJJJrnye.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3704045569417806103/06-去黄色.jpg"
+        }
+      ],
+      "discount_prices_ignored": [
+        "页面成交价¥58",
+        "抖音商城App专享¥52"
+      ],
+      "source_screenshots": [
+        "knowledge-base/products/source-assets/03-施华蔻固色/001-WU2vbpKohovrOzxixZucJJJrnye.jpg",
+        "knowledge-base/products/source-assets/03-施华蔻固色/002-QoKTbQClho8C1Vx4krAcTp76nPc.jpg",
+        "knowledge-base/products/source-assets/03-施华蔻固色/003-BTulb71qrouBcaxYaefcJiyOnTd.jpg",
+        "knowledge-base/products/source-assets/03-施华蔻固色/004-ViwwbcsMBo7NRHxpjRQcZr4anNh.jpg",
+        "knowledge-base/products/source-assets/03-施华蔻固色/005-JQXMbx7M5o4XM7xeyLectOnGnqh.jpg",
+        "knowledge-base/products/source-assets/03-施华蔻固色/006-ZAwpbJmgWoQZ9TxbQKjcgekPnOf.jpg",
+        "knowledge-base/products/source-assets/03-施华蔻固色/007-VXYIbgHJfovCVxxRKxtcRX8Dn8f.jpg",
+        "knowledge-base/products/source-assets/03-施华蔻固色/008-HL4Bbsekqo5i17x4WOJc6eKUn7g.jpg",
+        "knowledge-base/products/source-assets/03-施华蔻固色/009-BkdfbqRBqoDVcYxpz26cQcIenFd.jpg"
+      ],
+      "product_image_path": "/product-assets/product-masters/douyin_3704045569417806103.jpg",
+      "product_image_source_screenshot": "knowledge-base/products/source-assets/03-施华蔻固色/001-WU2vbpKohovrOzxixZucJJJrnye.jpg",
+      "usage_guide": {
+        "text": "00:55；65；×；25/25；使用方法；方法一：适合染后日常护理；① 第一步 清洁；将头发浸湿后，取；适量洗发水，用起；泡器或者浴球打出；泡泡，将泡沫快速；均匀涂满全头，全；方位清洁后冲洗干；净。；① 第二步护色；发丝清洁完毕后，；略微控干水分，取；适量发膜，均匀涂；满发丝。；① 第三步 固色；发膜涂抹均匀后，；浅色调保留5-10分；钟，深色调保留；10-15分钟，洗净；发丝即可。；方法二：适合掉色需要增强补色；① 第一步；干发状态下均匀涂；抹发膜；② 第二步；停留15分钟以上（；也配使用加热帽）；③ 第三步；冲洗头发，使用固；色洗发水清洁头发；，清洁后可按方法；一再使用一次发膜；。；温馨提示：洗发水可以清洁头发，减少掉色，发膜能滋养和补色，头发颜色较；浅者，可每洗2-3次头发用一次发膜，漂染过的发色更容易补色，使用时请务必；均匀涂抹，有挑染处注意避开，发膜会有轻微染手，介意者可戴手套，使用时；注意避开头皮",
+        "image_paths": [
+          "/product-assets/usage/douyin_3704045569417806103/01.jpg"
+        ],
+        "source_screenshots": [
+          "knowledge-base/products/source-assets/03-施华蔻固色/008-HL4Bbsekqo5i17x4WOJc6eKUn7g.jpg"
+        ]
+      },
+      "product_image_library_path": "knowledge-base/products/derived-assets/product-masters/douyin_3704045569417806103.jpg"
+    },
+    {
+      "product_id": "douyin_3806625202599756215",
+      "brand_name": "RENATA蕾娜塔",
+      "brand_aliases": [
+        "RENATA",
+        "蕾娜塔"
+      ],
+      "product_name": "RENATA蕾娜塔固色洗发水锁色护专用洗头水补色灰色粉色奶茶色去黄",
+      "product_type": "color_deposit_shampoo",
+      "shop_name": "RENATA蕾娜塔个人护理海外旗舰店",
+      "douyin_url": "https://v.douyin.com/AGMdcQrCNQY/",
+      "product_image_url": "https://p26-item.ecombdimg.com/img/ecom-shop-material/jpeg_m_47d73a0dc6ebc2c85db26089b042a40c_sx_441877_www1000-1000~tplv-5mmsx3fupr-image.png",
+      "listing_price": {
+        "min": 89,
+        "max": 89,
+        "scope": "regular_original_price",
+        "basis": "regular_price_before_discount"
+      },
+      "sales_count": 1178,
+      "capacity_text": "250ml",
+      "quantity_policy_id": "mvp_color_care_one_unit",
+      "official_params": {
+        "applicable_hair": "普通发质",
+        "functions": [
+          "染后护色"
+        ],
+        "special_use_cosmetic": false
+      },
+      "merchant_claims": [
+        "洗护同时补色",
+        "详情图建议有色产品停留10–20分钟"
+      ],
+      "known_risks": [
+        "“延长120天”等属于商家营销口径，不作为系统承诺",
+        "部分16色色名在公开图中字号过小，当前只录入清晰可辨认项"
+      ],
+      "colors": [
+        {
+          "color_name": "粉红泡泡",
+          "color_family": "pink",
+          "aliases": [
+            "MELLOW ROSE",
+            "粉色"
+          ],
+          "levels": [],
+          "level_status": "not_disclosed",
+          "product_image_path": "/product-assets/color-variants/douyin_3806625202599756215/01-粉红泡泡.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/04-蕾纳塔/001-F4LpbOsMuoeAXLxxImUcyTQPnVd.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3806625202599756215/01-粉红泡泡.jpg"
+        },
+        {
+          "color_name": "青椒橄榄",
+          "color_family": "green",
+          "aliases": [
+            "GREEN",
+            "橄榄绿"
+          ],
+          "levels": [],
+          "level_status": "not_disclosed",
+          "product_image_path": "/product-assets/color-variants/douyin_3806625202599756215/02-青椒橄榄.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/04-蕾纳塔/003-Btv6b53DVormqhxnNnycEN0lnFc.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3806625202599756215/02-青椒橄榄.jpg"
+        },
+        {
+          "color_name": "高雅宝蓝",
+          "color_family": "blue",
+          "aliases": [
+            "BLUE",
+            "宝蓝"
+          ],
+          "levels": [],
+          "level_status": "not_disclosed",
+          "product_image_path": "/product-assets/color-variants/douyin_3806625202599756215/03-高雅宝蓝.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/04-蕾纳塔/004-RBg7bUof1oKk2Zxqk66ctdHbnZj.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3806625202599756215/03-高雅宝蓝.jpg"
+        },
+        {
+          "color_name": "灰紫桔梗",
+          "color_family": "purple",
+          "aliases": [
+            "FOG",
+            "灰紫"
+          ],
+          "levels": [],
+          "level_status": "not_disclosed",
+          "product_image_path": "/product-assets/color-variants/douyin_3806625202599756215/04-灰紫桔梗.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/04-蕾纳塔/002-PCwPbSut7orpt6xNeOjcEqi8nAd.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3806625202599756215/04-灰紫桔梗.jpg"
+        },
+        {
+          "color_name": "净白雾光",
+          "color_family": "gray",
+          "aliases": [
+            "CORRECTIVE COLOR",
+            "去黄"
+          ],
+          "levels": [],
+          "level_status": "not_disclosed",
+          "product_image_path": "/product-assets/color-variants/douyin_3806625202599756215/05-净白雾光.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/04-蕾纳塔/001-F4LpbOsMuoeAXLxxImUcyTQPnVd.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3806625202599756215/05-净白雾光.jpg"
+        },
+        {
+          "color_name": "玫瑰酒红",
+          "color_family": "red",
+          "aliases": [
+            "RED",
+            "酒红"
+          ],
+          "levels": [],
+          "level_status": "not_disclosed",
+          "product_image_path": "/product-assets/color-variants/douyin_3806625202599756215/06-玫瑰酒红.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/04-蕾纳塔/005-EfMTbWlLnoTfn8xMw3scdU8fnfe.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3806625202599756215/06-玫瑰酒红.jpg"
+        },
+        {
+          "color_name": "魅惑紫罗",
+          "color_family": "purple",
+          "aliases": [
+            "VIOLET",
+            "紫罗兰"
+          ],
+          "levels": [],
+          "level_status": "not_disclosed",
+          "product_image_path": "/product-assets/color-variants/douyin_3806625202599756215/07-魅惑紫罗.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/04-蕾纳塔/006-CW3LbXwBsoEAphxjrZSceR3cnpb.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3806625202599756215/07-魅惑紫罗.jpg"
+        },
+        {
+          "color_name": "蜜糖甜橘",
+          "color_family": "orange",
+          "aliases": [
+            "ORANGE",
+            "橘色"
+          ],
+          "levels": [],
+          "level_status": "not_disclosed",
+          "product_image_path": "/product-assets/color-variants/douyin_3806625202599756215/08-蜜糖甜橘.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/04-蕾纳塔/003-Btv6b53DVormqhxnNnycEN0lnFc.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3806625202599756215/08-蜜糖甜橘.jpg"
+        },
+        {
+          "color_name": "醇浓咖啡",
+          "color_family": "brown",
+          "aliases": [
+            "THICK BROWN",
+            "咖啡棕"
+          ],
+          "levels": [],
+          "level_status": "not_disclosed",
+          "product_image_path": "/product-assets/color-variants/douyin_3806625202599756215/09-醇浓咖啡.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/04-蕾纳塔/002-PCwPbSut7orpt6xNeOjcEqi8nAd.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3806625202599756215/09-醇浓咖啡.jpg"
+        }
+      ],
+      "discount_prices_ignored": [
+        "页面成交价¥79",
+        "抖音商城App专享¥73"
+      ],
+      "source_screenshots": [
+        "knowledge-base/products/source-assets/04-蕾纳塔/001-F4LpbOsMuoeAXLxxImUcyTQPnVd.jpg",
+        "knowledge-base/products/source-assets/04-蕾纳塔/002-PCwPbSut7orpt6xNeOjcEqi8nAd.jpg",
+        "knowledge-base/products/source-assets/04-蕾纳塔/003-Btv6b53DVormqhxnNnycEN0lnFc.jpg",
+        "knowledge-base/products/source-assets/04-蕾纳塔/004-RBg7bUof1oKk2Zxqk66ctdHbnZj.jpg",
+        "knowledge-base/products/source-assets/04-蕾纳塔/005-EfMTbWlLnoTfn8xMw3scdU8fnfe.jpg",
+        "knowledge-base/products/source-assets/04-蕾纳塔/006-CW3LbXwBsoEAphxjrZSceR3cnpb.jpg",
+        "knowledge-base/products/source-assets/04-蕾纳塔/007-O6fObbhnXosDdCxtj06crXfxnRC.jpg",
+        "knowledge-base/products/source-assets/04-蕾纳塔/008-ZSYobF6c1oTId8xciZxcqwJZnJG.jpg",
+        "knowledge-base/products/source-assets/04-蕾纳塔/009-VaMybLp00oefyTxvLhRcXNqlnsh.jpg",
+        "knowledge-base/products/source-assets/04-蕾纳塔/010-BgsVbq7L1oAAX6xL8Uoc59SEnHh.jpg",
+        "knowledge-base/products/source-assets/04-蕾纳塔/011-A9Bxb5MAdosOSPxqdaBcuP3dnQd.jpg",
+        "knowledge-base/products/source-assets/04-蕾纳塔/012-Pukobc2KroM1kKxyqdBc4PAhn2c.jpg",
+        "knowledge-base/products/source-assets/04-蕾纳塔/013-Je2ybvTzooQoFDxRJwecBa0jnBe.jpg"
+      ],
+      "product_image_path": "/product-assets/product-masters/douyin_3806625202599756215.jpg",
+      "product_image_source_screenshot": "knowledge-base/products/source-assets/04-蕾纳塔/001-F4LpbOsMuoeAXLxxImUcyTQPnVd.jpg",
+      "usage_guide": {
+        "text": "00:57；×；分*；64；18/19；使用方法-和洗发水相同；1.用温水打湿头发；2.取适量洗发水；揉搓起泡；3.将泡沫均匀地涂抹在；发丝上，以打圈的方式；用指腹按摩；4.按摩片刻后，；冲洗干净；用量TIPS：；短发；一次2泵，可根据发量调节用量；长发；一次3-4泵，可根据发量调节用量",
+        "image_paths": [
+          "/product-assets/usage/douyin_3806625202599756215/01.jpg"
+        ],
+        "source_screenshots": [
+          "knowledge-base/products/source-assets/04-蕾纳塔/011-A9Bxb5MAdosOSPxqdaBcuP3dnQd.jpg"
+        ]
+      },
+      "product_image_library_path": "knowledge-base/products/derived-assets/product-masters/douyin_3806625202599756215.jpg"
+    },
+    {
+      "product_id": "douyin_3801276422086066263",
+      "brand_name": "TOCU探色",
+      "brand_aliases": [
+        "TOCU",
+        "探色"
+      ],
+      "product_name": "TOCU探色染发剂免漂焦糖咖啡在家染持久固色流行推荐显白染发膏",
+      "product_type": "hair_dye_cream",
+      "shop_name": "TOCU探色官方旗舰店",
+      "douyin_url": "https://v.douyin.com/ify_irz0ZSY/",
+      "product_image_url": "https://p26-item.ecombdimg.com/img/ecom-shop-material/png_m_5f7cd87345bf86bbacdb2d70db2f088b_sx_184412_www800-800~tplv-5mmsx3fupr-image.png",
+      "listing_price": {
+        "min": 49.9,
+        "max": 119.9,
+        "scope": "regular_original_price_range",
+        "basis": "regular_price_before_discount"
+      },
+      "sales_count": 142,
+      "capacity_text": null,
+      "quantity_policy_id": "mvp_dye_kit_fallback",
+      "official_params": {
+        "applicable_people": "成人",
+        "not_applicable": [
+          "孕妇",
+          "婴幼儿",
+          "哺乳期"
+        ],
+        "applicable_season": "各季"
+      },
+      "merchant_claims": [
+        "免漂潮色",
+        "详情图展示5种植物提取物",
+        "商家宣称低氨、低碱"
+      ],
+      "known_risks": [
+        "不同色号与套装对应价格未公开",
+        "用量采用MVP通用估算，不是品牌官方建议"
+      ],
+      "colors": [
+        {
+          "color_name": "焦糖咖啡",
+          "color_family": "brown",
+          "aliases": [
+            "焦糖棕",
+            "咖啡棕"
+          ],
+          "levels": [
+            6
+          ],
+          "level_status": "some_cards_show_level_6",
+          "product_image_path": "/product-assets/color-variants/douyin_3801276422086066263/01-焦糖咖啡.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/05-探色/001-HltMbKAR7oRtGxx3fH3cnsOXnrb.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3801276422086066263/01-焦糖咖啡.jpg"
+        },
+        {
+          "color_name": "茶褐栗棕",
+          "color_family": "brown",
+          "aliases": [
+            "栗棕"
+          ],
+          "levels": [
+            6
+          ],
+          "level_status": "some_cards_show_level_6",
+          "product_image_path": "/product-assets/color-variants/douyin_3801276422086066263/02-茶褐栗棕.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/05-探色/002-FnRvbyAvKoZT4lxZRLccQMZBncr.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3801276422086066263/02-茶褐栗棕.jpg"
+        },
+        {
+          "color_name": "浆果梅红",
+          "color_family": "red",
+          "aliases": [
+            "梅红",
+            "浆果红"
+          ],
+          "levels": [
+            6
+          ],
+          "level_status": "some_cards_show_level_6",
+          "product_image_path": "/product-assets/color-variants/douyin_3801276422086066263/03-浆果梅红.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/05-探色/002-FnRvbyAvKoZT4lxZRLccQMZBncr.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3801276422086066263/03-浆果梅红.jpg"
+        },
+        {
+          "color_name": "海王红",
+          "color_family": "red",
+          "aliases": [
+            "红色"
+          ],
+          "levels": [
+            6
+          ],
+          "level_status": "some_cards_show_level_6",
+          "product_image_path": "/product-assets/color-variants/douyin_3801276422086066263/04-海王红.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/05-探色/002-FnRvbyAvKoZT4lxZRLccQMZBncr.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3801276422086066263/04-海王红.jpg"
+        },
+        {
+          "color_name": "黑加仑紫",
+          "color_family": "purple",
+          "aliases": [
+            "紫色"
+          ],
+          "levels": [
+            6
+          ],
+          "level_status": "some_cards_show_level_6",
+          "product_image_path": "/product-assets/color-variants/douyin_3801276422086066263/05-黑加仑紫.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/05-探色/002-FnRvbyAvKoZT4lxZRLccQMZBncr.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3801276422086066263/05-黑加仑紫.jpg"
+        },
+        {
+          "color_name": "雾感青棕",
+          "color_family": "green",
+          "aliases": [
+            "青棕"
+          ],
+          "levels": [
+            6
+          ],
+          "level_status": "some_cards_show_level_6",
+          "product_image_path": "/product-assets/color-variants/douyin_3801276422086066263/06-雾感青棕.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/05-探色/002-FnRvbyAvKoZT4lxZRLccQMZBncr.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3801276422086066263/06-雾感青棕.jpg"
+        },
+        {
+          "color_name": "奶茶冷棕",
+          "color_family": "brown",
+          "aliases": [
+            "奶茶棕"
+          ],
+          "levels": [
+            6
+          ],
+          "level_status": "some_cards_show_level_6",
+          "product_image_path": "/product-assets/color-variants/douyin_3801276422086066263/07-奶茶冷棕.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/05-探色/002-FnRvbyAvKoZT4lxZRLccQMZBncr.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3801276422086066263/07-奶茶冷棕.jpg"
+        },
+        {
+          "color_name": "星耀蓝黑",
+          "color_family": "blue",
+          "aliases": [
+            "蓝黑",
+            "蓝色"
+          ],
+          "levels": [
+            6
+          ],
+          "level_status": "some_cards_show_level_6",
+          "product_image_path": "/product-assets/color-variants/douyin_3801276422086066263/08-星耀蓝黑.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/05-探色/002-FnRvbyAvKoZT4lxZRLccQMZBncr.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3801276422086066263/08-星耀蓝黑.jpg"
+        },
+        {
+          "color_name": "珍珠炫黑",
+          "color_family": "black",
+          "aliases": [
+            "黑色"
+          ],
+          "levels": [
+            6
+          ],
+          "level_status": "some_cards_show_level_6",
+          "product_image_path": "/product-assets/color-variants/douyin_3801276422086066263/09-珍珠炫黑.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/05-探色/002-FnRvbyAvKoZT4lxZRLccQMZBncr.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3801276422086066263/09-珍珠炫黑.jpg"
+        },
+        {
+          "color_name": "莫兰黑茶",
+          "color_family": "brown",
+          "aliases": [
+            "黑茶色"
+          ],
+          "levels": [
+            6
+          ],
+          "level_status": "some_cards_show_level_6",
+          "product_image_path": "/product-assets/color-variants/douyin_3801276422086066263/10-莫兰黑茶.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/05-探色/002-FnRvbyAvKoZT4lxZRLccQMZBncr.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3801276422086066263/10-莫兰黑茶.jpg"
+        },
+        {
+          "color_name": "可可深棕",
+          "color_family": "brown",
+          "aliases": [
+            "可可棕"
+          ],
+          "levels": [
+            6
+          ],
+          "level_status": "some_cards_show_level_6",
+          "product_image_path": "/product-assets/color-variants/douyin_3801276422086066263/11-可可深棕.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/05-探色/002-FnRvbyAvKoZT4lxZRLccQMZBncr.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3801276422086066263/11-可可深棕.jpg"
+        },
+        {
+          "color_name": "玫瑰粉棕",
+          "color_family": "pink",
+          "aliases": [
+            "粉棕"
+          ],
+          "levels": [
+            6
+          ],
+          "level_status": "some_cards_show_level_6",
+          "product_image_path": "/product-assets/color-variants/douyin_3801276422086066263/12-玫瑰粉棕.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/05-探色/002-FnRvbyAvKoZT4lxZRLccQMZBncr.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3801276422086066263/12-玫瑰粉棕.jpg"
+        }
+      ],
+      "discount_prices_ignored": [
+        "抖音商城App专享¥43.9"
+      ],
+      "source_screenshots": [
+        "knowledge-base/products/source-assets/05-探色/001-HltMbKAR7oRtGxx3fH3cnsOXnrb.jpg",
+        "knowledge-base/products/source-assets/05-探色/002-FnRvbyAvKoZT4lxZRLccQMZBncr.jpg",
+        "knowledge-base/products/source-assets/05-探色/003-CUePbg6H2ohpQ0xl0Eqc68Zonfc.jpg",
+        "knowledge-base/products/source-assets/05-探色/004-Vo0IbTNfIoTRXnxLcXncEx0unDa.jpg",
+        "knowledge-base/products/source-assets/05-探色/005-TI0MbVbXQoU5UAx4lCVcMWlzngd.jpg",
+        "knowledge-base/products/source-assets/05-探色/006-VLpZbnHDZoCJdHxcI3zcPIGrnad.jpg",
+        "knowledge-base/products/source-assets/05-探色/007-CnnMbZNCcolsohxrAdScxG1Xnto.jpg",
+        "knowledge-base/products/source-assets/05-探色/008-KhB4bQ817oezmfx1jKncGIv1nig.jpg",
+        "knowledge-base/products/source-assets/05-探色/009-TjE4b6v37ogmydxyM8WctsUOnjg.jpg",
+        "knowledge-base/products/source-assets/05-探色/010-HmAcb1Yrco6QkVxeH1BcYCcknSd.jpg",
+        "knowledge-base/products/source-assets/05-探色/011-XvkgblSWSoFulrxvkBAcScG7nKd.jpg",
+        "knowledge-base/products/source-assets/05-探色/012-RhkUbJNHgoZu5Gx5RSKcgF2xnkb.jpg",
+        "knowledge-base/products/source-assets/05-探色/013-Vit3bEPitoycitxndQ7cz1synmd.jpg",
+        "knowledge-base/products/source-assets/05-探色/014-LKsvbUTPuoOQo1xPZbhc2yFPnVf.jpg",
+        "knowledge-base/products/source-assets/05-探色/015-Ch7Obzmu6oM0AqxVThwcW3VanAb.jpg"
+      ],
+      "product_image_path": "/product-assets/product-masters/douyin_3801276422086066263.jpg",
+      "product_image_source_screenshot": "knowledge-base/products/source-assets/05-探色/001-HltMbKAR7oRtGxx3fH3cnsOXnrb.jpg",
+      "usage_guide": {
+        "text": "00:58；分*；64；×；22/33；［染前须知］；Step 1.确认头发色度；3；5；10；Step 2.确认发量；短发；（小盒）；齐肩短发；（大盒）；齐胸长发；（大盒小盒）；齐腰长发；（大盒大盒）",
+        "image_paths": [
+          "/product-assets/usage/douyin_3801276422086066263/01.jpg"
+        ],
+        "source_screenshots": [
+          "knowledge-base/products/source-assets/05-探色/011-XvkgblSWSoFulrxvkBAcScG7nKd.jpg"
+        ]
+      },
+      "product_image_library_path": "knowledge-base/products/derived-assets/product-masters/douyin_3801276422086066263.jpg"
+    },
+    {
+      "product_id": "douyin_3776220798440833130",
+      "brand_name": "花王Liese莉婕",
+      "brand_aliases": [
+        "花王",
+        "Liese",
+        "莉婕"
+      ],
+      "product_name": "花王染发膏免漂显白抗黄许妍同款泡泡染发",
+      "product_type": "hair_dye_bubble",
+      "shop_name": "花王Liese莉婕坤江个人护理专卖店",
+      "douyin_url": "https://v.douyin.com/zN2XnSqXw-A/",
+      "product_image_url": "https://p3-item.ecombdimg.com/img/ecom-shop-material/jpeg_m_1b53a5d871437058c631c936aa7bb890_sx_427281_www800-800~tplv-5mmsx3fupr-image.png",
+      "listing_price": {
+        "min": 33.8,
+        "max": 138,
+        "scope": "regular_original_price_range",
+        "basis": "regular_price_before_discount"
+      },
+      "sales_count": 4728,
+      "capacity_text": null,
+      "quantity_policy_id": "official_kao_bubble_box_count",
+      "official_params": {
+        "applicable_people": "成人",
+        "applicable_season": "各季",
+        "registration": "国妆特进字20241063"
+      },
+      "merchant_claims": [
+        "免漂显白",
+        "抗黄",
+        "许妍同款"
+      ],
+      "known_risks": [
+        "已从商品图录入18个色号，但页面价格是多规格区间，尚不能把某个色号绑定到精确单价",
+        "官方用量已按短发1盒、中发2盒、长发3盒录入；发量很大时需要额外预留"
+      ],
+      "colors": [
+        {
+          "color_name": "雾霾棕",
+          "color_family": "gray_brown",
+          "aliases": [],
+          "levels": [],
+          "level_status": "visible_in_source_screenshot",
+          "product_image_path": "/product-assets/color-variants/douyin_3776220798440833130/01-雾霾棕.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/06-花王/002-C0F4b5TnNoEhHux283rcK4XJn4e.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3776220798440833130/01-雾霾棕.jpg"
+        },
+        {
+          "color_name": "鎏金可可",
+          "color_family": "brown",
+          "aliases": [],
+          "levels": [],
+          "level_status": "visible_in_source_screenshot",
+          "product_image_path": "/product-assets/color-variants/douyin_3776220798440833130/02-鎏金可可.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/06-花王/002-C0F4b5TnNoEhHux283rcK4XJn4e.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3776220798440833130/02-鎏金可可.jpg"
+        },
+        {
+          "color_name": "普罗旺斯玫瑰棕",
+          "color_family": "pink",
+          "aliases": [],
+          "levels": [],
+          "level_status": "visible_in_source_screenshot",
+          "product_image_path": "/product-assets/color-variants/douyin_3776220798440833130/03-普罗旺斯玫瑰棕.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/06-花王/014-UhVjblOtUo1KMbxQNK6cW7YknMd.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3776220798440833130/03-普罗旺斯玫瑰棕.jpg"
+        },
+        {
+          "color_name": "米兰烟灰",
+          "color_family": "gray_brown",
+          "aliases": [],
+          "levels": [],
+          "level_status": "visible_in_source_screenshot",
+          "product_image_path": "/product-assets/color-variants/douyin_3776220798440833130/04-米兰烟灰.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/06-花王/001-Bv7kbZL6VorXZYxBJKFcmxXonNe.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3776220798440833130/04-米兰烟灰.jpg"
+        },
+        {
+          "color_name": "维也纳醇棕",
+          "color_family": "brown",
+          "aliases": [],
+          "levels": [],
+          "level_status": "visible_in_source_screenshot",
+          "product_image_path": "/product-assets/color-variants/douyin_3776220798440833130/05-维也纳醇棕.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/06-花王/003-XZJ6bAbNboF1tnxSnTGcYGJFnRc.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3776220798440833130/05-维也纳醇棕.jpg"
+        },
+        {
+          "color_name": "赫尔辛基雾霾棕",
+          "color_family": "gray_brown",
+          "aliases": [],
+          "levels": [],
+          "level_status": "visible_in_source_screenshot",
+          "product_image_path": "/product-assets/color-variants/douyin_3776220798440833130/06-赫尔辛基雾霾棕.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/06-花王/004-RGqpbtAIuonNKFx4dpRccGDsnac.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3776220798440833130/06-赫尔辛基雾霾棕.jpg"
+        },
+        {
+          "color_name": "哈瓦那烟蓝",
+          "color_family": "blue",
+          "aliases": [],
+          "levels": [],
+          "level_status": "visible_in_source_screenshot",
+          "product_image_path": "/product-assets/color-variants/douyin_3776220798440833130/07-哈瓦那烟蓝.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/06-花王/006-VBBKbuyB0oq31HxIOoDcvpF4ngg.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3776220798440833130/07-哈瓦那烟蓝.jpg"
+        },
+        {
+          "color_name": "巴黎青灰",
+          "color_family": "green",
+          "aliases": [],
+          "levels": [],
+          "level_status": "visible_in_source_screenshot",
+          "product_image_path": "/product-assets/color-variants/douyin_3776220798440833130/08-巴黎青灰.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/06-花王/007-C3oLbQAgfoGRbAxTTqqcHC8vnYe.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3776220798440833130/08-巴黎青灰.jpg"
+        },
+        {
+          "color_name": "琥珀闪棕",
+          "color_family": "brown",
+          "aliases": [],
+          "levels": [],
+          "level_status": "visible_in_source_screenshot",
+          "product_image_path": "/product-assets/color-variants/douyin_3776220798440833130/09-琥珀闪棕.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/06-花王/008-EBdcbwrQXoA0s6xscpBcxJIEneb.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3776220798440833130/09-琥珀闪棕.jpg"
+        },
+        {
+          "color_name": "英国灰咖",
+          "color_family": "gray_brown",
+          "aliases": [],
+          "levels": [],
+          "level_status": "visible_in_source_screenshot",
+          "product_image_path": "/product-assets/color-variants/douyin_3776220798440833130/10-英国灰咖.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/06-花王/009-ZlKjbwMjNoTRmsxtSH2cejgnn8c.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3776220798440833130/10-英国灰咖.jpg"
+        },
+        {
+          "color_name": "璀璨翡绿",
+          "color_family": "green",
+          "aliases": [],
+          "levels": [],
+          "level_status": "visible_in_source_screenshot",
+          "product_image_path": "/product-assets/color-variants/douyin_3776220798440833130/11-璀璨翡绿.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/06-花王/010-IbAtbSxtto4XKMx6brKcSxtRnTf.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3776220798440833130/11-璀璨翡绿.jpg"
+        },
+        {
+          "color_name": "柏林闷青",
+          "color_family": "green",
+          "aliases": [],
+          "levels": [],
+          "level_status": "visible_in_source_screenshot",
+          "product_image_path": "/product-assets/color-variants/douyin_3776220798440833130/12-柏林闷青.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/06-花王/011-LQOpbL5XQoX3aHxe98PcwBRDnZb.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3776220798440833130/12-柏林闷青.jpg"
+        },
+        {
+          "color_name": "罗马暖棕",
+          "color_family": "brown",
+          "aliases": [],
+          "levels": [],
+          "level_status": "visible_in_source_screenshot",
+          "product_image_path": "/product-assets/color-variants/douyin_3776220798440833130/13-罗马暖棕.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/06-花王/012-Is0pbFdXgo2041x2Pv2cJ4nlnab.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3776220798440833130/13-罗马暖棕.jpg"
+        },
+        {
+          "color_name": "星光玫瑰",
+          "color_family": "pink",
+          "aliases": [],
+          "levels": [],
+          "level_status": "visible_in_source_screenshot",
+          "product_image_path": "/product-assets/color-variants/douyin_3776220798440833130/14-星光玫瑰.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/06-花王/013-Xe87bnBu1oDG2Hxqvx2c8QVWnRc.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3776220798440833130/14-星光玫瑰.jpg"
+        },
+        {
+          "color_name": "晶石透粉",
+          "color_family": "pink",
+          "aliases": [],
+          "levels": [],
+          "level_status": "visible_in_source_screenshot",
+          "product_image_path": "/product-assets/color-variants/douyin_3776220798440833130/15-晶石透粉.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/06-花王/014-UhVjblOtUo1KMbxQNK6cW7YknMd.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3776220798440833130/15-晶石透粉.jpg"
+        },
+        {
+          "color_name": "纽约灰棕",
+          "color_family": "gray_brown",
+          "aliases": [],
+          "levels": [],
+          "level_status": "visible_in_source_screenshot",
+          "product_image_path": "/product-assets/color-variants/douyin_3776220798440833130/16-纽约灰棕.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/06-花王/014-UhVjblOtUo1KMbxQNK6cW7YknMd.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3776220798440833130/16-纽约灰棕.jpg"
+        },
+        {
+          "color_name": "自然棕",
+          "color_family": "brown",
+          "aliases": [],
+          "levels": [],
+          "level_status": "visible_in_source_screenshot",
+          "product_image_path": "/product-assets/color-variants/douyin_3776220798440833130/17-自然棕.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/06-花王/017-VGSFbiuMnoEAR5xkf3Pc6UnInYf.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3776220798440833130/17-自然棕.jpg"
+        },
+        {
+          "color_name": "冷感烟灰",
+          "color_family": "gray_brown",
+          "aliases": [],
+          "levels": [],
+          "level_status": "visible_in_source_screenshot",
+          "product_image_path": "/product-assets/color-variants/douyin_3776220798440833130/18-冷感烟灰.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/06-花王/017-VGSFbiuMnoEAR5xkf3Pc6UnInYf.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3776220798440833130/18-冷感烟灰.jpg"
+        }
+      ],
+      "discount_prices_ignored": [
+        "抖音商城App专享¥27.8",
+        "会员立减"
+      ],
+      "source_screenshots": [
+        "knowledge-base/products/source-assets/06-花王/001-Bv7kbZL6VorXZYxBJKFcmxXonNe.jpg",
+        "knowledge-base/products/source-assets/06-花王/002-C0F4b5TnNoEhHux283rcK4XJn4e.jpg",
+        "knowledge-base/products/source-assets/06-花王/003-XZJ6bAbNboF1tnxSnTGcYGJFnRc.jpg",
+        "knowledge-base/products/source-assets/06-花王/004-RGqpbtAIuonNKFx4dpRccGDsnac.jpg",
+        "knowledge-base/products/source-assets/06-花王/005-Xg5sbCFPuoMNMuxuxOzc7xKGn9e.jpg",
+        "knowledge-base/products/source-assets/06-花王/006-VBBKbuyB0oq31HxIOoDcvpF4ngg.jpg",
+        "knowledge-base/products/source-assets/06-花王/007-C3oLbQAgfoGRbAxTTqqcHC8vnYe.jpg",
+        "knowledge-base/products/source-assets/06-花王/008-EBdcbwrQXoA0s6xscpBcxJIEneb.jpg",
+        "knowledge-base/products/source-assets/06-花王/009-ZlKjbwMjNoTRmsxtSH2cejgnn8c.jpg",
+        "knowledge-base/products/source-assets/06-花王/010-IbAtbSxtto4XKMx6brKcSxtRnTf.jpg",
+        "knowledge-base/products/source-assets/06-花王/011-LQOpbL5XQoX3aHxe98PcwBRDnZb.jpg",
+        "knowledge-base/products/source-assets/06-花王/012-Is0pbFdXgo2041x2Pv2cJ4nlnab.jpg",
+        "knowledge-base/products/source-assets/06-花王/013-Xe87bnBu1oDG2Hxqvx2c8QVWnRc.jpg",
+        "knowledge-base/products/source-assets/06-花王/014-UhVjblOtUo1KMbxQNK6cW7YknMd.jpg",
+        "knowledge-base/products/source-assets/06-花王/015-IXM3bQxeIo4WKhx9KPdcgGkZnVL.jpg",
+        "knowledge-base/products/source-assets/06-花王/016-GrVqb1Ot0oOfoaxmzTIcVgLYnZd.jpg",
+        "knowledge-base/products/source-assets/06-花王/017-VGSFbiuMnoEAR5xkf3Pc6UnInYf.jpg",
+        "knowledge-base/products/source-assets/06-花王/018-EUpQbSqsVoKq2kxl0tGcEBwMn4b.jpg",
+        "knowledge-base/products/source-assets/06-花王/019-UAXdbLJ3hoQtpjxakdicYLS6nlh.jpg"
+      ],
+      "product_image_path": "/product-assets/product-masters/douyin_3776220798440833130.jpg",
+      "product_image_source_screenshot": "knowledge-base/products/source-assets/06-花王/001-Bv7kbZL6VorXZYxBJKFcmxXonNe.jpg",
+      "usage_guide": {
+        "text": "01:00；×；分*；63；42/47；简单4步 边洗边染；5次；STEP 1；将1液加人2液后进行混合；倒立 还原；不要剧烈摇晃；STEP 3；在干燥的头发上涂满泡沫；为防止头发打结；请随意的用手指轻轻揉搓；泡沫变成奶霜状！涂满至发梢，静置时泡沫不易滴落，与头发贴合在一起；STEP 2；挤压容器，挤出泡沫；直立容器按中央部；请务必带上手套；花王莿牌，；桑后护发椅华紊；STEP 4；静置20分钟；用清水洗净，之后再使用洗；发水和附带的精华素完成；整个流程。泡沫（混合液）；注意不要流人眼睛。；用量建议；短发 盒；中发2盒；长发3盒；*图片为示意图，会有泡沫和液体的颜色与实际不同的情况\n01:00；<；Q 日本花王泡沫染发剂；只；认真阅读使用说明；63；•••；① 将1液加人2液后进行混合。；倒立 还原 不要剧烈摇晃；② 挤压容器，挤出泡沫。；直立容器按中央部 请务必带上手套；③ 在干燥的头发上涂满泡沫，为防止头发打结，请随意；的用手指轻轻揉搓。；泡沫变成奶霜状！涂满至发梢；静置时泡沫不会滴落，与头发贴合在一起；更多视频〉；④ 静置 20分钟后，用清水洗净，之后再使用洗发水和附带的；精华素完成整个流程。图片为示意图。会有泡沫；和液体的颜色与实际不同的情况。；泡沫（混合液），冲洗液请注意不要流入眼睛。；附带 染发护发精华素；用于染发后的秀发，护理受损的头发表面。；为防止爆顶，请勿直接按压泡沫于头顶！；染发爆顶为发根偏色（通常偏淡），这是由于头皮温度较高，；会更容易上色，导致发色不均匀；特别提醒！；注意：超时染发或者使用浴霸等可能造成爆顶。；进店逛逛〉；个；⑤ 染发前可以在耳朵、发鬓、脖子等易染到的位置涂上；107人正在看 或者乳液，如不小心染到这些部位，以便清洗。；时力心取过敏测试。；加入店铺会员，本单可再减3元；进店；去领优惠 X；¥33.8",
+        "image_paths": [
+          "/product-assets/usage/douyin_3776220798440833130/01.jpg",
+          "/product-assets/usage/douyin_3776220798440833130/02.jpg"
+        ],
+        "source_screenshots": [
+          "knowledge-base/products/source-assets/06-花王/015-IXM3bQxeIo4WKhx9KPdcgGkZnVL.jpg",
+          "knowledge-base/products/source-assets/06-花王/016-GrVqb1Ot0oOfoaxmzTIcVgLYnZd.jpg"
+        ]
+      },
+      "product_image_library_path": "knowledge-base/products/derived-assets/product-masters/douyin_3776220798440833130.jpg"
+    },
+    {
+      "product_id": "douyin_3573258288193747022",
+      "brand_name": "L'ORÉAL欧莱雅",
+      "brand_aliases": [
+        "L'ORÉAL",
+        "欧莱雅"
+      ],
+      "product_name": "欧莱雅法式烫染炫色染发霜持久染发剂",
+      "product_type": "hair_dye_cream",
+      "shop_name": "欧莱雅官方旗舰店",
+      "douyin_url": "https://v.douyin.com/GsVA-bNxr_A/",
+      "product_image_url": "https://p26-item.ecombdimg.com/img/ecom-shop-material/png_m_30537ee255bd24d99ec574b6e2dba3fd_sx_793386_www800-800~tplv-5mmsx3fupr-image.png",
+      "listing_price": {
+        "min": 65,
+        "max": 65,
+        "scope": "regular_original_price",
+        "basis": "regular_price_before_discount"
+      },
+      "sales_count": 13056,
+      "capacity_text": null,
+      "quantity_policy_id": "mvp_dye_kit_fallback",
+      "official_params": {
+        "product_line": "卓韵霜时尚染发霜",
+        "registration": "国妆特字G20212002",
+        "special_use_cosmetic": true
+      },
+      "merchant_claims": [
+        "详情图宣称染后8周不易显黄",
+        "4.11与4.21展示2、4、8、12周色彩变化"
+      ],
+      "known_risks": [
+        "用量采用MVP通用估算，不是品牌官方建议",
+        "色号效果会随洗发逐步变化"
+      ],
+      "colors": [
+        {
+          "color_name": "7.35太空烟青",
+          "color_family": "green",
+          "aliases": [
+            "太空烟青",
+            "青色"
+          ],
+          "levels": [
+            7
+          ],
+          "level_status": "shade_code_prefix",
+          "product_image_path": "/product-assets/color-variants/douyin_3573258288193747022/01-7.35太空烟青.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/07-欧莱雅/002-I1Pdb64D1omBGxx0MfjcruKTnOj.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3573258288193747022/01-7.35太空烟青.jpg"
+        },
+        {
+          "color_name": "6.13榛果冷茶",
+          "color_family": "brown",
+          "aliases": [
+            "榛果冷茶",
+            "冷茶棕"
+          ],
+          "levels": [
+            6
+          ],
+          "level_status": "shade_code_prefix",
+          "product_image_path": "/product-assets/color-variants/douyin_3573258288193747022/02-6.13榛果冷茶.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/07-欧莱雅/001-Vbggb7nsLo5MbBxAL0GcZa3VnKd.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3573258288193747022/02-6.13榛果冷茶.jpg"
+        },
+        {
+          "color_name": "6.73薄荷青棕",
+          "color_family": "green",
+          "aliases": [
+            "薄荷青棕",
+            "青棕"
+          ],
+          "levels": [
+            6
+          ],
+          "level_status": "shade_code_prefix",
+          "product_image_path": "/product-assets/color-variants/douyin_3573258288193747022/03-6.73薄荷青棕.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/07-欧莱雅/002-I1Pdb64D1omBGxx0MfjcruKTnOj.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3573258288193747022/03-6.73薄荷青棕.jpg"
+        },
+        {
+          "color_name": "6.41焦糖暖棕",
+          "color_family": "brown",
+          "aliases": [
+            "焦糖暖棕",
+            "暖棕"
+          ],
+          "levels": [
+            6
+          ],
+          "level_status": "shade_code_prefix",
+          "product_image_path": "/product-assets/color-variants/douyin_3573258288193747022/04-6.41焦糖暖棕.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/07-欧莱雅/002-I1Pdb64D1omBGxx0MfjcruKTnOj.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3573258288193747022/04-6.41焦糖暖棕.jpg"
+        },
+        {
+          "color_name": "6.17橄榄茶棕",
+          "color_family": "green",
+          "aliases": [
+            "橄榄茶棕",
+            "橄榄棕"
+          ],
+          "levels": [
+            6
+          ],
+          "level_status": "shade_code_prefix",
+          "product_image_path": "/product-assets/color-variants/douyin_3573258288193747022/05-6.17橄榄茶棕.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/07-欧莱雅/002-I1Pdb64D1omBGxx0MfjcruKTnOj.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3573258288193747022/05-6.17橄榄茶棕.jpg"
+        },
+        {
+          "color_name": "5.64朗姆酒红",
+          "color_family": "red",
+          "aliases": [
+            "朗姆酒红",
+            "酒红"
+          ],
+          "levels": [
+            5
+          ],
+          "level_status": "shade_code_prefix",
+          "product_image_path": "/product-assets/color-variants/douyin_3573258288193747022/06-5.64朗姆酒红.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/07-欧莱雅/002-I1Pdb64D1omBGxx0MfjcruKTnOj.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3573258288193747022/06-5.64朗姆酒红.jpg"
+        },
+        {
+          "color_name": "4.11赛博蓝黑",
+          "color_family": "blue",
+          "aliases": [
+            "赛博蓝黑",
+            "蓝黑",
+            "蓝色"
+          ],
+          "levels": [
+            4
+          ],
+          "level_status": "shade_code_prefix",
+          "product_image_path": "/product-assets/color-variants/douyin_3573258288193747022/07-4.11赛博蓝黑.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/07-欧莱雅/002-I1Pdb64D1omBGxx0MfjcruKTnOj.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3573258288193747022/07-4.11赛博蓝黑.jpg"
+        },
+        {
+          "color_name": "4.21朋克烟紫",
+          "color_family": "purple",
+          "aliases": [
+            "朋克烟紫",
+            "烟紫",
+            "紫色"
+          ],
+          "levels": [
+            4
+          ],
+          "level_status": "shade_code_prefix",
+          "product_image_path": "/product-assets/color-variants/douyin_3573258288193747022/08-4.21朋克烟紫.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/07-欧莱雅/002-I1Pdb64D1omBGxx0MfjcruKTnOj.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3573258288193747022/08-4.21朋克烟紫.jpg"
+        }
+      ],
+      "discount_prices_ignored": [
+        "抖音商城App专享¥59"
+      ],
+      "source_screenshots": [
+        "knowledge-base/products/source-assets/07-欧莱雅/001-Vbggb7nsLo5MbBxAL0GcZa3VnKd.jpg",
+        "knowledge-base/products/source-assets/07-欧莱雅/002-I1Pdb64D1omBGxx0MfjcruKTnOj.jpg",
+        "knowledge-base/products/source-assets/07-欧莱雅/003-YuRSbGreVoLZrExjU9qcNlijnSb.jpg",
+        "knowledge-base/products/source-assets/07-欧莱雅/004-WW0ybkFCvo8fjmxAkp5crQ2ondb.jpg",
+        "knowledge-base/products/source-assets/07-欧莱雅/005-FKlCbOgc0omBZCxQQ1LcHQtUnch.jpg",
+        "knowledge-base/products/source-assets/07-欧莱雅/006-WcFIb0hzhorSnOxyIqicLcOWnBg.jpg",
+        "knowledge-base/products/source-assets/07-欧莱雅/007-NJayb80ZXou2cqxmDoscpfYtnHh.jpg",
+        "knowledge-base/products/source-assets/07-欧莱雅/008-Gpajb7obUo8YUTxxgsCcP8Ytnzr.jpg",
+        "knowledge-base/products/source-assets/07-欧莱雅/009-ZLfBbgiqwo1KgSxjP6WcVWUEnmh.jpg",
+        "knowledge-base/products/source-assets/07-欧莱雅/010-MW7cbKEhjoOHB2xBZPPc4Jm0nRe.jpg",
+        "knowledge-base/products/source-assets/07-欧莱雅/011-PSfgb89sEorNhgxdZImcyU0cnnf.jpg",
+        "knowledge-base/products/source-assets/07-欧莱雅/012-WDyUb2MmWoTEcexAnJKcek6HnJf.jpg",
+        "knowledge-base/products/source-assets/07-欧莱雅/013-A7W3bsYzSo8roIxKW0fchpiPnVc.jpg",
+        "knowledge-base/products/source-assets/07-欧莱雅/014-JUPWbOulaoCtfBxRYWvcCcqsnhg.jpg",
+        "knowledge-base/products/source-assets/07-欧莱雅/015-MGCmb7cdLo8xEAx7jIXcIR5unVd.jpg"
+      ],
+      "product_image_path": "/product-assets/product-masters/douyin_3573258288193747022.jpg",
+      "product_image_source_screenshot": "knowledge-base/products/source-assets/07-欧莱雅/001-Vbggb7nsLo5MbBxAL0GcZa3VnKd.jpg",
+      "usage_guide": {
+        "text": "01:02；×；62；16/34；［姿势正确 出色不爆顶］；全头染 涂抹顺序；因颅顶温度比较高，上色更快，为了防止爆顶，建议从下往上分区域染，颜色会更加均匀。；染发区分：后脖子-›头后面一两侧一头顶；处理明显布丁头 或补染发色；STEP1 先涂抹新生黑发，但留出距离发根3cm部分以防止爆顶，等待10-15分钟；STEP2；再涂抹下面以前染过的发尾，以及保留的3cm发根，等待15-20分钟；染前贴心提示；染前48小时进行敏感皮肤测试，用棉签沾取硬币大小染发霜均匀涂抹到耳后，如48小时；内未出现瘙痒红肿等不良反应，则可以安心使用本产品。；3発热點午味来源于会，统主選是帮购头发更舒上色，它具有拜发性，张发后会婆都调酸，\n01:02；美四；ND*；5g1l公；62；18/34；一人搞定 边梳边染很简单；使用方法；STEP1；戴上染发手套和披肩，；避免染膏沾染。；充分摇匀1A和1B两剂，；充分混合。；STEP2；从下至上（发尾到头顶），；均匀涂抹染膏到每束发丝，；停留30分钟。如果发质粗硬，；或者之前染过深色，；建议停留35分钟以上。；STEP3；加少量水分，充分按摩乳化3-5分钟；后，使用温水冲洗干净。再使用2号；锁色洗发露，清洁头皮并即刻护色。；充分涂抹3号润发乳于发丝，轻柔按摩；2-3分钟左右冲洗干净。染发后第三天；可以正常洗护。",
+        "image_paths": [
+          "/product-assets/usage/douyin_3573258288193747022/01.jpg",
+          "/product-assets/usage/douyin_3573258288193747022/02.jpg"
+        ],
+        "source_screenshots": [
+          "knowledge-base/products/source-assets/07-欧莱雅/012-WDyUb2MmWoTEcexAnJKcek6HnJf.jpg",
+          "knowledge-base/products/source-assets/07-欧莱雅/014-JUPWbOulaoCtfBxRYWvcCcqsnhg.jpg"
+        ]
+      },
+      "product_image_library_path": "knowledge-base/products/derived-assets/product-masters/douyin_3573258288193747022.jpg"
+    },
+    {
+      "product_id": "douyin_3612223167361359924",
+      "brand_name": "EiSANSUN E忆丝芸",
+      "brand_aliases": [
+        "忆丝芸",
+        "忆芸丝",
+        "EISANSUN"
+      ],
+      "product_name": "忆丝芸浅茶摩卡精油染发膏琥珀浅棕染发剂冷萃黑咖免漂显白发色女",
+      "product_type": "hair_dye_cream",
+      "shop_name": "忆丝芸官方旗舰店",
+      "douyin_url": "https://v.douyin.com/RQdPRWy_SEU/",
+      "product_image_url": "https://p3-item.ecombdimg.com/img/ecom-shop-material/jpeg_m_5bbba373b3a19ed7a81fd087c57803c1_sx_340505_www1440-1440~tplv-5mmsx3fupr-image.png",
+      "listing_price": {
+        "min": 69.9,
+        "max": 129.9,
+        "scope": "regular_original_price_range",
+        "basis": "regular_price_before_discount"
+      },
+      "sales_count": 990654,
+      "capacity_text": "套装含染发剂1剂、染发剂2剂、精油和染护工具；净含量待确认",
+      "quantity_policy_id": "mvp_dye_kit_fallback",
+      "official_params": {
+        "product_name": "EISANSUN忆丝芸盈彩染发膏D-1",
+        "authorization_visible": true
+      },
+      "merchant_claims": [
+        "玻尿酸精油染发膏",
+        "2026免漂潮流发色",
+        "套装含精油及染护工具"
+      ],
+      "known_risks": [
+        "页面价格为多SKU区间",
+        "用量采用MVP通用估算，不是品牌官方建议",
+        "同一色号在3、6、9度底色上结果差异明显"
+      ],
+      "colors": [
+        {
+          "color_name": "榛果灰棕",
+          "color_family": "gray_brown",
+          "aliases": [
+            "HAZELNUT GRAY BROWN"
+          ],
+          "levels": [
+            3,
+            6,
+            9
+          ],
+          "level_status": "official_effect_chart",
+          "product_image_path": "/product-assets/color-variants/douyin_3612223167361359924/01-榛果灰棕.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/08-忆丝芸/003-XD5Bb0ihbof9JOxOvSMcJL1rnud.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3612223167361359924/01-榛果灰棕.jpg"
+        },
+        {
+          "color_name": "荔枝粉棕",
+          "color_family": "pink",
+          "aliases": [
+            "PINK BROWN"
+          ],
+          "levels": [
+            3,
+            6,
+            9
+          ],
+          "level_status": "official_effect_chart",
+          "product_image_path": "/product-assets/color-variants/douyin_3612223167361359924/02-荔枝粉棕.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/08-忆丝芸/004-C3V0bXrfaoH35bxPF1LcoUHdnSh.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3612223167361359924/02-荔枝粉棕.jpg"
+        },
+        {
+          "color_name": "冷雾黑巧",
+          "color_family": "brown",
+          "aliases": [
+            "LIGHT TEA MOCHA",
+            "黑巧"
+          ],
+          "levels": [
+            3,
+            6,
+            9
+          ],
+          "level_status": "official_effect_chart",
+          "product_image_path": "/product-assets/color-variants/douyin_3612223167361359924/03-冷雾黑巧.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/08-忆丝芸/002-ZKjxbPHIKoA7dUx6KtMcbh2Cnke.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3612223167361359924/03-冷雾黑巧.jpg"
+        },
+        {
+          "color_name": "树莓红",
+          "color_family": "red",
+          "aliases": [
+            "RASPBERRY RED"
+          ],
+          "levels": [
+            3,
+            6,
+            9
+          ],
+          "level_status": "official_effect_chart",
+          "product_image_path": "/product-assets/color-variants/douyin_3612223167361359924/04-树莓红.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/08-忆丝芸/007-S8lVbUvUGoPVgBxPk11cCabEnGk.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3612223167361359924/04-树莓红.jpg"
+        },
+        {
+          "color_name": "橘棕色",
+          "color_family": "orange",
+          "aliases": [
+            "ORANGE BROWN",
+            "枫叶橘棕"
+          ],
+          "levels": [
+            3,
+            6,
+            9
+          ],
+          "level_status": "official_effect_chart",
+          "product_image_path": "/product-assets/color-variants/douyin_3612223167361359924/05-橘棕色.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/08-忆丝芸/008-E9HxbnmNao5YDvxDfVYc1nTWnyg.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3612223167361359924/05-橘棕色.jpg"
+        }
+      ],
+      "discount_prices_ignored": [
+        "实付价¥59.9",
+        "抖音商城App专享¥53.9"
+      ],
+      "source_screenshots": [
+        "knowledge-base/products/source-assets/08-忆丝芸/001-G090bekFkozxOFxMoizcMB8Znvy.jpg",
+        "knowledge-base/products/source-assets/08-忆丝芸/002-ZKjxbPHIKoA7dUx6KtMcbh2Cnke.jpg",
+        "knowledge-base/products/source-assets/08-忆丝芸/003-XD5Bb0ihbof9JOxOvSMcJL1rnud.jpg",
+        "knowledge-base/products/source-assets/08-忆丝芸/004-C3V0bXrfaoH35bxPF1LcoUHdnSh.jpg",
+        "knowledge-base/products/source-assets/08-忆丝芸/005-XQDabNJZ0oUOV2xGX0Xcpu6Anfh.jpg",
+        "knowledge-base/products/source-assets/08-忆丝芸/006-JrSTbddt8ooemrxx61lcRBepnpe.jpg",
+        "knowledge-base/products/source-assets/08-忆丝芸/007-S8lVbUvUGoPVgBxPk11cCabEnGk.jpg",
+        "knowledge-base/products/source-assets/08-忆丝芸/008-E9HxbnmNao5YDvxDfVYc1nTWnyg.jpg",
+        "knowledge-base/products/source-assets/08-忆丝芸/009-TBN5bJFWno56Upx5zOqcsHMdnAc.jpg",
+        "knowledge-base/products/source-assets/08-忆丝芸/010-TqOibR6okoJTOYx1IaOc4pvwnI0.jpg",
+        "knowledge-base/products/source-assets/08-忆丝芸/011-Bs95bGXGAonnFGx3iGEc9kjpnrf.jpg",
+        "knowledge-base/products/source-assets/08-忆丝芸/012-SJfsbDJrrokJzgxkI8Aci62znKh.jpg",
+        "knowledge-base/products/source-assets/08-忆丝芸/013-UsjdbY2m7omIVJxhKsXc8ghvnCd.jpg",
+        "knowledge-base/products/source-assets/08-忆丝芸/014-RJoubn9fIoxN3AxbT6Gc7FzCnEu.jpg",
+        "knowledge-base/products/source-assets/08-忆丝芸/015-QDPBbURoQoGIGnxHrq9caUVMnsf.jpg"
+      ],
+      "product_image_path": "/product-assets/product-masters/douyin_3612223167361359924.jpg",
+      "product_image_source_screenshot": "knowledge-base/products/source-assets/08-忆丝芸/001-G090bekFkozxOFxMoizcMB8Znvy.jpg",
+      "usage_guide": {
+        "text": "",
+        "image_paths": [],
+        "source_screenshots": []
+      },
+      "product_image_library_path": "knowledge-base/products/derived-assets/product-masters/douyin_3612223167361359924.jpg"
+    },
+    {
+      "product_id": "douyin_3746023263504040089",
+      "brand_name": "染鲤",
+      "brand_aliases": [],
+      "product_name": "染鲤精油染发膏染发显白发色在家染发",
+      "product_type": "hair_dye_cream",
+      "shop_name": null,
+      "douyin_url": "https://v.douyin.com/GaET6Ou9hU8/",
+      "product_image_url": "https://p26-item.ecombdimg.com/img/ecom-shop-material/jpeg_m_17feca87f71e2ae9e5b702ff1c6e6d40_sx_820326_www1601-1601~tplv-5mmsx3fupr-image.png",
+      "listing_price": {
+        "min": 54,
+        "max": 114,
+        "scope": "regular_original_price_range",
+        "basis": "regular_price_before_discount"
+      },
+      "sales_count": 93005,
+      "capacity_text": null,
+      "quantity_policy_id": "mvp_dye_kit_fallback",
+      "official_params": {
+        "product_name": "染鲤臻萃染发膏",
+        "applicable_people": "普通人群",
+        "applicable_season": "各季"
+      },
+      "merchant_claims": [
+        "精油染发膏",
+        "在家染发"
+      ],
+      "known_risks": [
+        "已从商品图录入11个色号，但容量、底色度数和色号对应精确价格仍待确认",
+        "用量采用MVP通用估算，不是品牌官方建议"
+      ],
+      "colors": [
+        {
+          "color_name": "烟冷棕",
+          "color_family": "brown",
+          "aliases": [],
+          "levels": [],
+          "level_status": "visible_in_source_screenshot",
+          "product_image_path": "/product-assets/color-variants/douyin_3746023263504040089/01-烟冷棕.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/09-染鲤/002-Q2SAb46u0oGHGuxkXuYcgywznXf.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3746023263504040089/01-烟冷棕.jpg"
+        },
+        {
+          "color_name": "锦鲤红",
+          "color_family": "red",
+          "aliases": [],
+          "levels": [],
+          "level_status": "visible_in_source_screenshot",
+          "product_image_path": "/product-assets/color-variants/douyin_3746023263504040089/02-锦鲤红.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/09-染鲤/002-Q2SAb46u0oGHGuxkXuYcgywznXf.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3746023263504040089/02-锦鲤红.jpg"
+        },
+        {
+          "color_name": "甘橘棕",
+          "color_family": "orange",
+          "aliases": [],
+          "levels": [],
+          "level_status": "visible_in_source_screenshot",
+          "product_image_path": "/product-assets/color-variants/douyin_3746023263504040089/03-甘橘棕.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/09-染鲤/002-Q2SAb46u0oGHGuxkXuYcgywznXf.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3746023263504040089/03-甘橘棕.jpg"
+        },
+        {
+          "color_name": "杏仁棕",
+          "color_family": "brown",
+          "aliases": [],
+          "levels": [],
+          "level_status": "visible_in_source_screenshot",
+          "product_image_path": "/product-assets/color-variants/douyin_3746023263504040089/04-杏仁棕.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/09-染鲤/003-FDZdbLL65o1a2bxcf2hcnJ20nrg.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3746023263504040089/04-杏仁棕.jpg"
+        },
+        {
+          "color_name": "竹绿青",
+          "color_family": "green",
+          "aliases": [],
+          "levels": [],
+          "level_status": "visible_in_source_screenshot",
+          "product_image_path": "/product-assets/color-variants/douyin_3746023263504040089/05-竹绿青.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/09-染鲤/002-Q2SAb46u0oGHGuxkXuYcgywznXf.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3746023263504040089/05-竹绿青.jpg"
+        },
+        {
+          "color_name": "珊瑚橘",
+          "color_family": "orange",
+          "aliases": [],
+          "levels": [],
+          "level_status": "visible_in_source_screenshot",
+          "product_image_path": "/product-assets/color-variants/douyin_3746023263504040089/06-珊瑚橘.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/09-染鲤/005-AmSXbqKaIom8CLxbkT1crEx1nbh.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3746023263504040089/06-珊瑚橘.jpg"
+        },
+        {
+          "color_name": "锦鲤玫粉",
+          "color_family": "pink",
+          "aliases": [],
+          "levels": [],
+          "level_status": "visible_in_source_screenshot",
+          "product_image_path": "/product-assets/color-variants/douyin_3746023263504040089/07-锦鲤玫粉.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/09-染鲤/005-AmSXbqKaIom8CLxbkT1crEx1nbh.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3746023263504040089/07-锦鲤玫粉.jpg"
+        },
+        {
+          "color_name": "亚麻香槟",
+          "color_family": "other",
+          "aliases": [],
+          "levels": [],
+          "level_status": "visible_in_source_screenshot",
+          "product_image_path": "/product-assets/color-variants/douyin_3746023263504040089/08-亚麻香槟.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/09-染鲤/004-YiWYbsOcIo5WOSx3EKjcILubnOe.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3746023263504040089/08-亚麻香槟.jpg"
+        },
+        {
+          "color_name": "奶茶雾棕",
+          "color_family": "brown",
+          "aliases": [],
+          "levels": [],
+          "level_status": "visible_in_source_screenshot",
+          "product_image_path": "/product-assets/color-variants/douyin_3746023263504040089/09-奶茶雾棕.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/09-染鲤/003-FDZdbLL65o1a2bxcf2hcnJ20nrg.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3746023263504040089/09-奶茶雾棕.jpg"
+        },
+        {
+          "color_name": "鸢尾蓝绿",
+          "color_family": "blue",
+          "aliases": [],
+          "levels": [],
+          "level_status": "visible_in_source_screenshot",
+          "product_image_path": "/product-assets/color-variants/douyin_3746023263504040089/10-鸢尾蓝绿.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/09-染鲤/002-Q2SAb46u0oGHGuxkXuYcgywznXf.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3746023263504040089/10-鸢尾蓝绿.jpg"
+        },
+        {
+          "color_name": "黑加仑紫",
+          "color_family": "purple",
+          "aliases": [],
+          "levels": [],
+          "level_status": "visible_in_source_screenshot",
+          "product_image_path": "/product-assets/color-variants/douyin_3746023263504040089/11-黑加仑紫.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/09-染鲤/002-Q2SAb46u0oGHGuxkXuYcgywznXf.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3746023263504040089/11-黑加仑紫.jpg"
+        }
+      ],
+      "discount_prices_ignored": [
+        "券后价¥49起",
+        "抖音商城App专享¥43"
+      ],
+      "source_screenshots": [
+        "knowledge-base/products/source-assets/09-染鲤/001-Y0fMbwJWyoPSpbxRMAUc5cJ7nhe.jpg",
+        "knowledge-base/products/source-assets/09-染鲤/002-Q2SAb46u0oGHGuxkXuYcgywznXf.jpg",
+        "knowledge-base/products/source-assets/09-染鲤/003-FDZdbLL65o1a2bxcf2hcnJ20nrg.jpg",
+        "knowledge-base/products/source-assets/09-染鲤/004-YiWYbsOcIo5WOSx3EKjcILubnOe.jpg",
+        "knowledge-base/products/source-assets/09-染鲤/005-AmSXbqKaIom8CLxbkT1crEx1nbh.jpg",
+        "knowledge-base/products/source-assets/09-染鲤/006-SHPabytwBoig16x0O12c0IBJnLc.jpg",
+        "knowledge-base/products/source-assets/09-染鲤/007-MvQHb94A3o1NyIxqUYkcra5knme.jpg",
+        "knowledge-base/products/source-assets/09-染鲤/008-PrjHbwHfXofuDlxAjVAcwdrnnLb.jpg",
+        "knowledge-base/products/source-assets/09-染鲤/009-OOcuboMTnoNBHTxexkIcGn6lnve.jpg",
+        "knowledge-base/products/source-assets/09-染鲤/010-EhGqbHvcGoVbgSxgDWbcWYSbnch.jpg"
+      ],
+      "product_image_path": "/product-assets/product-masters/douyin_3746023263504040089.jpg",
+      "product_image_source_screenshot": "knowledge-base/products/source-assets/09-染鲤/001-Y0fMbwJWyoPSpbxRMAUc5cJ7nhe.jpg",
+      "usage_guide": {
+        "text": "01:07；×；分*；60；40/49；4教程在手，新手轻松染；黑发/布丁头跟着染；Xanl米；停留10分钟即可冲水；停留10分钟即可冲水；步骤1.先涂抹发中的头发，；涂抹完成后停留15-20分钟；原生黑发染发步骤；两段色染发步骤；Ranli染理；等待10分钟；最后染预留出的发根部分；涂抹完成后；停留10分钟即可冲水；主项照生发與2m-3cm部分不夠；会珠完成后停留20分年；竹绿青染发步骤；三段色染发步骤",
+        "image_paths": [
+          "/product-assets/usage/douyin_3746023263504040089/01.jpg"
+        ],
+        "source_screenshots": [
+          "knowledge-base/products/source-assets/09-染鲤/007-MvQHb94A3o1NyIxqUYkcra5knme.jpg"
+        ]
+      },
+      "product_image_library_path": "knowledge-base/products/derived-assets/product-masters/douyin_3746023263504040089.jpg"
+    },
+    {
+      "product_id": "douyin_3627232676299311931",
+      "brand_name": "NATURVITAL",
+      "brand_aliases": [
+        "NV",
+        "西班牙NV"
+      ],
+      "product_name": "NATURVITAL西班牙NV固色洗发水发膜补色洗头水树莓红紫粉灰棕橘色",
+      "product_type": "color_deposit_care",
+      "shop_name": null,
+      "douyin_url": "https://v.douyin.com/AAK0Qzv9dR4/",
+      "product_image_url": "https://p26-item.ecombdimg.com/img/ecom-shop-material/jpeg_m_068b0cc4eb7b56bca7a6113ced2dfc4d_sx_490743_www800-800~tplv-5mmsx3fupr-image.png",
+      "listing_price": {
+        "min": 99,
+        "max": 129,
+        "scope": "regular_original_price_range",
+        "basis": "regular_price_before_discount"
+      },
+      "sales_count": 14368,
+      "capacity_text": null,
+      "quantity_policy_id": "mvp_color_care_one_unit",
+      "official_params": {},
+      "merchant_claims": [
+        "固色",
+        "补色",
+        "护色"
+      ],
+      "known_risks": [
+        "公开页只给出大色系，具体色名、容量与底色范围待补"
+      ],
+      "colors": [
+        {
+          "color_name": "树莓红",
+          "color_family": "red",
+          "aliases": [
+            "红色"
+          ],
+          "levels": [],
+          "level_status": "not_disclosed",
+          "product_image_path": "/product-assets/color-variants/douyin_3627232676299311931/01-树莓红.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/10-nv/001-NcNXbEafqodcqux9j9rc05Wyn1d.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3627232676299311931/01-树莓红.jpg"
+        },
+        {
+          "color_name": "紫色",
+          "color_family": "purple",
+          "aliases": [],
+          "levels": [],
+          "level_status": "not_disclosed",
+          "product_image_path": "/product-assets/color-variants/douyin_3627232676299311931/02-紫色.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/10-nv/001-NcNXbEafqodcqux9j9rc05Wyn1d.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3627232676299311931/02-紫色.jpg"
+        },
+        {
+          "color_name": "粉色",
+          "color_family": "pink",
+          "aliases": [],
+          "levels": [],
+          "level_status": "not_disclosed",
+          "product_image_path": "/product-assets/color-variants/douyin_3627232676299311931/03-粉色.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/10-nv/010-CwIJbiRSYo46KLxhXBEcEstun6d.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3627232676299311931/03-粉色.jpg"
+        },
+        {
+          "color_name": "灰色",
+          "color_family": "gray",
+          "aliases": [],
+          "levels": [],
+          "level_status": "not_disclosed",
+          "product_image_path": "/product-assets/color-variants/douyin_3627232676299311931/04-灰色.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/10-nv/001-NcNXbEafqodcqux9j9rc05Wyn1d.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3627232676299311931/04-灰色.jpg"
+        },
+        {
+          "color_name": "棕色",
+          "color_family": "brown",
+          "aliases": [],
+          "levels": [],
+          "level_status": "not_disclosed",
+          "product_image_path": "/product-assets/color-variants/douyin_3627232676299311931/05-棕色.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/10-nv/005-VaMXbFqVRoelPixeeuwc2WoUnGh.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3627232676299311931/05-棕色.jpg"
+        },
+        {
+          "color_name": "橘色",
+          "color_family": "orange",
+          "aliases": [],
+          "levels": [],
+          "level_status": "not_disclosed",
+          "product_image_path": "/product-assets/color-variants/douyin_3627232676299311931/06-橘色.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/10-nv/001-NcNXbEafqodcqux9j9rc05Wyn1d.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3627232676299311931/06-橘色.jpg"
+        }
+      ],
+      "discount_prices_ignored": [
+        "抖音商城App专享¥93"
+      ],
+      "source_screenshots": [
+        "knowledge-base/products/source-assets/10-nv/001-NcNXbEafqodcqux9j9rc05Wyn1d.jpg",
+        "knowledge-base/products/source-assets/10-nv/002-GXNKbGwiHoSagQxl3xFcHoupn6e.jpg",
+        "knowledge-base/products/source-assets/10-nv/003-Nj6Wbi2wnoyAfBxhhT8cCTbbnnc.jpg",
+        "knowledge-base/products/source-assets/10-nv/004-NSaAbKcbToiZr7xknMwc4KyXnCf.jpg",
+        "knowledge-base/products/source-assets/10-nv/005-VaMXbFqVRoelPixeeuwc2WoUnGh.jpg",
+        "knowledge-base/products/source-assets/10-nv/006-UKyKbQWYDoxB6Kx2Nrlc4oGfnDc.jpg",
+        "knowledge-base/products/source-assets/10-nv/007-V1KLbr5qVoFi4YxwAfqcxs62nCb.jpg",
+        "knowledge-base/products/source-assets/10-nv/008-AIStbbdj6ovsrDxsXxUcoyhHnDc.jpg",
+        "knowledge-base/products/source-assets/10-nv/009-CGA7bBgbVoj6YQxiWI1cvQn6nrq.jpg",
+        "knowledge-base/products/source-assets/10-nv/010-CwIJbiRSYo46KLxhXBEcEstun6d.jpg",
+        "knowledge-base/products/source-assets/10-nv/011-AaKQbtiC4oUYA5x4DlscpY7EnYf.jpg",
+        "knowledge-base/products/source-assets/10-nv/012-JzITbofvcoNNEdxNZTNcDRxfndc.jpg",
+        "knowledge-base/products/source-assets/10-nv/013-VpXabCNQOoW5oxxTBScceLYlnuQ.jpg"
+      ],
+      "product_image_path": "/product-assets/product-masters/douyin_3627232676299311931.jpg",
+      "product_image_source_screenshot": "knowledge-base/products/source-assets/10-nv/001-NcNXbEafqodcqux9j9rc05Wyn1d.jpg",
+      "usage_guide": {
+        "text": "01:09；×；NO*；5G；60；22/25；使用方法；方法一：适合染后日常护理；① 第一步 清洁；将头发浸湿后，取；适量洗发水，用起；泡器或者浴球打出；泡泡，将泡沫快速；均匀涂满全头，清；洁后冲洗干净；① 第二步 护色；发丝清洁完毕后，；略微控干水分，取；适量发膜，均匀涂；满发丝；① 第三步 固色；发膜涂抹均匀后，；浅色调保留5-10分；钟，深色调保留；10-15分钟，洗净；发丝即可；方法二：适合掉色需要增强补色；① 第一步；干发状态下均匀涂；抹发膜；② 第二步；停留15分钟以上（；也配使用加热帽）；③ 第三步；冲洗头发，使用固；色洗发水清洁头发；，清洁后可按方法；一再使用一次发膜；温馨提示：洗发水可以清洁头发，减少掉色，发膜能滋养和补色，头发颜色较；浅者，可每洗2-3次头发用一次发膜，漂染过的发色更容易补色，使用时请务必；均匀涂抹，有挑染处注意避开，发膜会有轻微染手，介意者可戴手套，使用时；注意避开头皮\n01:09；45；159；视频；图集；m**5分钟前正在浏览！；718；先补后固 发色持久炫彩；Step1；先补色；快速精准补色；补色染色必选；NIATUR；LV/IAL；LU HAIR MASK；IATUR；｛VITAL；Step2；后固色；多重氨基酸；温和清洁；减缓掉色；NV固色发膜；20=1；101ke；NV固色洗发水；/前后对比参考/；包找撂籠使用 效果更佳（日常护理可先用洗发水，再用发膜）；¥99",
+        "image_paths": [
+          "/product-assets/usage/douyin_3627232676299311931/01.jpg",
+          "/product-assets/usage/douyin_3627232676299311931/02.jpg"
+        ],
+        "source_screenshots": [
+          "knowledge-base/products/source-assets/10-nv/009-CGA7bBgbVoj6YQxiWI1cvQn6nrq.jpg",
+          "knowledge-base/products/source-assets/10-nv/012-JzITbofvcoNNEdxNZTNcDRxfndc.jpg"
+        ]
+      },
+      "product_image_library_path": "knowledge-base/products/derived-assets/product-masters/douyin_3627232676299311931.jpg"
+    },
+    {
+      "product_id": "douyin_3683606309598527682",
+      "brand_name": "Schwarzkopf/施华蔻",
+      "brand_aliases": [
+        "Schwarzkopf",
+        "施华蔻",
+        "斐丝丽"
+      ],
+      "product_name": "施华蔻斐丝丽黑发直染免漂染发霜显色氛围感发色时尚",
+      "product_type": "hair_dye_cream",
+      "shop_name": "施华蔻官方旗舰店",
+      "douyin_url": "https://v.douyin.com/s7cDn2UA9uo/",
+      "product_image_url": "https://p3-item.ecombdimg.com/img/ecom-shop-material/jpeg_m_1c3ce06cc6c0970a9d6aeb63eb1738e0_sx_224442_www800-800~tplv-5mmsx3fupr-image.png",
+      "listing_price": {
+        "min": 109,
+        "max": 109,
+        "scope": "regular_original_price",
+        "basis": "regular_price_before_discount"
+      },
+      "sales_count": 9541,
+      "capacity_text": null,
+      "quantity_policy_id": "official_schwarzkopf_cream_box_count",
+      "official_params": {
+        "applicable_people": "普通人群",
+        "applicable_season": "各季"
+      },
+      "merchant_claims": [
+        "黑发直染",
+        "免漂显色"
+      ],
+      "known_risks": [
+        "已从商品图录入8个色号，官方用量已按及耳1盒、及肩2盒、过肩3盒录入，但底色度数仍待确认",
+        "黑发直染的显色深浅会受当前底色和既往染黑影响"
+      ],
+      "colors": [
+        {
+          "color_name": "树莓红棕",
+          "color_family": "red",
+          "aliases": [],
+          "levels": [],
+          "level_status": "visible_in_source_screenshot",
+          "product_image_path": "/product-assets/color-variants/douyin_3683606309598527682/01-树莓红棕.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/11-施华蔻/001-M6EqbV1qRoWpZcxdkEHcs990npe.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3683606309598527682/01-树莓红棕.jpg"
+        },
+        {
+          "color_name": "榛果米棕",
+          "color_family": "brown",
+          "aliases": [],
+          "levels": [],
+          "level_status": "visible_in_source_screenshot",
+          "product_image_path": "/product-assets/color-variants/douyin_3683606309598527682/02-榛果米棕.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/11-施华蔻/008-NWa1bZpgzoOBsfx2giVcX9rznvd.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3683606309598527682/02-榛果米棕.jpg"
+        },
+        {
+          "color_name": "蜜橘粉棕",
+          "color_family": "pink",
+          "aliases": [],
+          "levels": [],
+          "level_status": "visible_in_source_screenshot",
+          "product_image_path": "/product-assets/color-variants/douyin_3683606309598527682/03-蜜橘粉棕.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/11-施华蔻/008-NWa1bZpgzoOBsfx2giVcX9rznvd.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3683606309598527682/03-蜜橘粉棕.jpg"
+        },
+        {
+          "color_name": "黑加仑紫",
+          "color_family": "purple",
+          "aliases": [],
+          "levels": [],
+          "level_status": "visible_in_source_screenshot",
+          "product_image_path": "/product-assets/color-variants/douyin_3683606309598527682/04-黑加仑紫.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/11-施华蔻/008-NWa1bZpgzoOBsfx2giVcX9rznvd.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3683606309598527682/04-黑加仑紫.jpg"
+        },
+        {
+          "color_name": "南瓜焦糖",
+          "color_family": "orange",
+          "aliases": [],
+          "levels": [],
+          "level_status": "visible_in_source_screenshot",
+          "product_image_path": "/product-assets/color-variants/douyin_3683606309598527682/05-南瓜焦糖.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/11-施华蔻/008-NWa1bZpgzoOBsfx2giVcX9rznvd.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3683606309598527682/05-南瓜焦糖.jpg"
+        },
+        {
+          "color_name": "远山青雾",
+          "color_family": "green",
+          "aliases": [],
+          "levels": [],
+          "level_status": "visible_in_source_screenshot",
+          "product_image_path": "/product-assets/color-variants/douyin_3683606309598527682/06-远山青雾.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/11-施华蔻/008-NWa1bZpgzoOBsfx2giVcX9rznvd.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3683606309598527682/06-远山青雾.jpg"
+        },
+        {
+          "color_name": "深海蓝鲸",
+          "color_family": "blue",
+          "aliases": [],
+          "levels": [],
+          "level_status": "visible_in_source_screenshot",
+          "product_image_path": "/product-assets/color-variants/douyin_3683606309598527682/07-深海蓝鲸.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/11-施华蔻/008-NWa1bZpgzoOBsfx2giVcX9rznvd.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3683606309598527682/07-深海蓝鲸.jpg"
+        },
+        {
+          "color_name": "冷萃灰棕",
+          "color_family": "gray_brown",
+          "aliases": [],
+          "levels": [],
+          "level_status": "visible_in_source_screenshot",
+          "product_image_path": "/product-assets/color-variants/douyin_3683606309598527682/08-冷萃灰棕.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/11-施华蔻/008-NWa1bZpgzoOBsfx2giVcX9rznvd.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3683606309598527682/08-冷萃灰棕.jpg"
+        }
+      ],
+      "discount_prices_ignored": [
+        "实付价/优惠价¥89",
+        "抖音商城App专享¥83"
+      ],
+      "source_screenshots": [
+        "knowledge-base/products/source-assets/11-施华蔻/001-M6EqbV1qRoWpZcxdkEHcs990npe.jpg",
+        "knowledge-base/products/source-assets/11-施华蔻/002-BDWYb1AEEouW0ixlgpschC0nnTy.jpg",
+        "knowledge-base/products/source-assets/11-施华蔻/003-Rd0AbCODcotbZyxvPEJcDk3Dnjy.jpg",
+        "knowledge-base/products/source-assets/11-施华蔻/004-WLebb6KD5oTVhvxNsMgcrGI4nge.jpg",
+        "knowledge-base/products/source-assets/11-施华蔻/005-Skvcb54vtoEJZFx4kQyc9YoOn8c.jpg",
+        "knowledge-base/products/source-assets/11-施华蔻/006-FbBPbneUlonyscxN4Wpc9ak6nQg.jpg",
+        "knowledge-base/products/source-assets/11-施华蔻/007-Ol1ebydbyo6LoDxtl0kccnufnTh.jpg",
+        "knowledge-base/products/source-assets/11-施华蔻/008-NWa1bZpgzoOBsfx2giVcX9rznvd.jpg"
+      ],
+      "product_image_path": "/product-assets/product-masters/douyin_3683606309598527682.jpg",
+      "product_image_source_screenshot": "knowledge-base/products/source-assets/11-施华蔻/001-M6EqbV1qRoWpZcxdkEHcs990npe.jpg",
+      "usage_guide": {
+        "text": "01:11；<；Q 施华蔻璀璨灰棕；只；•••；详情；使用；72；盒；头发长度及肩；使用；盒；头发长度过肩；使用方法；抖音旗舰•正品保障；［+；优惠价￥89\n01:11；<；睡；Q 施华蔻璀璨灰棕；59；只、；详情；使用方法；Stepl；染前准备；使用附带手套，将1剂和发纤强；韧精华露倒入2剂中，上下摇晃；瓶子30次使其充分混合，瓶盖；取下换上便捷染发梳；Step2；开始染发；开始染发前；先使用染前头皮保护精华液均匀；涂抹于头皮；从颈根处-头部后方-两侧和顶部-；前额和发际，顺序涂抹头发，全；部涂抹完毕后停留30分钟",
+        "image_paths": [
+          "/product-assets/usage/douyin_3683606309598527682/01.jpg",
+          "/product-assets/usage/douyin_3683606309598527682/02.jpg"
+        ],
+        "source_screenshots": [
+          "knowledge-base/products/source-assets/11-施华蔻/004-WLebb6KD5oTVhvxNsMgcrGI4nge.jpg",
+          "knowledge-base/products/source-assets/11-施华蔻/005-Skvcb54vtoEJZFx4kQyc9YoOn8c.jpg"
+        ]
+      },
+      "product_image_library_path": "knowledge-base/products/derived-assets/product-masters/douyin_3683606309598527682.jpg"
+    },
+    {
+      "product_id": "douyin_3661006633414322112",
+      "brand_name": "Schwarzkopf/施华蔻",
+      "brand_aliases": [
+        "Schwarzkopf",
+        "施华蔻",
+        "斐丝丽"
+      ],
+      "product_name": "施华蔻斐丝丽泡泡显白染发剂潮色氛围感染发膏泡沫女",
+      "product_type": "hair_dye_bubble",
+      "shop_name": "施华蔻官方旗舰店",
+      "douyin_url": "https://v.douyin.com/thWJp3vbE9s/",
+      "product_image_url": "https://p26-item.ecombdimg.com/img/ecom-shop-material/jpeg_m_3eddce4c1195272c8893cf5fdb834561_sx_450026_www800-800~tplv-5mmsx3fupr-image.png",
+      "listing_price": {
+        "min": 99,
+        "max": 99,
+        "scope": "regular_original_price",
+        "basis": "regular_price_before_discount"
+      },
+      "sales_count": 79501,
+      "capacity_text": null,
+      "quantity_policy_id": "official_schwarzkopf_bubble_box_count",
+      "official_params": {
+        "applicable_people": "普通人群",
+        "applicable_season": "各季"
+      },
+      "merchant_claims": [
+        "泡泡质地适合新手",
+        "详情图宣称pH4.5平衡锁色技术",
+        "详情图展示修护和香气升级"
+      ],
+      "known_risks": [
+        "官方用量已按及耳1盒、及肩2盒、过肩3盒及以上录入；发量大时可多备1盒",
+        "部分网红发色需先漂后染，不属于本产品链路的居家漂发指导"
+      ],
+      "colors": [
+        {
+          "color_name": "蜜糖醇棕",
+          "color_family": "brown",
+          "aliases": [],
+          "levels": [],
+          "level_status": "not_disclosed",
+          "product_image_path": "/product-assets/color-variants/douyin_3661006633414322112/01-蜜糖醇棕.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/12-施华蔻泡泡染/010-EtYHbVJ88o9Nk4xDRLLcbtjMnnd.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3661006633414322112/01-蜜糖醇棕.jpg"
+        },
+        {
+          "color_name": "迷雾茶棕",
+          "color_family": "brown",
+          "aliases": [],
+          "levels": [],
+          "level_status": "not_disclosed",
+          "product_image_path": "/product-assets/color-variants/douyin_3661006633414322112/02-迷雾茶棕.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/12-施华蔻泡泡染/019-CROSb6IQXonWPxx6YUccXuzYncg.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3661006633414322112/02-迷雾茶棕.jpg"
+        },
+        {
+          "color_name": "暗夜蓝黑",
+          "color_family": "blue",
+          "aliases": [
+            "蓝黑",
+            "蓝色"
+          ],
+          "levels": [],
+          "level_status": "not_disclosed",
+          "product_image_path": "/product-assets/color-variants/douyin_3661006633414322112/03-暗夜蓝黑.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/12-施华蔻泡泡染/016-DZKSbkQENo4jHkx4ELWc9mzbngf.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3661006633414322112/03-暗夜蓝黑.jpg"
+        },
+        {
+          "color_name": "极光灰棕",
+          "color_family": "gray_brown",
+          "aliases": [
+            "灰棕"
+          ],
+          "levels": [],
+          "level_status": "not_disclosed",
+          "product_image_path": "/product-assets/color-variants/douyin_3661006633414322112/04-极光灰棕.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/12-施华蔻泡泡染/004-E15lbgiAQomAwDxeLyScIq31nUc.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3661006633414322112/04-极光灰棕.jpg"
+        },
+        {
+          "color_name": "奶油浅咖",
+          "color_family": "brown",
+          "aliases": [
+            "浅咖"
+          ],
+          "levels": [],
+          "level_status": "not_disclosed",
+          "product_image_path": "/product-assets/color-variants/douyin_3661006633414322112/05-奶油浅咖.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/12-施华蔻泡泡染/012-PGltbzJYmoVqOixGIHNc0Nrjnvg.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3661006633414322112/05-奶油浅咖.jpg"
+        },
+        {
+          "color_name": "亚麻茶青",
+          "color_family": "green",
+          "aliases": [
+            "茶青"
+          ],
+          "levels": [],
+          "level_status": "not_disclosed",
+          "product_image_path": "/product-assets/color-variants/douyin_3661006633414322112/06-亚麻茶青.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/12-施华蔻泡泡染/001-PVeYbOH7poK2xfxAUNTcua0Snyh.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3661006633414322112/06-亚麻茶青.jpg"
+        },
+        {
+          "color_name": "拿铁灰棕",
+          "color_family": "gray_brown",
+          "aliases": [
+            "灰棕"
+          ],
+          "levels": [],
+          "level_status": "not_disclosed",
+          "product_image_path": "/product-assets/color-variants/douyin_3661006633414322112/07-拿铁灰棕.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/12-施华蔻泡泡染/004-E15lbgiAQomAwDxeLyScIq31nUc.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3661006633414322112/07-拿铁灰棕.jpg"
+        },
+        {
+          "color_name": "香草蜜茶",
+          "color_family": "brown",
+          "aliases": [
+            "蜜茶棕"
+          ],
+          "levels": [],
+          "level_status": "not_disclosed",
+          "product_image_path": "/product-assets/color-variants/douyin_3661006633414322112/08-香草蜜茶.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/12-施华蔻泡泡染/001-PVeYbOH7poK2xfxAUNTcua0Snyh.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3661006633414322112/08-香草蜜茶.jpg"
+        },
+        {
+          "color_name": "奶茶栗棕",
+          "color_family": "brown",
+          "aliases": [
+            "栗棕"
+          ],
+          "levels": [],
+          "level_status": "not_disclosed",
+          "product_image_path": "/product-assets/color-variants/douyin_3661006633414322112/09-奶茶栗棕.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/12-施华蔻泡泡染/001-PVeYbOH7poK2xfxAUNTcua0Snyh.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3661006633414322112/09-奶茶栗棕.jpg"
+        },
+        {
+          "color_name": "焦糖啡棕",
+          "color_family": "brown",
+          "aliases": [
+            "焦糖棕"
+          ],
+          "levels": [],
+          "level_status": "not_disclosed",
+          "product_image_path": "/product-assets/color-variants/douyin_3661006633414322112/10-焦糖啡棕.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/12-施华蔻泡泡染/018-VlyvbGsA1ojW19xA8jOc1hZTnDl.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3661006633414322112/10-焦糖啡棕.jpg"
+        },
+        {
+          "color_name": "落日脏橘",
+          "color_family": "orange",
+          "aliases": [
+            "脏橘"
+          ],
+          "levels": [],
+          "level_status": "not_disclosed",
+          "product_image_path": "/product-assets/color-variants/douyin_3661006633414322112/11-落日脏橘.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/12-施华蔻泡泡染/007-T4JFbA3xOoX1eqx0bttc7YGUnJg.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3661006633414322112/11-落日脏橘.jpg"
+        },
+        {
+          "color_name": "粉玫瑰棕",
+          "color_family": "pink",
+          "aliases": [
+            "粉棕"
+          ],
+          "levels": [],
+          "level_status": "not_disclosed",
+          "product_image_path": "/product-assets/color-variants/douyin_3661006633414322112/12-粉玫瑰棕.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/12-施华蔻泡泡染/005-GPaKbkQoxoIx21xCXB3csJJUnVS.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3661006633414322112/12-粉玫瑰棕.jpg"
+        },
+        {
+          "color_name": "波尔多红",
+          "color_family": "red",
+          "aliases": [
+            "酒红"
+          ],
+          "levels": [],
+          "level_status": "not_disclosed",
+          "product_image_path": "/product-assets/color-variants/douyin_3661006633414322112/13-波尔多红.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/12-施华蔻泡泡染/015-JQhnbbmHpoJ57bxM0XnceF5rnEe.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3661006633414322112/13-波尔多红.jpg"
+        },
+        {
+          "color_name": "烟熏紫灰",
+          "color_family": "purple",
+          "aliases": [
+            "紫灰"
+          ],
+          "levels": [],
+          "level_status": "not_disclosed",
+          "product_image_path": "/product-assets/color-variants/douyin_3661006633414322112/14-烟熏紫灰.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/12-施华蔻泡泡染/001-PVeYbOH7poK2xfxAUNTcua0Snyh.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3661006633414322112/14-烟熏紫灰.jpg"
+        },
+        {
+          "color_name": "樱桃丽棕",
+          "color_family": "red",
+          "aliases": [
+            "红棕"
+          ],
+          "levels": [],
+          "level_status": "not_disclosed",
+          "product_image_path": "/product-assets/color-variants/douyin_3661006633414322112/15-樱桃丽棕.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/12-施华蔻泡泡染/002-MzCibwelQodO0zxUuJecKfHlnRh.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3661006633414322112/15-樱桃丽棕.jpg"
+        },
+        {
+          "color_name": "复古浆果",
+          "color_family": "red",
+          "aliases": [
+            "浆果红"
+          ],
+          "levels": [],
+          "level_status": "not_disclosed",
+          "product_image_path": "/product-assets/color-variants/douyin_3661006633414322112/16-复古浆果.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/12-施华蔻泡泡染/001-PVeYbOH7poK2xfxAUNTcua0Snyh.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3661006633414322112/16-复古浆果.jpg"
+        },
+        {
+          "color_name": "西柚莓粉",
+          "color_family": "pink",
+          "aliases": [
+            "粉色"
+          ],
+          "levels": [],
+          "level_status": "not_disclosed",
+          "product_image_path": "/product-assets/color-variants/douyin_3661006633414322112/17-西柚莓粉.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/12-施华蔻泡泡染/001-PVeYbOH7poK2xfxAUNTcua0Snyh.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3661006633414322112/17-西柚莓粉.jpg"
+        },
+        {
+          "color_name": "薄藤灰紫",
+          "color_family": "purple",
+          "aliases": [
+            "灰紫"
+          ],
+          "levels": [],
+          "level_status": "not_disclosed",
+          "product_image_path": "/product-assets/color-variants/douyin_3661006633414322112/18-薄藤灰紫.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/12-施华蔻泡泡染/013-U484bu1vConNWtxkT3Fc74dnnob.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3661006633414322112/18-薄藤灰紫.jpg"
+        }
+      ],
+      "discount_prices_ignored": [
+        "实付价/优惠价¥66",
+        "抖音商城App专享¥60"
+      ],
+      "source_screenshots": [
+        "knowledge-base/products/source-assets/12-施华蔻泡泡染/001-PVeYbOH7poK2xfxAUNTcua0Snyh.jpg",
+        "knowledge-base/products/source-assets/12-施华蔻泡泡染/002-MzCibwelQodO0zxUuJecKfHlnRh.jpg",
+        "knowledge-base/products/source-assets/12-施华蔻泡泡染/003-TlpjbezYcotOyJxClhQcMMb8nfh.jpg",
+        "knowledge-base/products/source-assets/12-施华蔻泡泡染/004-E15lbgiAQomAwDxeLyScIq31nUc.jpg",
+        "knowledge-base/products/source-assets/12-施华蔻泡泡染/005-GPaKbkQoxoIx21xCXB3csJJUnVS.jpg",
+        "knowledge-base/products/source-assets/12-施华蔻泡泡染/006-E8uXbgQbXoMdVsxTbTmcwx9ongd.jpg",
+        "knowledge-base/products/source-assets/12-施华蔻泡泡染/007-T4JFbA3xOoX1eqx0bttc7YGUnJg.jpg",
+        "knowledge-base/products/source-assets/12-施华蔻泡泡染/008-QMuvbXXUMoJH0Lx3qyzcHlnVn7d.jpg",
+        "knowledge-base/products/source-assets/12-施华蔻泡泡染/009-MsI2bYh6ColEbAx2kpKcmJfVnrc.jpg",
+        "knowledge-base/products/source-assets/12-施华蔻泡泡染/010-EtYHbVJ88o9Nk4xDRLLcbtjMnnd.jpg",
+        "knowledge-base/products/source-assets/12-施华蔻泡泡染/011-VlifbbNSzoEtltxCbU8cAciPnyd.jpg",
+        "knowledge-base/products/source-assets/12-施华蔻泡泡染/012-PGltbzJYmoVqOixGIHNc0Nrjnvg.jpg",
+        "knowledge-base/products/source-assets/12-施华蔻泡泡染/013-U484bu1vConNWtxkT3Fc74dnnob.jpg",
+        "knowledge-base/products/source-assets/12-施华蔻泡泡染/014-V4ogbYIFromIX6xcK0EcT71wnUd.jpg",
+        "knowledge-base/products/source-assets/12-施华蔻泡泡染/015-JQhnbbmHpoJ57bxM0XnceF5rnEe.jpg",
+        "knowledge-base/products/source-assets/12-施华蔻泡泡染/016-DZKSbkQENo4jHkx4ELWc9mzbngf.jpg",
+        "knowledge-base/products/source-assets/12-施华蔻泡泡染/017-KKEobOYFIohl5mxgzjac2Gitnzf.jpg",
+        "knowledge-base/products/source-assets/12-施华蔻泡泡染/018-VlyvbGsA1ojW19xA8jOc1hZTnDl.jpg",
+        "knowledge-base/products/source-assets/12-施华蔻泡泡染/019-CROSb6IQXonWPxx6YUccXuzYncg.jpg",
+        "knowledge-base/products/source-assets/12-施华蔻泡泡染/020-ABPobbwvKoKVkuxASMcclQ9knwb.jpg",
+        "knowledge-base/products/source-assets/12-施华蔻泡泡染/021-O0SQbsC1DoNuGVxSwHecAI1fnVg.jpg",
+        "knowledge-base/products/source-assets/12-施华蔻泡泡染/022-FCBlbdGdtoeEBLxQTlRczbiznbc.jpg",
+        "knowledge-base/products/source-assets/12-施华蔻泡泡染/023-UGc4bwyunowSmZxtVwycdbhjn4f.jpg",
+        "knowledge-base/products/source-assets/12-施华蔻泡泡染/024-AxkNbG5auoGU1yxckyMcqL6Knkf.jpg",
+        "knowledge-base/products/source-assets/12-施华蔻泡泡染/025-EspabYB48ol6gExqRSBcGslNnQ8.jpg"
+      ],
+      "product_image_path": "/product-assets/product-masters/douyin_3661006633414322112.jpg",
+      "product_image_source_screenshot": "knowledge-base/products/source-assets/12-施华蔻泡泡染/001-PVeYbOH7poK2xfxAUNTcua0Snyh.jpg",
+      "usage_guide": {
+        "text": "01:14；Q 施华蔻染发剂；5；只；详情；更多视频〉；$s；用量建议；头发长度及耳；使用1盒；x1；头发长度及肩；使用2盒；x2；头发长度过肩；使用3盒及以上；x3；*建议可多加1盒用于补染；.简单3步 一染就会；优惠价￥66\n01:14；<；Q 施华蔻染发剂；只；•••；详情；简单3步一染就会；更多视频〉；Step1染前准备；将1剂全部倒入2剂内，瓶口换上挤压式喷；嘴，左右轻轻摇晃10次左右；Step2 开始染发；带上手套，将泡泡乳挤在带着手套的手中。；为头发划分不同区域，并把大量泡泡乳从发；根至发档涂抹在头发上，停留约30分钟；Step3 染后洗护；用温水彻底冲洗，直至水变清。将锁色修护；发膜涂于头发并停留片刻后彻底冲洗头发；。全套染发工具；居家染发一盒齐全；913人正在看；显色敷用乳；坊安氿岩病20ml v1；优惠价¥66",
+        "image_paths": [
+          "/product-assets/usage/douyin_3661006633414322112/01.jpg",
+          "/product-assets/usage/douyin_3661006633414322112/02.jpg"
+        ],
+        "source_screenshots": [
+          "knowledge-base/products/source-assets/12-施华蔻泡泡染/020-ABPobbwvKoKVkuxASMcclQ9knwb.jpg",
+          "knowledge-base/products/source-assets/12-施华蔻泡泡染/021-O0SQbsC1DoNuGVxSwHecAI1fnVg.jpg"
+        ]
+      },
+      "product_image_library_path": "knowledge-base/products/derived-assets/product-masters/douyin_3661006633414322112.jpg"
+    },
+    {
+      "product_id": "douyin_3832247538640093617",
+      "brand_name": "玫丽盼",
+      "brand_aliases": [
+        "MILBON"
+      ],
+      "product_name": "玫丽盼正品彩色洗发水150ml去黄固色漂染修护护色锁色",
+      "product_type": "color_deposit_shampoo",
+      "shop_name": null,
+      "douyin_url": "https://v.douyin.com/7TSbEGeifLg/",
+      "product_image_url": "https://p3-item.ecombdimg.com/img/ecom-shop-material/jpeg_m_b3030956de720cba44c4aab7e7d6da76_sx_86562_www800-800~tplv-5mmsx3fupr-image.png",
+      "listing_price": {
+        "min": 79,
+        "max": 79,
+        "scope": "regular_original_price",
+        "basis": "regular_price_before_discount"
+      },
+      "sales_count": 3,
+      "capacity_text": "150ml",
+      "quantity_policy_id": "mvp_color_care_one_unit",
+      "official_params": {
+        "applicable_hair": "各类发质",
+        "functions": [
+          "染后护色",
+          "受损发护理",
+          "锁色"
+        ],
+        "origin": "日本"
+      },
+      "merchant_claims": [
+        "去黄",
+        "固色",
+        "漂染修护"
+      ],
+      "known_risks": [
+        "已从商品图录入7个补色方向，但具体底色度数和各色使用频率仍待确认",
+        "属于彩色洗发水，不能替代染发膏完成明显提浅"
+      ],
+      "colors": [
+        {
+          "color_name": "绿色",
+          "color_family": "green",
+          "aliases": [],
+          "levels": [],
+          "level_status": "visible_in_source_screenshot",
+          "product_image_path": "/product-assets/color-variants/douyin_3832247538640093617/01-绿色.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/13-玫丽盼/007-FYC0bV4ekoc1awxvuTrcbd7Gnrb.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3832247538640093617/01-绿色.jpg"
+        },
+        {
+          "color_name": "驼色",
+          "color_family": "brown",
+          "aliases": [],
+          "levels": [],
+          "level_status": "visible_in_source_screenshot",
+          "product_image_path": "/product-assets/color-variants/douyin_3832247538640093617/02-驼色.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/13-玫丽盼/007-FYC0bV4ekoc1awxvuTrcbd7Gnrb.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3832247538640093617/02-驼色.jpg"
+        },
+        {
+          "color_name": "薰衣草紫",
+          "color_family": "purple",
+          "aliases": [],
+          "levels": [],
+          "level_status": "visible_in_source_screenshot",
+          "product_image_path": "/product-assets/color-variants/douyin_3832247538640093617/03-薰衣草紫.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/13-玫丽盼/002-FIFabrsfOot4CPxnA7nciu3gn1g.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3832247538640093617/03-薰衣草紫.jpg"
+        },
+        {
+          "color_name": "草莓粉",
+          "color_family": "pink",
+          "aliases": [],
+          "levels": [],
+          "level_status": "visible_in_source_screenshot",
+          "product_image_path": "/product-assets/color-variants/douyin_3832247538640093617/04-草莓粉.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/13-玫丽盼/004-MHZCbin4IoX5ANxWcogcFX6SnNb.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3832247538640093617/04-草莓粉.jpg"
+        },
+        {
+          "color_name": "奶茶灰",
+          "color_family": "gray",
+          "aliases": [],
+          "levels": [],
+          "level_status": "visible_in_source_screenshot",
+          "product_image_path": "/product-assets/color-variants/douyin_3832247538640093617/05-奶茶灰.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/13-玫丽盼/003-Jt7cbmhVCoTTZTxWTwIc0IennIc.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3832247538640093617/05-奶茶灰.jpg"
+        },
+        {
+          "color_name": "蓝色",
+          "color_family": "blue",
+          "aliases": [],
+          "levels": [],
+          "level_status": "visible_in_source_screenshot",
+          "product_image_path": "/product-assets/color-variants/douyin_3832247538640093617/06-蓝色.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/13-玫丽盼/007-FYC0bV4ekoc1awxvuTrcbd7Gnrb.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3832247538640093617/06-蓝色.jpg"
+        },
+        {
+          "color_name": "橙色",
+          "color_family": "orange",
+          "aliases": [],
+          "levels": [],
+          "level_status": "visible_in_source_screenshot",
+          "product_image_path": "/product-assets/color-variants/douyin_3832247538640093617/07-橙色.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/13-玫丽盼/004-MHZCbin4IoX5ANxWcogcFX6SnNb.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3832247538640093617/07-橙色.jpg"
+        }
+      ],
+      "discount_prices_ignored": [
+        "新人/实付价¥78",
+        "抖音商城App专享¥72"
+      ],
+      "source_screenshots": [
+        "knowledge-base/products/source-assets/13-玫丽盼/001-Rg6hbMUqJoGlc6xZXq1cuwtBnMb.jpg",
+        "knowledge-base/products/source-assets/13-玫丽盼/002-FIFabrsfOot4CPxnA7nciu3gn1g.jpg",
+        "knowledge-base/products/source-assets/13-玫丽盼/003-Jt7cbmhVCoTTZTxWTwIc0IennIc.jpg",
+        "knowledge-base/products/source-assets/13-玫丽盼/004-MHZCbin4IoX5ANxWcogcFX6SnNb.jpg",
+        "knowledge-base/products/source-assets/13-玫丽盼/005-PTLtbXIpzoAQMrxYghpcFyRwnPe.jpg",
+        "knowledge-base/products/source-assets/13-玫丽盼/006-TDOhbDFmwoRM5nxCJ8eccA1XnFe.jpg",
+        "knowledge-base/products/source-assets/13-玫丽盼/007-FYC0bV4ekoc1awxvuTrcbd7Gnrb.jpg"
+      ],
+      "product_image_path": "/product-assets/product-masters/douyin_3832247538640093617.jpg",
+      "product_image_source_screenshot": "knowledge-base/products/source-assets/13-玫丽盼/001-Rg6hbMUqJoGlc6xZXq1cuwtBnMb.jpg",
+      "usage_guide": {
+        "text": "01:14；担亭商城进口超市，全球购【自营；语**1小时前正在浏览！；精品优选；正品保障；Milbon 玫丽盼；彩色洗发水；& 固色护色；& 漂后修护；& 持久护色；-如何使用-；① 将統发水振控超烈；② 泡沫包要井湿合；• 全球好物零距离。•；@找同款；1/6；共7款＞；¥79；新人价¥78；//150ml；已享受：店铺新人减1元；全球购 自营【自营】玫丽盼正品彩色洗发水；150ml 去黄固色漂染修护护色锁色#；已售2；14人正在看；店铺销量超千万；477人逛过；0（隔日达16:30前下单，预计后天送达；保税进口|免运费；进口超市；新人价¥78\n润泽养护发丝；打造柔顺亮泽秀发；19；添加角鲨烷与保湿液态油成分；帮助提升发丝润泽感，减少干燥毛躁；搭配 MX-CMADK 发丝护理成分；使秀发更柔顺、更有光泽；COLOR；62668+0；GADGETU；SADGETG；润泽；柔顺；光泽；GADGET S；GADGET6；GADGET；• 如何使用。；①；将洗发水揉搓起泡；用洗发水打湿头发，将洗发水在手中；轻轻揉搓起泡，然后主要涂抹在发根处；② 泡沫包裹并混合；取一些洗发水，将泡沫涂抹在整个头发上，；像做发膜一样。从头发中段开始涂抹至发尾；冲洗；彻底冲洗，直到不再有彩色水流出为止",
+        "image_paths": [
+          "/product-assets/usage/douyin_3832247538640093617/01.jpg",
+          "/product-assets/usage/douyin_3832247538640093617/02.jpg"
+        ],
+        "source_screenshots": [
+          "knowledge-base/products/source-assets/13-玫丽盼/001-Rg6hbMUqJoGlc6xZXq1cuwtBnMb.jpg",
+          "knowledge-base/products/source-assets/13-玫丽盼/006-TDOhbDFmwoRM5nxCJ8eccA1XnFe.jpg"
+        ]
+      },
+      "product_image_library_path": "knowledge-base/products/derived-assets/product-masters/douyin_3832247538640093617.jpg"
+    },
+    {
+      "product_id": "douyin_3763760159604736414",
+      "brand_name": "SHOUPIN首品",
+      "brand_aliases": [
+        "SHOUPIN",
+        "首品"
+      ],
+      "product_name": "首品固色发膜粉红色紫灰棕绿蓝青补色固色护色锁护",
+      "product_type": "color_deposit_mask",
+      "shop_name": "首品SHOUPIN官方旗舰店",
+      "douyin_url": "https://v.douyin.com/MFfvNjEQhwA/",
+      "product_image_url": "https://p3-item.ecombdimg.com/img/ecom-shop-material/png_m_c207b3e4e377ef7aefa6e1e306d21843_sx_665802_www800-800~tplv-5mmsx3fupr-image.png",
+      "listing_price": {
+        "min": 41,
+        "max": 41,
+        "scope": "regular_original_price",
+        "basis": "regular_price_before_discount"
+      },
+      "sales_count": 2267,
+      "capacity_text": null,
+      "quantity_policy_id": "mvp_color_care_one_unit",
+      "official_params": {
+        "product_name": "SHOUPIN首品固色彩色护理发膜",
+        "functions": [
+          "固色",
+          "柔顺"
+        ],
+        "registration": "粤G妆网备字2024472683"
+      },
+      "merchant_claims": [
+        "商家宣称3分钟均匀出色",
+        "详情图展示湿发日常固色与干发强力固色两种用法",
+        "详情图展示植物油脂护理"
+      ],
+      "known_risks": [
+        "仅适用于漂染后秀发，黑发使用无效",
+        "使用前应做48小时过敏测试",
+        "颜色不均的底色可能导致结果不均"
+      ],
+      "colors": [
+        {
+          "color_name": "灰色",
+          "color_family": "gray",
+          "aliases": [],
+          "levels": [],
+          "level_status": "not_disclosed",
+          "product_image_path": "/product-assets/color-variants/douyin_3763760159604736414/01-灰色.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/15-首品/002-AJhNbHjh2oGnD6xnMaqc80C7nrb.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3763760159604736414/01-灰色.jpg"
+        },
+        {
+          "color_name": "香槟灰",
+          "color_family": "gray",
+          "aliases": [],
+          "levels": [],
+          "level_status": "not_disclosed",
+          "product_image_path": "/product-assets/color-variants/douyin_3763760159604736414/02-香槟灰.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/15-首品/010-S255bvTb0oJvcVxP34KcLaLfnlh.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3763760159604736414/02-香槟灰.jpg"
+        },
+        {
+          "color_name": "银灰色",
+          "color_family": "gray",
+          "aliases": [],
+          "levels": [],
+          "level_status": "not_disclosed",
+          "product_image_path": "/product-assets/color-variants/douyin_3763760159604736414/03-银灰色.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/15-首品/002-AJhNbHjh2oGnD6xnMaqc80C7nrb.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3763760159604736414/03-银灰色.jpg"
+        },
+        {
+          "color_name": "浅灰色",
+          "color_family": "gray",
+          "aliases": [],
+          "levels": [],
+          "level_status": "not_disclosed",
+          "product_image_path": "/product-assets/color-variants/douyin_3763760159604736414/04-浅灰色.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/15-首品/010-S255bvTb0oJvcVxP34KcLaLfnlh.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3763760159604736414/04-浅灰色.jpg"
+        },
+        {
+          "color_name": "海王红",
+          "color_family": "red",
+          "aliases": [],
+          "levels": [],
+          "level_status": "not_disclosed",
+          "product_image_path": "/product-assets/color-variants/douyin_3763760159604736414/05-海王红.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/15-首品/004-LZRgbE6mno1y64xbPBvc8oNCn57.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3763760159604736414/05-海王红.jpg"
+        },
+        {
+          "color_name": "西西红",
+          "color_family": "red",
+          "aliases": [],
+          "levels": [],
+          "level_status": "not_disclosed",
+          "product_image_path": "/product-assets/color-variants/douyin_3763760159604736414/06-西西红.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/15-首品/010-S255bvTb0oJvcVxP34KcLaLfnlh.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3763760159604736414/06-西西红.jpg"
+        },
+        {
+          "color_name": "红棕色",
+          "color_family": "red",
+          "aliases": [],
+          "levels": [],
+          "level_status": "not_disclosed",
+          "product_image_path": "/product-assets/color-variants/douyin_3763760159604736414/07-红棕色.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/15-首品/010-S255bvTb0oJvcVxP34KcLaLfnlh.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3763760159604736414/07-红棕色.jpg"
+        },
+        {
+          "color_name": "娜拉红",
+          "color_family": "red",
+          "aliases": [],
+          "levels": [],
+          "level_status": "not_disclosed",
+          "product_image_path": "/product-assets/color-variants/douyin_3763760159604736414/08-娜拉红.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/15-首品/001-ZSFrbMGhJo1D4HxxW4YcAxLUnsH.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3763760159604736414/08-娜拉红.jpg"
+        },
+        {
+          "color_name": "芭比粉",
+          "color_family": "pink",
+          "aliases": [],
+          "levels": [],
+          "level_status": "not_disclosed",
+          "product_image_path": "/product-assets/color-variants/douyin_3763760159604736414/09-芭比粉.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/15-首品/010-S255bvTb0oJvcVxP34KcLaLfnlh.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3763760159604736414/09-芭比粉.jpg"
+        },
+        {
+          "color_name": "粉棕色",
+          "color_family": "pink",
+          "aliases": [],
+          "levels": [],
+          "level_status": "not_disclosed",
+          "product_image_path": "/product-assets/color-variants/douyin_3763760159604736414/10-粉棕色.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/15-首品/003-H8BcbVLjfo18TFx3Z1Rc9I42nIb.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3763760159604736414/10-粉棕色.jpg"
+        },
+        {
+          "color_name": "玫瑰甜棕",
+          "color_family": "pink",
+          "aliases": [],
+          "levels": [],
+          "level_status": "not_disclosed",
+          "product_image_path": "/product-assets/color-variants/douyin_3763760159604736414/11-玫瑰甜棕.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/15-首品/001-ZSFrbMGhJo1D4HxxW4YcAxLUnsH.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3763760159604736414/11-玫瑰甜棕.jpg"
+        },
+        {
+          "color_name": "樱花粉",
+          "color_family": "pink",
+          "aliases": [],
+          "levels": [],
+          "level_status": "not_disclosed",
+          "product_image_path": "/product-assets/color-variants/douyin_3763760159604736414/12-樱花粉.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/15-首品/003-H8BcbVLjfo18TFx3Z1Rc9I42nIb.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3763760159604736414/12-樱花粉.jpg"
+        },
+        {
+          "color_name": "摩卡深棕",
+          "color_family": "brown",
+          "aliases": [],
+          "levels": [],
+          "level_status": "not_disclosed",
+          "product_image_path": "/product-assets/color-variants/douyin_3763760159604736414/13-摩卡深棕.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/15-首品/010-S255bvTb0oJvcVxP34KcLaLfnlh.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3763760159604736414/13-摩卡深棕.jpg"
+        },
+        {
+          "color_name": "蜜茶棕",
+          "color_family": "brown",
+          "aliases": [],
+          "levels": [],
+          "level_status": "not_disclosed",
+          "product_image_path": "/product-assets/color-variants/douyin_3763760159604736414/14-蜜茶棕.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/15-首品/010-S255bvTb0oJvcVxP34KcLaLfnlh.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3763760159604736414/14-蜜茶棕.jpg"
+        },
+        {
+          "color_name": "蜜糖醇棕",
+          "color_family": "brown",
+          "aliases": [],
+          "levels": [],
+          "level_status": "not_disclosed",
+          "product_image_path": "/product-assets/color-variants/douyin_3763760159604736414/15-蜜糖醇棕.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/15-首品/010-S255bvTb0oJvcVxP34KcLaLfnlh.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3763760159604736414/15-蜜糖醇棕.jpg"
+        },
+        {
+          "color_name": "巧克力棕",
+          "color_family": "brown",
+          "aliases": [],
+          "levels": [],
+          "level_status": "not_disclosed",
+          "product_image_path": "/product-assets/color-variants/douyin_3763760159604736414/16-巧克力棕.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/15-首品/008-HVfFbKOu6oHLFoxBMCtcHUGynLf.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3763760159604736414/16-巧克力棕.jpg"
+        },
+        {
+          "color_name": "枫叶橙",
+          "color_family": "orange",
+          "aliases": [],
+          "levels": [],
+          "level_status": "not_disclosed",
+          "product_image_path": "/product-assets/color-variants/douyin_3763760159604736414/17-枫叶橙.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/15-首品/001-ZSFrbMGhJo1D4HxxW4YcAxLUnsH.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3763760159604736414/17-枫叶橙.jpg"
+        },
+        {
+          "color_name": "珊瑚橙",
+          "color_family": "orange",
+          "aliases": [],
+          "levels": [],
+          "level_status": "not_disclosed",
+          "product_image_path": "/product-assets/color-variants/douyin_3763760159604736414/18-珊瑚橙.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/15-首品/001-ZSFrbMGhJo1D4HxxW4YcAxLUnsH.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3763760159604736414/18-珊瑚橙.jpg"
+        },
+        {
+          "color_name": "芬达橙",
+          "color_family": "orange",
+          "aliases": [],
+          "levels": [],
+          "level_status": "not_disclosed",
+          "product_image_path": "/product-assets/color-variants/douyin_3763760159604736414/19-芬达橙.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/15-首品/010-S255bvTb0oJvcVxP34KcLaLfnlh.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3763760159604736414/19-芬达橙.jpg"
+        },
+        {
+          "color_name": "阳光橙",
+          "color_family": "orange",
+          "aliases": [],
+          "levels": [],
+          "level_status": "not_disclosed",
+          "product_image_path": "/product-assets/color-variants/douyin_3763760159604736414/20-阳光橙.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/15-首品/010-S255bvTb0oJvcVxP34KcLaLfnlh.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3763760159604736414/20-阳光橙.jpg"
+        },
+        {
+          "color_name": "深蓝色",
+          "color_family": "blue",
+          "aliases": [],
+          "levels": [],
+          "level_status": "not_disclosed",
+          "product_image_path": "/product-assets/color-variants/douyin_3763760159604736414/21-深蓝色.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/15-首品/010-S255bvTb0oJvcVxP34KcLaLfnlh.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3763760159604736414/21-深蓝色.jpg"
+        },
+        {
+          "color_name": "冰蓝色",
+          "color_family": "blue",
+          "aliases": [],
+          "levels": [],
+          "level_status": "not_disclosed",
+          "product_image_path": "/product-assets/color-variants/douyin_3763760159604736414/22-冰蓝色.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/15-首品/010-S255bvTb0oJvcVxP34KcLaLfnlh.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3763760159604736414/22-冰蓝色.jpg"
+        },
+        {
+          "color_name": "宝石蓝",
+          "color_family": "blue",
+          "aliases": [
+            "宝蓝"
+          ],
+          "levels": [],
+          "level_status": "not_disclosed",
+          "product_image_path": "/product-assets/color-variants/douyin_3763760159604736414/23-宝石蓝.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/15-首品/010-S255bvTb0oJvcVxP34KcLaLfnlh.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3763760159604736414/23-宝石蓝.jpg"
+        },
+        {
+          "color_name": "克莱因蓝",
+          "color_family": "blue",
+          "aliases": [],
+          "levels": [],
+          "level_status": "not_disclosed",
+          "product_image_path": "/product-assets/color-variants/douyin_3763760159604736414/24-克莱因蓝.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/15-首品/010-S255bvTb0oJvcVxP34KcLaLfnlh.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3763760159604736414/24-克莱因蓝.jpg"
+        },
+        {
+          "color_name": "紫棕色",
+          "color_family": "purple",
+          "aliases": [],
+          "levels": [],
+          "level_status": "not_disclosed",
+          "product_image_path": "/product-assets/color-variants/douyin_3763760159604736414/25-紫棕色.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/15-首品/010-S255bvTb0oJvcVxP34KcLaLfnlh.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3763760159604736414/25-紫棕色.jpg"
+        },
+        {
+          "color_name": "星空紫",
+          "color_family": "purple",
+          "aliases": [],
+          "levels": [],
+          "level_status": "not_disclosed",
+          "product_image_path": "/product-assets/color-variants/douyin_3763760159604736414/26-星空紫.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/15-首品/010-S255bvTb0oJvcVxP34KcLaLfnlh.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3763760159604736414/26-星空紫.jpg"
+        },
+        {
+          "color_name": "葡萄紫",
+          "color_family": "purple",
+          "aliases": [],
+          "levels": [],
+          "level_status": "not_disclosed",
+          "product_image_path": "/product-assets/color-variants/douyin_3763760159604736414/27-葡萄紫.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/15-首品/010-S255bvTb0oJvcVxP34KcLaLfnlh.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3763760159604736414/27-葡萄紫.jpg"
+        },
+        {
+          "color_name": "紫红色",
+          "color_family": "purple",
+          "aliases": [],
+          "levels": [],
+          "level_status": "not_disclosed",
+          "product_image_path": "/product-assets/color-variants/douyin_3763760159604736414/28-紫红色.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/15-首品/010-S255bvTb0oJvcVxP34KcLaLfnlh.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3763760159604736414/28-紫红色.jpg"
+        },
+        {
+          "color_name": "墨绿色",
+          "color_family": "green",
+          "aliases": [],
+          "levels": [],
+          "level_status": "not_disclosed",
+          "product_image_path": "/product-assets/color-variants/douyin_3763760159604736414/29-墨绿色.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/15-首品/010-S255bvTb0oJvcVxP34KcLaLfnlh.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3763760159604736414/29-墨绿色.jpg"
+        },
+        {
+          "color_name": "人鱼绿",
+          "color_family": "green",
+          "aliases": [],
+          "levels": [],
+          "level_status": "not_disclosed",
+          "product_image_path": "/product-assets/color-variants/douyin_3763760159604736414/30-人鱼绿.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/15-首品/010-S255bvTb0oJvcVxP34KcLaLfnlh.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3763760159604736414/30-人鱼绿.jpg"
+        },
+        {
+          "color_name": "松石绿",
+          "color_family": "green",
+          "aliases": [],
+          "levels": [],
+          "level_status": "not_disclosed",
+          "product_image_path": "/product-assets/color-variants/douyin_3763760159604736414/31-松石绿.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/15-首品/010-S255bvTb0oJvcVxP34KcLaLfnlh.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3763760159604736414/31-松石绿.jpg"
+        },
+        {
+          "color_name": "北极星绿",
+          "color_family": "green",
+          "aliases": [],
+          "levels": [],
+          "level_status": "not_disclosed",
+          "product_image_path": "/product-assets/color-variants/douyin_3763760159604736414/32-北极星绿.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/15-首品/010-S255bvTb0oJvcVxP34KcLaLfnlh.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3763760159604736414/32-北极星绿.jpg"
+        },
+        {
+          "color_name": "奶茶棕",
+          "color_family": "gray_brown",
+          "aliases": [],
+          "levels": [],
+          "level_status": "not_disclosed",
+          "product_image_path": "/product-assets/color-variants/douyin_3763760159604736414/33-奶茶棕.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/15-首品/010-S255bvTb0oJvcVxP34KcLaLfnlh.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3763760159604736414/33-奶茶棕.jpg"
+        },
+        {
+          "color_name": "榛果灰棕",
+          "color_family": "gray_brown",
+          "aliases": [],
+          "levels": [],
+          "level_status": "not_disclosed",
+          "product_image_path": "/product-assets/color-variants/douyin_3763760159604736414/34-榛果灰棕.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/15-首品/010-S255bvTb0oJvcVxP34KcLaLfnlh.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3763760159604736414/34-榛果灰棕.jpg"
+        },
+        {
+          "color_name": "亚麻灰棕",
+          "color_family": "gray_brown",
+          "aliases": [],
+          "levels": [],
+          "level_status": "not_disclosed",
+          "product_image_path": "/product-assets/color-variants/douyin_3763760159604736414/35-亚麻灰棕.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/15-首品/010-S255bvTb0oJvcVxP34KcLaLfnlh.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3763760159604736414/35-亚麻灰棕.jpg"
+        },
+        {
+          "color_name": "奶茶灰棕",
+          "color_family": "gray_brown",
+          "aliases": [],
+          "levels": [],
+          "level_status": "not_disclosed",
+          "product_image_path": "/product-assets/color-variants/douyin_3763760159604736414/36-奶茶灰棕.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/15-首品/010-S255bvTb0oJvcVxP34KcLaLfnlh.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3763760159604736414/36-奶茶灰棕.jpg"
+        }
+      ],
+      "discount_prices_ignored": [
+        "券后价¥38",
+        "抖音商城App专享¥32"
+      ],
+      "source_screenshots": [
+        "knowledge-base/products/source-assets/15-首品/001-ZSFrbMGhJo1D4HxxW4YcAxLUnsH.jpg",
+        "knowledge-base/products/source-assets/15-首品/002-AJhNbHjh2oGnD6xnMaqc80C7nrb.jpg",
+        "knowledge-base/products/source-assets/15-首品/003-H8BcbVLjfo18TFx3Z1Rc9I42nIb.jpg",
+        "knowledge-base/products/source-assets/15-首品/004-LZRgbE6mno1y64xbPBvc8oNCn57.jpg",
+        "knowledge-base/products/source-assets/15-首品/005-C07PbZfRBoGQzXxuVqGcO3ncnef.jpg",
+        "knowledge-base/products/source-assets/15-首品/006-OElObwbaaoCEQXx54yXc5o04ndh.jpg",
+        "knowledge-base/products/source-assets/15-首品/007-BSVpbrDS1oXG0kxak2Acc8yQnoM.jpg",
+        "knowledge-base/products/source-assets/15-首品/008-HVfFbKOu6oHLFoxBMCtcHUGynLf.jpg",
+        "knowledge-base/products/source-assets/15-首品/009-FDqJb9gJ9oLBPdx0wbjcZdo3n3c.jpg",
+        "knowledge-base/products/source-assets/15-首品/010-S255bvTb0oJvcVxP34KcLaLfnlh.jpg",
+        "knowledge-base/products/source-assets/15-首品/011-UdpzbJDJ8ok3O5xNRKIcCMrinIh.jpg",
+        "knowledge-base/products/source-assets/15-首品/012-AOKhbp3ODoo2YOxurXkc6Amin7g.jpg",
+        "knowledge-base/products/source-assets/15-首品/013-ZsMQbBBiKoFCU6xePPoc8pnjnRt.jpg",
+        "knowledge-base/products/source-assets/15-首品/014-SJYlbdGruoV9dgx01oHcxLbRntc.jpg",
+        "knowledge-base/products/source-assets/15-首品/015-Frozben6ZoBGlxxxzZ2cf3hknce.jpg"
+      ],
+      "product_image_path": "/product-assets/product-masters/douyin_3763760159604736414.jpg",
+      "product_image_source_screenshot": "knowledge-base/products/source-assets/15-首品/001-ZSFrbMGhJo1D4HxxW4YcAxLUnsH.jpg",
+      "usage_guide": {
+        "text": "01:15；×；四*；591 4915；15/18；使用方法；轻松锁住头发颜色；1.湿发固色（日常固色）；漂染后搭配使用首品固色洗护，发色均匀持久；Step1；洗发后略微擦干头发，将首品固色；发膜在手心揉搓开后再均匀涂抹在；头发上。；Step2；充分梳理头发，确保发膜均匀分；布。（建议使用梳子以确保均匀）；Step3；停留3分钟后洗净。；*黑发使用没效果\n01:15；×；②*；16/18；2.干发固色（强力固色）；建议佩戴手套使用；Step 1；将头发分为4个区域戴；上手套、穿上披肩。；Step2；将首品固色发膜均匀；涂抹在干发上，覆盖所；有发丝。；Step 3；建议用梳子涂抹均匀充；分按摩确保每根发丝都；被包裹。\n01:15；×；②*；17/18；Step；4；停留3分钟以上，无需；加热。；Step 5；用温水冲洗，建议勿用；洗发水。；Step 6；后续建议持续搭配使用；首品固色洗护系列，维；持发色鲜亮。；备注：；1.最终使用效果受头发底色、发色、发质、头发受损情况、操作手法等因素影响因人而异。；2.若染后已经明显掉色，建议首次干发染色使用，效果更明显。；3.如有局部挑染的部位请着重涂抹。",
+        "image_paths": [
+          "/product-assets/usage/douyin_3763760159604736414/01.jpg",
+          "/product-assets/usage/douyin_3763760159604736414/02.jpg",
+          "/product-assets/usage/douyin_3763760159604736414/03.jpg"
+        ],
+        "source_screenshots": [
+          "knowledge-base/products/source-assets/15-首品/011-UdpzbJDJ8ok3O5xNRKIcCMrinIh.jpg",
+          "knowledge-base/products/source-assets/15-首品/012-AOKhbp3ODoo2YOxurXkc6Amin7g.jpg",
+          "knowledge-base/products/source-assets/15-首品/013-ZsMQbBBiKoFCU6xePPoc8pnjnRt.jpg"
+        ]
+      },
+      "product_image_library_path": "knowledge-base/products/derived-assets/product-masters/douyin_3763760159604736414.jpg"
+    },
+    {
+      "product_id": "douyin_3532983050122197537",
+      "brand_name": "COLORLOMO卡洛美",
+      "brand_aliases": [
+        "COLORLOMO",
+        "卡洛美"
+      ],
+      "product_name": "COLORLOMO卡洛美固色护发素潮色漂染强力补色固色发膜红色奶茶色",
+      "product_type": "color_deposit_mask",
+      "shop_name": "COLORLOMO官方海外旗舰店",
+      "douyin_url": "https://v.douyin.com/ut65y6IpV4g/",
+      "product_image_url": "https://p26-item.ecombdimg.com/img/ecom-shop-material/jpeg_m_f48c19e4368920f2f5475e1c78ba4ee0_sx_460754_www800-800~tplv-5mmsx3fupr-image.png",
+      "listing_price": {
+        "min": 89.1,
+        "max": 89.1,
+        "scope": "regular_original_price",
+        "basis": "regular_price_before_discount"
+      },
+      "sales_count": 64350,
+      "capacity_text": "180ml",
+      "quantity_policy_id": "official_colorlomo_180ml_dry",
+      "official_params": {
+        "net_content": "180ml",
+        "functions": [
+          "改善毛躁",
+          "补水",
+          "染后护发",
+          "锁色"
+        ],
+        "special_use_cosmetic": false
+      },
+      "merchant_claims": [
+        "湿发日常固色",
+        "干发强力补色",
+        "上色力较强",
+        "快速补色"
+      ],
+      "known_risks": [
+        "仅限漂染后秀发使用，深色头发使用无效",
+        "蓝色在偏黄底色上可能偏绿",
+        "底色越深显色越暗"
+      ],
+      "colors": [
+        {
+          "color_name": "黑茶色",
+          "color_family": "brown",
+          "aliases": [
+            "DARK BROWN"
+          ],
+          "levels": [
+            4,
+            5,
+            6,
+            7,
+            8,
+            9
+          ],
+          "level_status": "official_effect_chart",
+          "product_image_path": "/product-assets/color-variants/douyin_3532983050122197537/01-黑茶色.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/15-首品/016-L17SbTyW6odkZExiYyscDw2vndg.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3532983050122197537/01-黑茶色.jpg"
+        },
+        {
+          "color_name": "奶茶灰棕",
+          "color_family": "gray_brown",
+          "aliases": [
+            "MOCHA"
+          ],
+          "levels": [
+            6,
+            7,
+            8,
+            9
+          ],
+          "level_status": "official_effect_chart",
+          "product_image_path": "/product-assets/color-variants/douyin_3532983050122197537/02-奶茶灰棕.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/15-首品/016-L17SbTyW6odkZExiYyscDw2vndg.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3532983050122197537/02-奶茶灰棕.jpg"
+        },
+        {
+          "color_name": "奶茶金",
+          "color_family": "brown",
+          "aliases": [
+            "LIGHT ASH BROWN"
+          ],
+          "levels": [
+            8,
+            9
+          ],
+          "level_status": "official_effect_chart",
+          "product_image_path": "/product-assets/color-variants/douyin_3532983050122197537/03-奶茶金.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/15-首品/016-L17SbTyW6odkZExiYyscDw2vndg.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3532983050122197537/03-奶茶金.jpg"
+        },
+        {
+          "color_name": "雾霾灰",
+          "color_family": "gray",
+          "aliases": [
+            "EXTREME SILVER"
+          ],
+          "levels": [
+            6,
+            7,
+            8,
+            9
+          ],
+          "level_status": "official_effect_chart",
+          "product_image_path": "/product-assets/color-variants/douyin_3532983050122197537/04-雾霾灰.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/15-首品/016-L17SbTyW6odkZExiYyscDw2vndg.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3532983050122197537/04-雾霾灰.jpg"
+        },
+        {
+          "color_name": "银灰色",
+          "color_family": "gray",
+          "aliases": [
+            "SILVER"
+          ],
+          "levels": [
+            8,
+            9
+          ],
+          "level_status": "official_effect_chart",
+          "product_image_path": "/product-assets/color-variants/douyin_3532983050122197537/05-银灰色.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/15-首品/016-L17SbTyW6odkZExiYyscDw2vndg.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3532983050122197537/05-银灰色.jpg"
+        },
+        {
+          "color_name": "红色",
+          "color_family": "red",
+          "aliases": [
+            "RED"
+          ],
+          "levels": [
+            5,
+            6,
+            7,
+            8,
+            9
+          ],
+          "level_status": "official_effect_chart",
+          "product_image_path": "/product-assets/color-variants/douyin_3532983050122197537/06-红色.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/15-首品/016-L17SbTyW6odkZExiYyscDw2vndg.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3532983050122197537/06-红色.jpg"
+        },
+        {
+          "color_name": "树莓红",
+          "color_family": "red",
+          "aliases": [
+            "MERLOT"
+          ],
+          "levels": [
+            6,
+            7,
+            8,
+            9
+          ],
+          "level_status": "official_effect_chart",
+          "product_image_path": "/product-assets/color-variants/douyin_3532983050122197537/07-树莓红.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/15-首品/016-L17SbTyW6odkZExiYyscDw2vndg.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3532983050122197537/07-树莓红.jpg"
+        },
+        {
+          "color_name": "粉棕色",
+          "color_family": "pink",
+          "aliases": [
+            "ROSE BROWN"
+          ],
+          "levels": [
+            6,
+            7,
+            8,
+            9
+          ],
+          "level_status": "official_effect_chart",
+          "product_image_path": "/product-assets/color-variants/douyin_3532983050122197537/08-粉棕色.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/15-首品/016-L17SbTyW6odkZExiYyscDw2vndg.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3532983050122197537/08-粉棕色.jpg"
+        },
+        {
+          "color_name": "粉色",
+          "color_family": "pink",
+          "aliases": [
+            "PINK"
+          ],
+          "levels": [
+            8,
+            9
+          ],
+          "level_status": "official_effect_chart",
+          "product_image_path": "/product-assets/color-variants/douyin_3532983050122197537/09-粉色.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/15-首品/016-L17SbTyW6odkZExiYyscDw2vndg.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3532983050122197537/09-粉色.jpg"
+        },
+        {
+          "color_name": "脏橘色",
+          "color_family": "orange",
+          "aliases": [
+            "COPPER"
+          ],
+          "levels": [
+            5,
+            6,
+            7,
+            8,
+            9
+          ],
+          "level_status": "official_effect_chart",
+          "product_image_path": "/product-assets/color-variants/douyin_3532983050122197537/10-脏橘色.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/15-首品/016-L17SbTyW6odkZExiYyscDw2vndg.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3532983050122197537/10-脏橘色.jpg"
+        },
+        {
+          "color_name": "橙色",
+          "color_family": "orange",
+          "aliases": [
+            "ORANGE"
+          ],
+          "levels": [
+            6,
+            7,
+            8,
+            9
+          ],
+          "level_status": "official_effect_chart",
+          "product_image_path": "/product-assets/color-variants/douyin_3532983050122197537/11-橙色.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/15-首品/016-L17SbTyW6odkZExiYyscDw2vndg.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3532983050122197537/11-橙色.jpg"
+        },
+        {
+          "color_name": "蓝色",
+          "color_family": "blue",
+          "aliases": [
+            "BLUE"
+          ],
+          "levels": [
+            6,
+            7,
+            8,
+            9
+          ],
+          "recommended_min_level": 8,
+          "level_status": "official_effect_chart",
+          "product_image_path": "/product-assets/color-variants/douyin_3532983050122197537/12-蓝色.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/15-首品/016-L17SbTyW6odkZExiYyscDw2vndg.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3532983050122197537/12-蓝色.jpg"
+        },
+        {
+          "color_name": "紫色",
+          "color_family": "purple",
+          "aliases": [
+            "PURPLE"
+          ],
+          "levels": [
+            6,
+            7,
+            8,
+            9
+          ],
+          "recommended_min_level": 7,
+          "level_status": "official_effect_chart",
+          "product_image_path": "/product-assets/color-variants/douyin_3532983050122197537/13-紫色.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/15-首品/016-L17SbTyW6odkZExiYyscDw2vndg.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3532983050122197537/13-紫色.jpg"
+        },
+        {
+          "color_name": "青色",
+          "color_family": "green",
+          "aliases": [
+            "TEAL"
+          ],
+          "levels": [
+            6,
+            7,
+            8,
+            9
+          ],
+          "recommended_min_level": 7,
+          "level_status": "official_effect_chart",
+          "product_image_path": "/product-assets/color-variants/douyin_3532983050122197537/14-青色.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/15-首品/016-L17SbTyW6odkZExiYyscDw2vndg.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3532983050122197537/14-青色.jpg"
+        }
+      ],
+      "discount_prices_ignored": [],
+      "source_screenshots": [
+        "knowledge-base/products/source-assets/15-首品/016-L17SbTyW6odkZExiYyscDw2vndg.jpg"
+      ],
+      "product_image_path": "/product-assets/product-masters/douyin_3532983050122197537.jpg",
+      "product_image_source_screenshot": "knowledge-base/products/source-assets/15-首品/016-L17SbTyW6odkZExiYyscDw2vndg.jpg",
+      "usage_guide": {
+        "text": "湿发日常固色：洗发后略微擦干，将发膜在手心揉开后均匀涂抹并梳匀，停留约3分钟后洗净。干发补色：佩戴手套，将头发分成4区，把发膜覆盖全部干发并梳匀，停留15分钟以上，无需加热；用温水冲洗，建议当次不用洗发水。官方用量图：干发补色时齐耳/男士短发1支180ml、齐肩中发1–1.5支、过肩长发2–3支；湿发固色按棒子/丘丘球大小取量。湿发固色建议染后开始使用、每周2–3次、约3分钟；干发补色在严重掉色或漂后直接染色时按需使用、约15分钟。",
+        "image_paths": [
+          "/product-assets/usage/douyin_3532983050122197537/01.jpg",
+          "/product-assets/usage/douyin_3532983050122197537/02.jpg"
+        ],
+        "source_screenshots": [
+          "knowledge-base/products/source-assets/colorlomo-user-evidence/usage-method.png",
+          "knowledge-base/products/source-assets/colorlomo-user-evidence/quantity-frequency.png"
+        ]
+      },
+      "product_image_library_path": "knowledge-base/products/derived-assets/product-masters/douyin_3532983050122197537.jpg"
+    },
+    {
+      "product_id": "douyin_3648409433551280580",
+      "brand_name": "OKCS",
+      "brand_aliases": [],
+      "product_name": "OKCS染发膏遮盖白发在家自己染发树莓红玫瑰粉棕显白发色推荐DB",
+      "product_type": "hair_dye_cream",
+      "shop_name": "OKCS官方旗舰店",
+      "douyin_url": "https://v.douyin.com/ykMjYJEJC8k/",
+      "product_image_url": "https://p3-item.ecombdimg.com/img/ecom-shop-material/jpeg_m_72a82de6d7529b3a6bdbdfe879c908b2_sx_178780_www800-800~tplv-5mmsx3fupr-image.png",
+      "listing_price": {
+        "min": 39,
+        "max": 79,
+        "scope": "regular_original_price_range",
+        "basis": "regular_price_before_discount"
+      },
+      "sales_count": 488027,
+      "capacity_text": "短发装、中发装、长发装均含1份工具包；实际染膏净含量待确认",
+      "quantity_policy_id": "official_okcs_box_count",
+      "official_params": {
+        "applicable_people": "成人",
+        "not_applicable": [
+          "孕妇",
+          "婴幼儿",
+          "哺乳期"
+        ],
+        "applicable_season": "各季"
+      },
+      "merchant_claims": [
+        "免漂23色可选",
+        "商家宣称低氨配方",
+        "染膏采用胶囊毛鳞片包裹工艺"
+      ],
+      "known_risks": [
+        "已从商品图录入23个色号，但短发装、中发装和长发装对应原价仍是区间，尚不能把单个色号绑定到精确单价",
+        "黑色染发史需先漂发才可能正常上色，本产品不提供居家漂发指导",
+        "发量多且浓密或发质粗硬时应按官方提示多备1盒"
+      ],
+      "colors": [
+        {
+          "color_name": "树莓红",
+          "color_family": "red",
+          "aliases": [
+            "红色"
+          ],
+          "levels": [
+            3,
+            6,
+            9
+          ],
+          "level_status": "merchant_says_3_6_9_base_compatible",
+          "product_image_path": "/product-assets/color-variants/douyin_3648409433551280580/01-树莓红.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/16-okcs/001-I8bCbE9kYoHa0jxNJd5cNkSknye.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3648409433551280580/01-树莓红.jpg"
+        },
+        {
+          "color_name": "玫瑰粉棕",
+          "color_family": "pink",
+          "aliases": [
+            "粉棕"
+          ],
+          "levels": [
+            3,
+            6,
+            9
+          ],
+          "level_status": "merchant_says_3_6_9_base_compatible",
+          "product_image_path": "/product-assets/color-variants/douyin_3648409433551280580/02-玫瑰粉棕.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/16-okcs/001-I8bCbE9kYoHa0jxNJd5cNkSknye.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3648409433551280580/02-玫瑰粉棕.jpg"
+        },
+        {
+          "color_name": "莫奈肉桂",
+          "color_family": "other",
+          "aliases": [],
+          "levels": [],
+          "level_status": "visible_in_source_screenshot",
+          "product_image_path": "/product-assets/color-variants/douyin_3648409433551280580/03-莫奈肉桂.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/16-okcs/004-CuppbuMlsoY44xxNuFicGKb3nug.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3648409433551280580/03-莫奈肉桂.jpg"
+        },
+        {
+          "color_name": "亚麻灰棕",
+          "color_family": "gray_brown",
+          "aliases": [],
+          "levels": [],
+          "level_status": "visible_in_source_screenshot",
+          "product_image_path": "/product-assets/color-variants/douyin_3648409433551280580/04-亚麻灰棕.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/16-okcs/005-K6pvbgIcpoVldSxHX7ycHfhxnpb.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3648409433551280580/04-亚麻灰棕.jpg"
+        },
+        {
+          "color_name": "伦敦奶咖",
+          "color_family": "brown",
+          "aliases": [],
+          "levels": [],
+          "level_status": "visible_in_source_screenshot",
+          "product_image_path": "/product-assets/color-variants/douyin_3648409433551280580/05-伦敦奶咖.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/16-okcs/006-CMWQbuhvZoe3sXxqDDccVCO5nhh.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3648409433551280580/05-伦敦奶咖.jpg"
+        },
+        {
+          "color_name": "哥特冷黑",
+          "color_family": "brown",
+          "aliases": [],
+          "levels": [],
+          "level_status": "visible_in_source_screenshot",
+          "product_image_path": "/product-assets/color-variants/douyin_3648409433551280580/06-哥特冷黑.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/16-okcs/007-GPa3byX7Powqtnxt2CeczP3onoc.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3648409433551280580/06-哥特冷黑.jpg"
+        },
+        {
+          "color_name": "熔岩榛巧",
+          "color_family": "brown",
+          "aliases": [],
+          "levels": [],
+          "level_status": "visible_in_source_screenshot",
+          "product_image_path": "/product-assets/color-variants/douyin_3648409433551280580/07-熔岩榛巧.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/16-okcs/008-ZVUeb0l9co9FMqxbeeycWtxGnwf.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3648409433551280580/07-熔岩榛巧.jpg"
+        },
+        {
+          "color_name": "英式早茶",
+          "color_family": "brown",
+          "aliases": [],
+          "levels": [],
+          "level_status": "visible_in_source_screenshot",
+          "product_image_path": "/product-assets/color-variants/douyin_3648409433551280580/08-英式早茶.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/16-okcs/009-EJTsbo8cToS2GIxQ99vcY20Snnc.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3648409433551280580/08-英式早茶.jpg"
+        },
+        {
+          "color_name": "乌木褐棕",
+          "color_family": "brown",
+          "aliases": [],
+          "levels": [],
+          "level_status": "visible_in_source_screenshot",
+          "product_image_path": "/product-assets/color-variants/douyin_3648409433551280580/09-乌木褐棕.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/16-okcs/010-UTxKbOEwloAs6dxhVonc2ncAnde.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3648409433551280580/09-乌木褐棕.jpg"
+        },
+        {
+          "color_name": "沙漠玫瑰",
+          "color_family": "pink",
+          "aliases": [],
+          "levels": [],
+          "level_status": "visible_in_source_screenshot",
+          "product_image_path": "/product-assets/color-variants/douyin_3648409433551280580/10-沙漠玫瑰.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/16-okcs/011-C9jIbE6WdoYEwyxTVmqcsKVFnSc.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3648409433551280580/10-沙漠玫瑰.jpg"
+        },
+        {
+          "color_name": "星空紫藤",
+          "color_family": "purple",
+          "aliases": [],
+          "levels": [],
+          "level_status": "visible_in_source_screenshot",
+          "product_image_path": "/product-assets/color-variants/douyin_3648409433551280580/11-星空紫藤.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/16-okcs/012-Xzm2br6qMoHezDxCA9XcuLEvnsg.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3648409433551280580/11-星空紫藤.jpg"
+        },
+        {
+          "color_name": "雅典娜紫",
+          "color_family": "purple",
+          "aliases": [],
+          "levels": [],
+          "level_status": "visible_in_source_screenshot",
+          "product_image_path": "/product-assets/color-variants/douyin_3648409433551280580/12-雅典娜紫.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/16-okcs/013-XlWSb4MlaobDlExCELrcd3Eznbh.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3648409433551280580/12-雅典娜紫.jpg"
+        },
+        {
+          "color_name": "法式藤棕",
+          "color_family": "purple",
+          "aliases": [],
+          "levels": [],
+          "level_status": "visible_in_source_screenshot",
+          "product_image_path": "/product-assets/color-variants/douyin_3648409433551280580/13-法式藤棕.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/16-okcs/014-UDXJblGvMo0ecTxX9EFcFbytnab.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3648409433551280580/13-法式藤棕.jpg"
+        },
+        {
+          "color_name": "榛子松露",
+          "color_family": "brown",
+          "aliases": [],
+          "levels": [],
+          "level_status": "visible_in_source_screenshot",
+          "product_image_path": "/product-assets/color-variants/douyin_3648409433551280580/14-榛子松露.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/16-okcs/015-NkBPbyQRLoofcGx8bKbcNI2nnwb.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3648409433551280580/14-榛子松露.jpg"
+        },
+        {
+          "color_name": "红陌樱花",
+          "color_family": "pink",
+          "aliases": [],
+          "levels": [],
+          "level_status": "visible_in_source_screenshot",
+          "product_image_path": "/product-assets/color-variants/douyin_3648409433551280580/15-红陌樱花.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/16-okcs/016-Sqapb3kAVorvYDxsFo2cUzd2nqh.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3648409433551280580/15-红陌樱花.jpg"
+        },
+        {
+          "color_name": "边境红枫",
+          "color_family": "red",
+          "aliases": [],
+          "levels": [],
+          "level_status": "visible_in_source_screenshot",
+          "product_image_path": "/product-assets/color-variants/douyin_3648409433551280580/16-边境红枫.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/16-okcs/017-SV7LbwZUUolbn1xdDgOcchEjnpg.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3648409433551280580/16-边境红枫.jpg"
+        },
+        {
+          "color_name": "海盐薄荷",
+          "color_family": "other",
+          "aliases": [],
+          "levels": [],
+          "level_status": "visible_in_source_screenshot",
+          "product_image_path": "/product-assets/color-variants/douyin_3648409433551280580/17-海盐薄荷.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/16-okcs/018-DEppbHjbRoGdHdxqH7gcUrbwnOe.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3648409433551280580/17-海盐薄荷.jpg"
+        },
+        {
+          "color_name": "焦糖奶茶",
+          "color_family": "orange",
+          "aliases": [],
+          "levels": [],
+          "level_status": "visible_in_source_screenshot",
+          "product_image_path": "/product-assets/color-variants/douyin_3648409433551280580/18-焦糖奶茶.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/16-okcs/019-Tza3bNWQqoZnLZxhBs1crExvnmd.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3648409433551280580/18-焦糖奶茶.jpg"
+        },
+        {
+          "color_name": "浅海鸢尾",
+          "color_family": "blue",
+          "aliases": [],
+          "levels": [],
+          "level_status": "visible_in_source_screenshot",
+          "product_image_path": "/product-assets/color-variants/douyin_3648409433551280580/19-浅海鸢尾.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/16-okcs/020-H0zdb9FtBowI7Zxqeqycrgh9nSf.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3648409433551280580/19-浅海鸢尾.jpg"
+        },
+        {
+          "color_name": "元气粉橘",
+          "color_family": "pink",
+          "aliases": [],
+          "levels": [],
+          "level_status": "visible_in_source_screenshot",
+          "product_image_path": "/product-assets/color-variants/douyin_3648409433551280580/20-元气粉橘.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/16-okcs/021-LUtkbpsqHoq0gAxKccbcsp3Znng.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3648409433551280580/20-元气粉橘.jpg"
+        },
+        {
+          "color_name": "罗马曼波红",
+          "color_family": "red",
+          "aliases": [],
+          "levels": [],
+          "level_status": "visible_in_source_screenshot",
+          "product_image_path": "/product-assets/color-variants/douyin_3648409433551280580/21-罗马曼波红.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/16-okcs/022-K81sbiGAyofLFNxdyv8c6LFEnGe.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3648409433551280580/21-罗马曼波红.jpg"
+        },
+        {
+          "color_name": "莫桑比克粉",
+          "color_family": "pink",
+          "aliases": [],
+          "levels": [],
+          "level_status": "visible_in_source_screenshot",
+          "product_image_path": "/product-assets/color-variants/douyin_3648409433551280580/22-莫桑比克粉.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/16-okcs/023-EtW3b9swWohdljxu064cfY3hnve.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3648409433551280580/22-莫桑比克粉.jpg"
+        },
+        {
+          "color_name": "诺达雨林绿",
+          "color_family": "green",
+          "aliases": [],
+          "levels": [],
+          "level_status": "visible_in_source_screenshot",
+          "product_image_path": "/product-assets/color-variants/douyin_3648409433551280580/23-诺达雨林绿.jpg",
+          "source_screenshot": "knowledge-base/products/source-assets/16-okcs/024-TEw2bnzTUooE7cxzJ4wcCJysnfd.jpg",
+          "product_image_library_path": "knowledge-base/products/derived-assets/color-variants/douyin_3648409433551280580/23-诺达雨林绿.jpg"
+        }
+      ],
+      "discount_prices_ignored": [
+        "抖音商城App专享¥33"
+      ],
+      "source_screenshots": [
+        "knowledge-base/products/source-assets/16-okcs/001-I8bCbE9kYoHa0jxNJd5cNkSknye.jpg",
+        "knowledge-base/products/source-assets/16-okcs/002-BpqHbPGj9ocjHDx5I5ycHXpGnMe.jpg",
+        "knowledge-base/products/source-assets/16-okcs/003-CE8Obt7MVoGkuuxg77acflPDnGc.jpg",
+        "knowledge-base/products/source-assets/16-okcs/004-CuppbuMlsoY44xxNuFicGKb3nug.jpg",
+        "knowledge-base/products/source-assets/16-okcs/005-K6pvbgIcpoVldSxHX7ycHfhxnpb.jpg",
+        "knowledge-base/products/source-assets/16-okcs/006-CMWQbuhvZoe3sXxqDDccVCO5nhh.jpg",
+        "knowledge-base/products/source-assets/16-okcs/007-GPa3byX7Powqtnxt2CeczP3onoc.jpg",
+        "knowledge-base/products/source-assets/16-okcs/008-ZVUeb0l9co9FMqxbeeycWtxGnwf.jpg",
+        "knowledge-base/products/source-assets/16-okcs/009-EJTsbo8cToS2GIxQ99vcY20Snnc.jpg",
+        "knowledge-base/products/source-assets/16-okcs/010-UTxKbOEwloAs6dxhVonc2ncAnde.jpg",
+        "knowledge-base/products/source-assets/16-okcs/011-C9jIbE6WdoYEwyxTVmqcsKVFnSc.jpg",
+        "knowledge-base/products/source-assets/16-okcs/012-Xzm2br6qMoHezDxCA9XcuLEvnsg.jpg",
+        "knowledge-base/products/source-assets/16-okcs/013-XlWSb4MlaobDlExCELrcd3Eznbh.jpg",
+        "knowledge-base/products/source-assets/16-okcs/014-UDXJblGvMo0ecTxX9EFcFbytnab.jpg",
+        "knowledge-base/products/source-assets/16-okcs/015-NkBPbyQRLoofcGx8bKbcNI2nnwb.jpg",
+        "knowledge-base/products/source-assets/16-okcs/016-Sqapb3kAVorvYDxsFo2cUzd2nqh.jpg",
+        "knowledge-base/products/source-assets/16-okcs/017-SV7LbwZUUolbn1xdDgOcchEjnpg.jpg",
+        "knowledge-base/products/source-assets/16-okcs/018-DEppbHjbRoGdHdxqH7gcUrbwnOe.jpg",
+        "knowledge-base/products/source-assets/16-okcs/019-Tza3bNWQqoZnLZxhBs1crExvnmd.jpg",
+        "knowledge-base/products/source-assets/16-okcs/020-H0zdb9FtBowI7Zxqeqycrgh9nSf.jpg",
+        "knowledge-base/products/source-assets/16-okcs/021-LUtkbpsqHoq0gAxKccbcsp3Znng.jpg",
+        "knowledge-base/products/source-assets/16-okcs/022-K81sbiGAyofLFNxdyv8c6LFEnGe.jpg",
+        "knowledge-base/products/source-assets/16-okcs/023-EtW3b9swWohdljxu064cfY3hnve.jpg",
+        "knowledge-base/products/source-assets/16-okcs/024-TEw2bnzTUooE7cxzJ4wcCJysnfd.jpg",
+        "knowledge-base/products/source-assets/16-okcs/025-ZeqxbQUkLoPC7lx9IspcyqvunPd.jpg"
+      ],
+      "product_image_path": "/product-assets/product-masters/douyin_3648409433551280580.jpg",
+      "product_image_source_screenshot": "knowledge-base/products/source-assets/16-okcs/001-I8bCbE9kYoHa0jxNJd5cNkSknye.jpg",
+      "usage_guide": {
+        "text": "",
+        "image_paths": [],
+        "source_screenshots": []
+      },
+      "product_image_library_path": "knowledge-base/products/derived-assets/product-masters/douyin_3648409433551280580.jpg"
+    }
+  ],
+  "source_document": {
+    "platform": "feishu_wiki",
+    "url": "https://my.feishu.cn/wiki/T4ZAwePFXim4AxkhsNEckFCdnqd",
+    "document_token": "R3fpdKidmo1FSFxv2EZcNnEMnCg",
+    "revision_id": 98,
+    "screenshot_count": 214,
+    "extra_user_evidence_count": 2
+  }
+}

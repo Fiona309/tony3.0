@@ -1,0 +1,27 @@
+[Unit]
+Description=Meifa FastAPI backend
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/meifa/backend
+EnvironmentFile=-/opt/meifa/backend/.env
+Environment=HOST=0.0.0.0
+Environment=PORT=8000
+Environment=DATA_DIR=/opt/meifa/backend/data
+Environment=MEDIA_DIR=/opt/meifa/backend/data/media
+Environment=DB_PATH=/opt/meifa/backend/data/meifa.db
+Environment=CHROMA_DIR=/opt/meifa/backend/data/chroma_data
+Environment=MODEL_CACHE_DIR=/opt/meifa/backend/data/models
+Environment=MOCK_MODELS=false
+Environment=ASR_PROVIDER=sensevoice
+Environment=SENSEVOICE_DEVICE=cpu
+ExecStart=/opt/meifa/backend/.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000
+Restart=always
+RestartSec=5
+StandardOutput=append:/opt/meifa/logs/backend.log
+StandardError=append:/opt/meifa/logs/backend.err.log
+
+[Install]
+WantedBy=multi-user.target

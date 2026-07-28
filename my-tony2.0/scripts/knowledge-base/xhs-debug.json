@@ -1,0 +1,213 @@
+{
+  "text": "创作中心\n业务合作\n发现\n直播\n发布\n通知\n\n沪ICP备13030189号 | 营业执照 | 2024沪公网安备31010102002533号 | 增值电信业务经营许可证：沪B2-20150021 | 医疗器械网络交易服务第三方平台备案：(沪)网械平台备字[2019]第00006号 | 互联网药品信息服务资格证书：(沪)-经营性-2023-0144 | 违法不良信息举报电话：4006676810 | 上海市互联网举报中心 | 网上有害信息举报专区 | 自营经营者信息 | 网络文化经营许可证：沪网文(2024)1344-086号 | 个性化推荐算法 网信算备310101216601302230019号\n\n© 2014-2026\n\n行吟信息科技（上海）有限公司\n\n地址：上海市黄浦区马当路388号C座\n\n电话：9501-3888\n\n更多\n关于我们\n\n沪ICP备13030189号 | 营业执照 | 2024沪公网安备31010102002533号 | 增值电信业务经营许可证：沪B2-20150021 | 医疗器械网络交易服务第三方平台备案：(沪)网械平台备字[2019]第00006号 | 互联网药品信息服务资格证书：(沪)-经营性-2023-0144 | 违法不良信息举报电话：4006676810 | 上海市互联网举报中心 | 网上有害信息举报专区 | 自营经营者信息 | 网络文化经营许可证：沪网文(2024)1344-086号 | 个性化推荐算法 网信算备310101216601302230019号\n\n© 2014-2026\n\n行吟信息科技（上海）有限公司\n\n地址：上海市黄浦区马当路388号C座\n\n电话：9501-3888\n\n全部\n图文\n视频\n用户",
+  "classes": [
+    "layout",
+    "limit",
+    "header-container",
+    "mask-paper",
+    "header-logo",
+    "input-box",
+    "search-input",
+    "input-button",
+    "search-icon",
+    "[object",
+    "SVGAnimatedString]",
+    "reds-button-new",
+    "min-width-search-icon",
+    "large",
+    "primary",
+    "has-icon",
+    "pure-icon",
+    "reds-button-new-box",
+    "right",
+    "menu",
+    "dropdown-nav",
+    "channel-btn",
+    "text",
+    "reds-button-new-text",
+    "menu-icon-dropdown-nav",
+    "menu-icon-btn",
+    "main-container",
+    "side-bar",
+    "channel-list",
+    "channel-list-content",
+    "link-wrapper",
+    "channel",
+    "bottom-channel",
+    "badge-container",
+    "bottom-menu-component",
+    "app-info",
+    "icp-info",
+    "icp-text",
+    "corp-info",
+    "divider",
+    "information-container",
+    "information-wrapper",
+    "about-us-block",
+    "outside",
+    "with-side-bar",
+    "main-content",
+    "feeds-page",
+    "search-layout",
+    "search-layout__top",
+    "scroll-container",
+    "channel-scroll-container",
+    "content-container",
+    "active",
+    "search-layout__middle",
+    "search-layout__main",
+    "bottom-menu"
+  ],
+  "items": [
+    {
+      "tag": "A",
+      "class": "icp-text",
+      "text": "沪ICP备13030189号"
+    },
+    {
+      "tag": "A",
+      "class": "icp-text",
+      "text": "2024沪公网安备31010102002533号"
+    },
+    {
+      "tag": "A",
+      "class": "icp-text",
+      "text": "增值电信业务经营许可证：沪B2-20150021"
+    },
+    {
+      "tag": "A",
+      "class": "icp-text",
+      "text": "医疗器械网络交易服务第三方平台备案：(沪)网械平台备字[2019]第00006号"
+    },
+    {
+      "tag": "A",
+      "class": "icp-text",
+      "text": "互联网药品信息服务资格证书：(沪)-经营性-2023-0144"
+    },
+    {
+      "tag": "A",
+      "class": "icp-text",
+      "text": "违法不良信息举报电话：4006676810"
+    },
+    {
+      "tag": "A",
+      "class": "icp-text",
+      "text": "网络文化经营许可证：沪网文(2024)1344-086号"
+    },
+    {
+      "tag": "A",
+      "class": "icp-text",
+      "text": "个性化推荐算法 网信算备310101216601302230019号"
+    },
+    {
+      "tag": "DIV",
+      "class": "corp-info",
+      "text": "© 2014-2026行吟信息科技（上海）有限公司地址：上海市黄浦区马当路388号C座电话：9501-3888"
+    },
+    {
+      "tag": "P",
+      "class": "",
+      "text": "行吟信息科技（上海）有限公司"
+    },
+    {
+      "tag": "P",
+      "class": "",
+      "text": "地址：上海市黄浦区马当路388号C座"
+    },
+    {
+      "tag": "P",
+      "class": "",
+      "text": "电话：9501-3888"
+    },
+    {
+      "tag": "A",
+      "class": "icp-text",
+      "text": "沪ICP备13030189号"
+    },
+    {
+      "tag": "A",
+      "class": "icp-text",
+      "text": "2024沪公网安备31010102002533号"
+    },
+    {
+      "tag": "A",
+      "class": "icp-text",
+      "text": "增值电信业务经营许可证：沪B2-20150021"
+    },
+    {
+      "tag": "A",
+      "class": "icp-text",
+      "text": "医疗器械网络交易服务第三方平台备案：(沪)网械平台备字[2019]第00006号"
+    },
+    {
+      "tag": "A",
+      "class": "icp-text",
+      "text": "互联网药品信息服务资格证书：(沪)-经营性-2023-0144"
+    },
+    {
+      "tag": "A",
+      "class": "icp-text",
+      "text": "违法不良信息举报电话：4006676810"
+    },
+    {
+      "tag": "A",
+      "class": "icp-text",
+      "text": "网络文化经营许可证：沪网文(2024)1344-086号"
+    },
+    {
+      "tag": "A",
+      "class": "icp-text",
+      "text": "个性化推荐算法 网信算备310101216601302230019号"
+    },
+    {
+      "tag": "DIV",
+      "class": "corp-info",
+      "text": "© 2014-2026行吟信息科技（上海）有限公司地址：上海市黄浦区马当路388号C座电话：9501-3888"
+    },
+    {
+      "tag": "P",
+      "class": "",
+      "text": "行吟信息科技（上海）有限公司"
+    },
+    {
+      "tag": "P",
+      "class": "",
+      "text": "地址：上海市黄浦区马当路388号C座"
+    },
+    {
+      "tag": "P",
+      "class": "",
+      "text": "电话：9501-3888"
+    },
+    {
+      "tag": "DIV",
+      "class": "with-side-bar main-content",
+      "text": "全部 图文 视频 用户"
+    },
+    {
+      "tag": "DIV",
+      "class": "feeds-page",
+      "text": "全部 图文 视频 用户"
+    },
+    {
+      "tag": "DIV",
+      "class": "search-layout",
+      "text": "全部 图文 视频 用户"
+    },
+    {
+      "tag": "DIV",
+      "class": "search-layout__top",
+      "text": "全部 图文 视频 用户"
+    },
+    {
+      "tag": "DIV",
+      "class": "scroll-container channel-scroll-container",
+      "text": "全部 图文 视频 用户"
+    },
+    {
+      "tag": "DIV",
+      "class": "content-container",
+      "text": "全部 图文 视频 用户"
+    }
+  ]
+}

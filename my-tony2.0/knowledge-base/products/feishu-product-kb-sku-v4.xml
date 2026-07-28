@@ -1,0 +1,269 @@
+<h1>2. SKU 级 RAG 入库规则</h1>
+<callout background-color="rgb(240,246,255)" border-color="rgb(78,131,253)" emoji="✅">
+  <p><b>当前版本的唯一主表规则：</b>一行只代表一个“可以被单独购买的 SKU”。品牌、商品形态、颜色、容量、套装或销售平台任一不同，都必须拆成不同记录。商品页的最低价、最高价和多个 SKU 的价格区间，不得写成某个色号的单价。</p>
+</callout>
+<ol>
+  <li><b>不再使用“商品父记录＋颜色子记录”作为主要推荐数据。</b>后端直接检索 SKU 行，避免回查后把别的颜色、容量或价格拼错。</li>
+  <li><b>没有“其他品牌”“其他盒装染发膏”或通用品牌用量。</b>用量只能来自这个具体商品的官方页面、包装说明或清晰商品图。</li>
+  <li><b>不同商品形态必须拆开。</b>固色洗发水、固色发膜/护发素、染发膏、泡泡染不能合成一条。</li>
+  <li><b>不同容量或套装必须拆开。</b>例如单支 180ml、洗发水＋发膜套装、两支装分别是三个 SKU。</li>
+  <li><b>价格必须带证据。</b>保存币种、平台、店铺、购买链接和采集日期。只有 exact_sku_price 才参加预算过滤；listing_price、price_range 和待核实价格只作线索。</li>
+  <li><b>缺失字段不能猜。</b>统一填“待核实”，并把 is_recommendable 设为 false；补齐后才能进入最佳推荐或次推荐。</li>
+</ol>
+
+<h1>3. 后端使用的字段</h1>
+<table>
+  <colgroup>
+    <col width="150"/>
+    <col width="220"/>
+    <col width="330"/>
+  </colgroup>
+  <thead>
+    <tr>
+      <th><p>字段</p></th>
+      <th><p>大白话说明</p></th>
+      <th><p>后端用途</p></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td><p>sku_id</p></td><td><p>这条具体商品的唯一编号</p></td><td><p>防止同一品牌、不同色号或不同平台串数据</p></td></tr>
+    <tr><td><p>brand_name / product_name</p></td><td><p>品牌名和完整商品名</p></td><td><p>前端商品卡展示；品牌去重</p></td></tr>
+    <tr><td><p>product_type</p></td><td><p>染发膏、泡泡染、固色洗发水、固色发膜/护发素</p></td><td><p>只在用户已经选择的“染发”或“固色”范围内检索</p></td></tr>
+    <tr><td><p>color_name / color_family / aliases</p></td><td><p>商品官方色名、蓝/红等标准大色系、常见别名</p></td><td><p>“蓝色、宝蓝、克莱因蓝”等颜色召回</p></td></tr>
+    <tr><td><p>recommended_levels / result_notes</p></td><td><p>适合几度底色；不同底色可能出现什么效果</p></td><td><p>排除明显不适合当前底色的商品，并展示偏色风险</p></td></tr>
+    <tr><td><p>capacity / pack</p></td><td><p>单支容量、盒数和套装内容</p></td><td><p>区分 SKU，并计算买几支、几盒</p></td></tr>
+    <tr><td><p>unit_price / currency / price_status</p></td><td><p>这个 SKU 的精确单价、币种和价格是否可用于推荐</p></td><td><p>预算过滤；区间价和商品页起售价不得参与精确计算</p></td></tr>
+    <tr><td><p>quantity_rule</p></td><td><p>这个具体商品针对发长的官方用量</p></td><td><p>根据齐耳、齐肩、齐胸、齐腰、超长发计算购买数量</p></td></tr>
+    <tr><td><p>dry_hair_method / wet_hair_method</p></td><td><p>官方干发和湿发步骤</p></td><td><p>商品推荐后的操作指导；没有官方方法就不补写</p></td></tr>
+    <tr><td><p>leave_time / frequency</p></td><td><p>停留多久、多久使用一次</p></td><td><p>教程计时和固色频率提示</p></td></tr>
+    <tr><td><p>strengths / risks</p></td><td><p>商品事实＋模型生成的推荐理由和风险</p></td><td><p>前端优缺点；模型只能基于已入库事实改写</p></td></tr>
+    <tr><td><p>product_image_url / purchase_url</p></td><td><p>商品图片直链和购买链接</p></td><td><p>前端卡片展示与跳转；页面截图不能直接当永久图片地址</p></td></tr>
+    <tr><td><p>source_url / store / captured_at</p></td><td><p>从哪里得到、哪家店、哪天采集</p></td><td><p>价格复核和后续更新</p></td></tr>
+    <tr><td><p>is_recommendable</p></td><td><p>这一行资料是否已达到可推荐标准</p></td><td><p>false 的记录只进入补数队列，不参加最佳推荐</p></td></tr>
+  </tbody>
+</table>
+
+<h1>4. SKU 主表：已经能精确对应的商品</h1>
+<p>下表是一行一个 SKU。重复出现同一色号，是因为销售平台或商品形态不同；后端必须把它们当成不同记录。价格采集于 2026-07-26，随平台变动，前端应显示采集时间。</p>
+
+<h2>4.1 固色发膜/护发素与固色洗发水</h2>
+<table>
+  <colgroup>
+    <col width="115"/><col width="155"/><col width="95"/><col width="105"/><col width="105"/>
+    <col width="100"/><col width="145"/><col width="165"/><col width="220"/><col width="220"/>
+    <col width="145"/><col width="185"/><col width="190"/><col width="190"/>
+  </colgroup>
+  <thead>
+    <tr>
+      <th><p>SKU ID</p></th>
+      <th><p>品牌 / 商品</p></th>
+      <th><p>类型</p></th>
+      <th><p>颜色 / 色号</p></th>
+      <th><p>底色与效果</p></th>
+      <th><p>规格</p></th>
+      <th><p>精确单价</p></th>
+      <th><p>发长与购买量</p></th>
+      <th><p>干发方法</p></th>
+      <th><p>湿发方法</p></th>
+      <th><p>停留 / 频率</p></th>
+      <th><p>优点 / 推荐理由</p></th>
+      <th><p>风险 / 限制</p></th>
+      <th><p>平台、图片与购买链接</p></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><p>clm-cond-red-us-180</p></td><td><p>COLORLOMO Color Depositing Conditioner</p></td><td><p>固色发膜/护发素</p></td><td><p>RED 红色</p></td><td><p>5–9度可见；9度更偏玫调</p></td><td><p>180ml 单支</p></td><td><p>US$18.90；exact_sku_price</p></td><td><p>干发：齐耳1支；齐肩官方1–1.5支，购买2支；过肩官方2–3支，购买3支。湿发首购1支。</p></td><td><p>戴手套，头发分4区，从发根到发尾涂匀，梳理/按摩后冲洗。</p></td><td><p>洗发后毛巾吸至湿润，均匀涂抹后冲洗。</p></td><td><p>干发≥15分钟；湿发约3分钟；初期每周2–3次，可按每次洗发维持。</p></td><td><p>纯红，底色跨度大；模型可生成“高饱和红色补色”理由。</p></td><td><p>浅底可能偏玫红；湿织物可能染色，头发全干后再接触衣物。</p></td><td><p><a href="https://colorlomo.com/products/color-depositing-conditioner">COLORLOMO 官网</a>；商品页有图，前端直链待上传对象存储。</p></td>
+    </tr>
+    <tr>
+      <td><p>clm-cond-pink-us-180</p></td><td><p>COLORLOMO Color Depositing Conditioner</p></td><td><p>固色发膜/护发素</p></td><td><p>PINK 粉色</p></td><td><p>建议8–9度并先去黄；黄色底色会偏橘</p></td><td><p>180ml 单支</p></td><td><p>US$18.90；exact_sku_price</p></td><td><p>干发：齐耳1支；齐肩购买2支；过肩购买3支。湿发首购1支。</p></td><td><p>干发分4区，戴手套均匀覆盖全部发丝。</p></td><td><p>洗发后毛巾吸干至湿润，均匀涂抹。</p></td><td><p>干发≥15分钟；湿发约3分钟；每周2–3次起。</p></td><td><p>低饱和粉红，不偏荧光、不偏紫。</p></td><td><p>低于8度或未去黄时偏橘；不适合深色头发直接补粉。</p></td><td><p><a href="https://colorlomo.com/products/color-depositing-conditioner">COLORLOMO 官网</a>；原始色卡见本文第10节。</p></td>
+    </tr>
+    <tr>
+      <td><p>clm-cond-blue-us-180</p></td><td><p>COLORLOMO Color Depositing Conditioner</p></td><td><p>固色发膜/护发素</p></td><td><p>BLUE 宝蓝色</p></td><td><p>建议≥8度并去黄；偏黄底色会偏绿；底色越高越亮</p></td><td><p>180ml 单支</p></td><td><p>US$18.90；exact_sku_price</p></td><td><p>干发：齐耳1支；齐肩购买2支；过肩购买3支。湿发首购1支。</p></td><td><p>戴手套，分4区，均匀涂至每根发丝，梳匀后冲洗。</p></td><td><p>洗发后毛巾吸干，均匀涂抹。</p></td><td><p>干发≥15分钟；湿发约3分钟；每周2–3次起。</p></td><td><p>宝蓝显色明确，可覆盖宝蓝、冰蓝、克莱因蓝等检索词。</p></td><td><p>黄底＋蓝会发绿；5度深发不推荐。</p></td><td><p><a href="https://colorlomo.com/products/color-depositing-conditioner">COLORLOMO 官网</a>；原始蓝色色卡见第10节。</p></td>
+    </tr>
+    <tr>
+      <td><p>clm-cond-purple-us-180</p></td><td><p>COLORLOMO Color Depositing Conditioner</p></td><td><p>固色发膜/护发素</p></td><td><p>PURPLE 暖调紫</p></td><td><p>建议≥7度；底色越高越亮</p></td><td><p>180ml 单支</p></td><td><p>US$18.90；exact_sku_price</p></td><td><p>干发：齐耳1支；齐肩购买2支；过肩购买3支。湿发首购1支。</p></td><td><p>分4区干发涂匀，梳理覆盖后冲洗。</p></td><td><p>洗发后湿发均匀涂抹。</p></td><td><p>干发≥15分钟；湿发约3分钟。</p></td><td><p>适合香芋紫、星空紫、葡萄紫等暖紫方向。</p></td><td><p>低底色显色较暗；5度不推荐。</p></td><td><p><a href="https://colorlomo.com/products/color-depositing-conditioner">COLORLOMO 官网</a>；原始紫色色卡见第10节。</p></td>
+    </tr>
+    <tr>
+      <td><p>clm-cond-teal-us-180</p></td><td><p>COLORLOMO Color Depositing Conditioner</p></td><td><p>固色发膜/护发素</p></td><td><p>TEAL 偏蓝调青色</p></td><td><p>建议≥7度；底色越黄，结果越绿</p></td><td><p>180ml 单支</p></td><td><p>US$18.90；exact_sku_price</p></td><td><p>干发：齐耳1支；齐肩购买2支；过肩购买3支。湿发首购1支。</p></td><td><p>干发分区后均匀涂抹。</p></td><td><p>洗发后湿发使用。</p></td><td><p>干发≥15分钟；湿发约3分钟。</p></td><td><p>可覆盖薄荷绿、北极星绿、人鱼绿、青灰等青绿色检索。</p></td><td><p>黄底明显时会偏绿；5度不推荐。</p></td><td><p><a href="https://colorlomo.com/products/color-depositing-conditioner">COLORLOMO 官网</a>；原始TEAL色卡见第10节。</p></td>
+    </tr>
+    <tr>
+      <td><p>clm-cond-orange-us-180</p></td><td><p>COLORLOMO Color Depositing Conditioner</p></td><td><p>固色发膜/护发素</p></td><td><p>ORANGE 偏红亮橙</p></td><td><p>建议≥6度；8–9度更亮；6–7度建议考虑COPPER</p></td><td><p>180ml 单支</p></td><td><p>US$18.90；exact_sku_price</p></td><td><p>干发：齐耳1支；齐肩购买2支；过肩购买3支。湿发首购1支。</p></td><td><p>干发分4区均匀涂抹。</p></td><td><p>洗发后湿发使用。</p></td><td><p>干发≥15分钟；湿发约3分钟。</p></td><td><p>适合芬达橙、阳光橙、亮橙等高亮橙色。</p></td><td><p>深底显色弱；6–7度可能更适合棕调脏橘。</p></td><td><p><a href="https://colorlomo.com/products/color-depositing-conditioner">COLORLOMO 官网</a>；原始橙色色卡见第10节。</p></td>
+    </tr>
+    <tr>
+      <td><p>clm-cond-merlot-us-180</p></td><td><p>COLORLOMO Color Depositing Conditioner</p></td><td><p>固色发膜/护发素</p></td><td><p>MERLOT 树莓红</p></td><td><p>5–7度接近树莓红；8–9度更鲜亮偏紫红</p></td><td><p>180ml 单支</p></td><td><p>US$18.90；exact_sku_price</p></td><td><p>干发：齐耳1支；齐肩购买2支；过肩购买3支。湿发首购1支。</p></td><td><p>干发分区后从根到尾涂匀。</p></td><td><p>洗发后湿发使用；红色洗发水可配合维持。</p></td><td><p>干发≥15分钟；湿发约3分钟。</p></td><td><p>适合树莓红、波尔多红、酒红等偏紫红方向。</p></td><td><p>浅底会比深底更鲜艳。</p></td><td><p><a href="https://colorlomo.com/products/color-depositing-conditioner">COLORLOMO 官网</a>；原始树莓红色卡见第10节。</p></td>
+    </tr>
+    <tr>
+      <td><p>clm-cond-mocha-us-180</p></td><td><p>COLORLOMO Color Depositing Conditioner</p></td><td><p>固色发膜/护发素</p></td><td><p>MOCHA 奶茶灰棕</p></td><td><p>商品矩阵建议6–9度；5度不推荐</p></td><td><p>180ml 单支</p></td><td><p>US$18.90；exact_sku_price</p></td><td><p>干发：齐耳1支；齐肩购买2支；过肩购买3支。湿发首购1支。</p></td><td><p>干发分区涂匀。</p></td><td><p>洗发后湿发使用。</p></td><td><p>干发≥15分钟；湿发约3分钟。</p></td><td><p>低饱和奶茶灰棕方向，适合棕灰色检索。</p></td><td><p>不同底色结果差异较大；具体偏色仍以底色矩阵为准。</p></td><td><p><a href="https://colorlomo.com/products/color-depositing-conditioner">COLORLOMO 官网</a>；矩阵见第10节。</p></td>
+    </tr>
+    <tr>
+      <td><p>clm-cond-extsilver-us-180</p></td><td><p>COLORLOMO Color Depositing Conditioner</p></td><td><p>固色发膜/护发素</p></td><td><p>EXTREME SILVER 雾霾灰</p></td><td><p>推荐6–7度偏深灰；8–9度浅灰更建议SILVER</p></td><td><p>180ml 单支</p></td><td><p>US$18.90；exact_sku_price</p></td><td><p>干发：齐耳1支；齐肩购买2支；过肩购买3支。湿发首购1支。</p></td><td><p>干发分区均匀涂抹。</p></td><td><p>洗发后湿发使用。</p></td><td><p>干发≥15分钟；湿发约3分钟。</p></td><td><p>偏紫调深灰，适合6–7度灰色系。</p></td><td><p>5度不推荐；8–9度可能过深或偏紫。</p></td><td><p><a href="https://colorlomo.com/products/color-depositing-conditioner">COLORLOMO 官网</a>；原始雾霾灰色卡见第10节。</p></td>
+    </tr>
+    <tr>
+      <td><p>clm-cond-blue-my-180</p></td><td><p>COLORLOMO Conditioner</p></td><td><p>固色发膜/护发素</p></td><td><p>BLUE 蓝色</p></td><td><p>同品牌蓝色色卡规则</p></td><td><p>180ml 单支</p></td><td><p>RM79；exact_sku_price</p></td><td><p>同款官方干发/湿发用量规则</p></td><td><p>同官网干发方法</p></td><td><p>同官网湿发方法</p></td><td><p>≥15分钟 / 约3分钟</p></td><td><p>马来西亚平台的可购买精确色号价格</p></td><td><p>非人民币；跨境运费未计入</p></td><td><p><a href="https://shopee.com.my/colorlomo.my">Shopee Malaysia / COLORLOMO店</a>；商品图在页面。</p></td>
+    </tr>
+    <tr>
+      <td><p>clm-cond-extsilver-my-180</p></td><td><p>COLORLOMO Conditioner</p></td><td><p>固色发膜/护发素</p></td><td><p>EXTREME SILVER 雾霾灰</p></td><td><p>6–7度偏深灰</p></td><td><p>180ml 单支</p></td><td><p>RM79；exact_sku_price</p></td><td><p>同款官方用量规则</p></td><td><p>同官网干发方法</p></td><td><p>同官网湿发方法</p></td><td><p>≥15分钟 / 约3分钟</p></td><td><p>精确色号价格已对应</p></td><td><p>非人民币；运费未计入</p></td><td><p><a href="https://shopee.com.my/colorlomo.my">Shopee Malaysia / COLORLOMO店</a></p></td>
+    </tr>
+    <tr>
+      <td><p>clm-cond-lightash-my-180</p></td><td><p>COLORLOMO Conditioner</p></td><td><p>固色发膜/护发素</p></td><td><p>LIGHT ASH BROWN 奶茶金</p></td><td><p>矩阵仅推荐8–9度</p></td><td><p>180ml 单支</p></td><td><p>RM79；exact_sku_price</p></td><td><p>同款官方用量规则</p></td><td><p>同官网干发方法</p></td><td><p>同官网湿发方法</p></td><td><p>≥15分钟 / 约3分钟</p></td><td><p>浅底奶茶金方向</p></td><td><p>5–7度不推荐</p></td><td><p><a href="https://shopee.com.my/colorlomo.my">Shopee Malaysia / COLORLOMO店</a></p></td>
+    </tr>
+    <tr>
+      <td><p>clm-cond-mocha-my-180</p></td><td><p>COLORLOMO Conditioner</p></td><td><p>固色发膜/护发素</p></td><td><p>MOCHA 奶茶灰棕</p></td><td><p>6–9度；5度不推荐</p></td><td><p>180ml 单支</p></td><td><p>RM79；exact_sku_price</p></td><td><p>同款官方用量规则</p></td><td><p>同官网干发方法</p></td><td><p>同官网湿发方法</p></td><td><p>≥15分钟 / 约3分钟</p></td><td><p>精确色号价格已对应</p></td><td><p>非人民币；运费未计入</p></td><td><p><a href="https://shopee.com.my/colorlomo.my">Shopee Malaysia / COLORLOMO店</a></p></td>
+    </tr>
+    <tr>
+      <td><p>clm-cond-purple-my-180</p></td><td><p>COLORLOMO Conditioner</p></td><td><p>固色发膜/护发素</p></td><td><p>PURPLE 紫色</p></td><td><p>建议≥7度</p></td><td><p>180ml 单支</p></td><td><p>RM79；exact_sku_price</p></td><td><p>同款官方用量规则</p></td><td><p>同官网干发方法</p></td><td><p>同官网湿发方法</p></td><td><p>≥15分钟 / 约3分钟</p></td><td><p>精确色号价格已对应</p></td><td><p>非人民币；运费未计入</p></td><td><p><a href="https://shopee.com.my/colorlomo.my">Shopee Malaysia / COLORLOMO店</a></p></td>
+    </tr>
+    <tr>
+      <td><p>clm-cond-red-my-180</p></td><td><p>COLORLOMO Conditioner</p></td><td><p>固色发膜/护发素</p></td><td><p>RED 红色</p></td><td><p>5–9度</p></td><td><p>180ml 单支</p></td><td><p>RM79；exact_sku_price</p></td><td><p>同款官方用量规则</p></td><td><p>同官网干发方法</p></td><td><p>同官网湿发方法</p></td><td><p>≥15分钟 / 约3分钟</p></td><td><p>精确色号价格已对应</p></td><td><p>非人民币；运费未计入</p></td><td><p><a href="https://shopee.com.my/colorlomo.my">Shopee Malaysia / COLORLOMO店</a></p></td>
+    </tr>
+    <tr>
+      <td><p>clm-shamp-ashbeige-my-350</p></td><td><p>COLORLOMO Color Shampoo</p></td><td><p>固色洗发水</p></td><td><p>ASH BEIGE 灰米色</p></td><td><p>具体度数待商品页补齐</p></td><td><p>350ml 单瓶</p></td><td><p>RM95；exact_sku_price</p></td><td><p>首购1瓶；不同发长的单次毫升数待核实</p></td><td><p>无官方干发用法，不适用</p></td><td><p>湿发按洗发水使用；完整停留步骤待核实</p></td><td><p>待核实</p></td><td><p>洗护类日常维持，比干发补色操作简单</p></td><td><p>底色与停留时间未补齐，暂不进入最佳推荐</p></td><td><p><a href="https://shopee.com.my/colorlomo.my">Shopee Malaysia / COLORLOMO店</a></p></td>
+    </tr>
+    <tr>
+      <td><p>clm-shamp-grey-my-350</p></td><td><p>COLORLOMO Color Shampoo</p></td><td><p>固色洗发水</p></td><td><p>GREY 灰色</p></td><td><p>待核实</p></td><td><p>350ml 单瓶</p></td><td><p>RM95；exact_sku_price</p></td><td><p>首购1瓶；单次毫升数待核实</p></td><td><p>不适用</p></td><td><p>湿发洗护；完整步骤待核实</p></td><td><p>待核实</p></td><td><p>灰色日常维持</p></td><td><p>资料未齐，暂不进入最佳推荐</p></td><td><p><a href="https://shopee.com.my/colorlomo.my">Shopee Malaysia / COLORLOMO店</a></p></td>
+    </tr>
+    <tr>
+      <td><p>clm-shamp-byebyegreen-my-350</p></td><td><p>COLORLOMO Color Shampoo</p></td><td><p>固色洗发水</p></td><td><p>BYEBYE GREEN 去绿</p></td><td><p>用于矫正偏绿；适用底色待核实</p></td><td><p>350ml 单瓶</p></td><td><p>RM95；exact_sku_price</p></td><td><p>首购1瓶；单次毫升数待核实</p></td><td><p>不适用</p></td><td><p>湿发洗护；完整步骤待核实</p></td><td><p>待核实</p></td><td><p>针对偏绿风险的矫色用途</p></td><td><p>不能仅凭名称推断所有绿色都适用</p></td><td><p><a href="https://shopee.com.my/colorlomo.my">Shopee Malaysia / COLORLOMO店</a></p></td>
+    </tr>
+    <tr>
+      <td><p>clm-shamp-pink-my-350</p></td><td><p>COLORLOMO Color Shampoo</p></td><td><p>固色洗发水</p></td><td><p>PINK 粉色</p></td><td><p>具体度数待核实</p></td><td><p>350ml 单瓶</p></td><td><p>RM95；exact_sku_price</p></td><td><p>首购1瓶；单次毫升数待核实</p></td><td><p>不适用</p></td><td><p>湿发洗护；完整步骤待核实</p></td><td><p>待核实</p></td><td><p>粉色日常维持</p></td><td><p>底色与频率未齐，暂不进入最佳推荐</p></td><td><p><a href="https://shopee.com.my/colorlomo.my">Shopee Malaysia / COLORLOMO店</a></p></td>
+    </tr>
+    <tr>
+      <td><p>clm-shamp-purple-my-350</p></td><td><p>COLORLOMO Color Shampoo</p></td><td><p>固色洗发水</p></td><td><p>PURPLE 紫色</p></td><td><p>具体度数待核实</p></td><td><p>350ml 单瓶</p></td><td><p>RM95；exact_sku_price</p></td><td><p>首购1瓶；单次毫升数待核实</p></td><td><p>不适用</p></td><td><p>湿发洗护；完整步骤待核实</p></td><td><p>待核实</p></td><td><p>紫色日常维持</p></td><td><p>底色与频率未齐，暂不进入最佳推荐</p></td><td><p><a href="https://shopee.com.my/colorlomo.my">Shopee Malaysia / COLORLOMO店</a></p></td>
+    </tr>
+    <tr>
+      <td><p>milbon-shamp-strawberry-150</p></td><td><p>玫丽盼彩色洗发水</p></td><td><p>固色洗发水</p></td><td><p>草莓粉</p></td><td><p>去黄/固色用途；具体底色待核实</p></td><td><p>150ml 单瓶</p></td><td><p>¥80.70；页面精确规格价</p></td><td><p>首购1瓶；单次毫升数待核实</p></td><td><p>不适用</p></td><td><p>官方完整步骤待核实</p></td><td><p>待核实</p></td><td><p>小容量，粉色补色方向明确</p></td><td><p>使用方法和适用度数未齐，暂不进入最佳推荐</p></td><td><p><a href="https://tao.hooos.com/tag_milbon_7.html">天猫商品索引页</a>；商品图待上传。</p></td>
+    </tr>
+    <tr>
+      <td><p>nv-shamp-purple-red-300</p></td><td><p>NaturVital NV 固色洗发水</p></td><td><p>固色洗发水</p></td><td><p>紫红色</p></td><td><p>具体底色待核实</p></td><td><p>300ml 单瓶</p></td><td><p>待核实；页面商品级参考¥84.10不可当色号价</p></td><td><p>首购1瓶；单次毫升数待核实</p></td><td><p>不适用</p></td><td><p>待核实</p></td><td><p>待核实</p></td><td><p>紫红补色方向明确</p></td><td><p>没有精确SKU价，is_recommendable=false</p></td><td><p><a href="https://www.tw.coupang.com/products/NaturVital-NV%E5%9B%BA%E8%89%B2%E6%B4%97%E9%AB%AE%E6%B0%B4-%E9%AB%AE%E8%86%9C-%E6%9F%93%E5%BE%8C%E9%8E%96%E8%89%B2%E8%A3%9C%E8%89%B2-%E6%96%B0%E5%BA%97%E9%96%8B%E6%A5%AD%E7%AB%8B%E6%B8%9B20-628899322806354">Coupang 商品页</a></p></td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>4.2 染发膏 / 泡泡染</h2>
+<table>
+  <colgroup>
+    <col width="115"/><col width="175"/><col width="95"/><col width="120"/><col width="105"/>
+    <col width="105"/><col width="145"/><col width="185"/><col width="230"/><col width="180"/>
+    <col width="190"/><col width="190"/>
+  </colgroup>
+  <thead>
+    <tr>
+      <th><p>SKU ID</p></th><th><p>品牌 / 商品</p></th><th><p>类型</p></th><th><p>颜色 / 色号</p></th>
+      <th><p>规格</p></th><th><p>精确单价</p></th><th><p>发长与购买量</p></th><th><p>官方使用方法</p></th>
+      <th><p>优点 / 推荐理由</p></th><th><p>风险 / 限制</p></th><th><p>平台与购买链接</p></th><th><p>推荐状态</p></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><p>okcs-cream-naturalblack-200</p></td><td><p>OKCS 染发膏</p></td><td><p>盒装染发膏</p></td><td><p>自然黑</p></td><td><p>200ml / 1盒</p></td><td><p>¥39；exact_sku_price</p></td><td><p>齐耳、齐肩、齐胸1盒；齐腰、超长2盒；发量多或粗硬＋1盒。</p></td><td><p>完整官方步骤待补；不能用通用染发步骤冒充。</p></td><td><p>容量和发长用量证据较完整，价格可精确计算。</p></td><td><p>用户本项目暂不考虑白发；黑色会影响后续改浅色，需在前端醒目提示。</p></td><td><p><a href="https://guangdiu.com/detail.php?id=21185269&amp;kf=m">公开商品页</a></p></td><td><p>价格和用量可用；使用步骤补齐前不进入教程页。</p></td>
+    </tr>
+    <tr>
+      <td><p>okcs-cream-desertrosecoffee</p></td><td><p>OKCS 染发膏</p></td><td><p>盒装染发膏</p></td><td><p>沙漠玫瑰咖啡</p></td><td><p>1盒；容量待核实</p></td><td><p>¥39；exact_sku_price</p></td><td><p>齐耳、齐肩、齐胸1盒；齐腰、超长2盒；发量多或粗硬＋1盒。</p></td><td><p>完整官方步骤待补。</p></td><td><p>网红色名明确，可被“玫瑰棕/咖啡棕”语义召回。</p></td><td><p>容量和底色效果未齐，is_recommendable=false。</p></td><td><p><a href="https://www.zhizhizhi.com/n/bmiab">公开促销商品页</a></p></td><td><p>补齐容量、底色和官方步骤后启用。</p></td>
+    </tr>
+    <tr>
+      <td><p>loreal-cream-5.64-tmall</p></td><td><p>巴黎欧莱雅法式炫色染发霜</p></td><td><p>染发霜</p></td><td><p>#5.64 朗姆酒红</p></td><td><p>1盒；容量待核实</p></td><td><p>¥74；exact_sku_price；天猫</p></td><td><p>官方发长用量待核实，不使用通用盒数。</p></td><td><p>官方步骤待核实。</p></td><td><p>色号和平台价格精确对应，酒红方向明确。</p></td><td><p>发长用量、容量和当前底色效果缺失，暂不做总价推荐。</p></td><td><p><a href="https://www.smzdm.com/p/174368189/">什么值得买聚合的天猫SKU证据</a></p></td><td><p>价格可用；quantity_rule补齐后启用。</p></td>
+    </tr>
+    <tr>
+      <td><p>loreal-cream-5.64-vip</p></td><td><p>巴黎欧莱雅法式炫色染发霜</p></td><td><p>染发霜</p></td><td><p>#5.64 朗姆酒红</p></td><td><p>1盒；容量待核实</p></td><td><p>¥78；exact_sku_price；唯品会</p></td><td><p>官方发长用量待核实。</p></td><td><p>官方步骤待核实。</p></td><td><p>同色号另一平台的精确价格，可供比价。</p></td><td><p>缺用量和底色效果，不进入最佳推荐。</p></td><td><p><a href="https://www.smzdm.com/p/174368189/">什么值得买聚合的唯品会SKU证据</a></p></td><td><p>quantity_rule补齐后启用。</p></td>
+    </tr>
+    <tr>
+      <td><p>schw-bubble-greybrown</p></td><td><p>施华蔻斐丝丽泡泡染</p></td><td><p>泡泡染</p></td><td><p>璀璨灰棕</p></td><td><p>1盒；容量待核实</p></td><td><p>¥35.75；页面精确色名价</p></td><td><p>官方发长用量待核实。</p></td><td><p>官方步骤待核实。</p></td><td><p>灰棕色名明确，价格低。</p></td><td><p>容量、底色、用量与步骤缺失，is_recommendable=false。</p></td><td><p><a href="https://tao.hooos.com/tag_%E6%96%BD%E5%8D%8E%E8%94%BB%E6%9F%93%E5%8F%91%E5%89%82%E6%B3%A1%E6%B3%A1.html">天猫商品索引页</a></p></td><td><p>只进补数队列。</p></td>
+    </tr>
+  </tbody>
+</table>
+
+<h1>5. 已采集但还不能当作精确 SKU 的商品线索</h1>
+<p>这些信息也保留在知识库采集层，但 price_status 不是 exact_sku_price，或用量、规格、颜色对应关系不完整。因此后端不能拿它们参加预算推荐，更不能把商品页区间价拆给某个颜色。</p>
+<table>
+  <colgroup><col width="145"/><col width="200"/><col width="200"/><col width="210"/><col width="210"/><col width="235"/></colgroup>
+  <thead>
+    <tr><th><p>品牌 / 商品</p></th><th><p>已经确认</p></th><th><p>价格线索</p></th><th><p>仍缺什么</p></th><th><p>后端状态</p></th><th><p>来源</p></th></tr>
+  </thead>
+  <tbody>
+    <tr><td><p>COLORLOMO 国内发膜</p></td><td><p>红、粉等页面；180ml发膜；官方干湿两种方法</p></td><td><p>天猫索引页面价¥89.10；另有¥84.10、¥159等不同页面</p></td><td><p>国内每个具体色号、容量、套装与价格的一一对应</p></td><td><p>listing_price；不可用于精确预算</p></td><td><p><a href="https://tao.hooos.com/goods_djWX0mxiZt5Nq3vHjDgHet3-d8ZBBDFn7g7AgAMSP.html">天猫索引商品页</a></p></td></tr>
+    <tr><td><p>COLORLOMO 其他色卡</p></td><td><p>DARK BROWN黑茶、LIGHT ASH BROWN奶茶金、SILVER银灰、ROSE BROWN粉棕、COPPER脏橘的底色矩阵</p></td><td><p>国内精确色号价待核实</p></td><td><p>具体销售SKU、单价、购买链接</p></td><td><p>可用于颜色和风险知识；不可用于商品价格推荐</p></td><td><p>本文第10节原始截图</p></td></tr>
+    <tr><td><p>RENATA蕾娜塔补色洗发水</p></td><td><p>250ml；湿发起泡，停留10–20分钟后冲洗；16色产品系列</p></td><td><p>抖音公开商品页曾显示¥79，但未证明每个色号同价</p></td><td><p>每个色号的精确SKU价、店铺链接、发长单次用量</p></td><td><p>方法知识可用；颜色价格推荐关闭</p></td><td><p><a href="https://www.renata-hair.com.tw/products/color-correcting-agent-250ml">RENATA 官网</a></p></td></tr>
+    <tr><td><p>RENATA已辨认色名</p></td><td><p>粉红泡泡、青椒橄榄、高雅宝蓝、灰紫桔梗、净白雾光、玫瑰酒红、魅惑紫罗、蜜糖甜橘、醇浓咖啡</p></td><td><p>待逐色确认</p></td><td><p>逐色商品价、适用底色与效果</p></td><td><p>可用于品牌颜色目录，不参与预算</p></td><td><p><a href="https://www.renata-hair.com.tw/products/color-correcting-agent-250ml">RENATA 官网</a></p></td></tr>
+    <tr><td><p>UYEE固色洗护</p></td><td><p>固色洗发水与发膜为不同形态；捕捉到蓝色等商品词</p></td><td><p>商品索引出现¥66.21；套装抖音页曾显示¥85–89</p></td><td><p>颜色、280ml洗发水/200ml发膜、单品/套装与价格的一一对应</p></td><td><p>全部为线索，不作为SKU单价</p></td><td><p><a href="https://tao.hooos.com/tag_uyee.html">天猫商品索引</a></p></td></tr>
+    <tr><td><p>LITI/俪缇固色洗发水</p></td><td><p>灰棕、奶茶、浅棕方向</p></td><td><p>抖音商品页曾显示¥44</p></td><td><p>容量、逐色价格、适用底色、官方步骤</p></td><td><p>is_recommendable=false</p></td><td><p><a href="https://v.douyin.com/peBAovguRYA/">原抖音商品链接</a></p></td></tr>
+    <tr><td><p>施华蔻固色洗护</p></td><td><p>有固色洗发水、护发素/发膜类页面</p></td><td><p>天猫索引出现¥51.54；抖音商品页曾显示¥58</p></td><td><p>具体产品名、颜色、规格、逐SKU价格和方法</p></td><td><p>通用护色目录；不参与蓝/红精确召回</p></td><td><p><a href="https://tao.hooos.com/tag_%E7%B2%89%E5%8F%91%E5%9B%BA%E8%89%B2.html">天猫商品索引</a></p></td></tr>
+    <tr><td><p>NaturVital NV固色洗护</p></td><td><p>洗发水/发膜；树莓红、紫、粉、灰、棕、橘等大色系；紫红洗发水300ml示例</p></td><td><p>天猫索引商品级¥84.10，其他渠道¥63.20；不是逐色精确价</p></td><td><p>每个色号、形态、容量与价格对应；官方方法</p></td><td><p>只作线索</p></td><td><p><a href="https://tao.hooos.com/search?w=NV">天猫商品索引搜索</a></p></td></tr>
+    <tr><td><p>TOCU探色染发膏</p></td><td><p>焦糖咖啡、茶褐栗棕、浆果梅红、海王红、黑加仑紫、雾感青棕、奶茶冷棕、星耀蓝黑、珍珠炫黑、莫兰黑茶、可可深棕、玫瑰粉棕</p></td><td><p>商品页区间¥49.90–119.90</p></td><td><p>逐色、容量、套装、精确单价和官方发长用量</p></td><td><p>颜色目录可用；价格推荐关闭</p></td><td><p><a href="https://m.tocu.com/cate/play/index.html">TOCU官网</a>；<a href="https://tao.hooos.com/goods_BKJMKYyT6tG7AajiprMSrte-63XvvVcyDAbXpqBfq.html">天猫索引</a></p></td></tr>
+    <tr><td><p>花王Liese莉婕泡泡染</p></td><td><p>官方中文操作：每次染前48小时皮试；泡沫充分覆盖发根；冲洗并洗发两次</p></td><td><p>抖音商品页区间¥33.80–138，不能作色号价</p></td><td><p>逐色SKU、容量、精确价、官方发长盒数</p></td><td><p>操作知识可用；商品价格推荐关闭</p></td><td><p><a href="https://www.kao.co.jp/liesecolor/howto/ch/">花王官方中文教程</a>；<a href="https://web.kao.com/tw/liese/bubble/howto/">花王台湾教程</a></p></td></tr>
+    <tr><td><p>巴黎欧莱雅法式炫色染发霜</p></td><td><p>7.35太空烟青、6.13榛果冷茶、6.73薄荷青棕、6.41焦糖暖棕、6.17橄榄茶棕、5.64朗姆酒红、4.11赛博蓝黑、4.21朋克烟紫</p></td><td><p>只有#5.64已找到精确平台价；其他色号待核实</p></td><td><p>其余逐色价格、容量和官方发长用量</p></td><td><p>#5.64进入价格层；其他只进颜色目录</p></td><td><p><a href="https://www.smzdm.com/p/174368189/">#5.64价格证据</a></p></td></tr>
+    <tr><td><p>忆丝芸精油染发膏</p></td><td><p>榛果灰棕、荔枝粉棕、冷雾黑巧、树莓红、橘棕色；已有3/6/9度效果图线索</p></td><td><p>抖音商品页区间¥59.90–129.90</p></td><td><p>每个颜色、容量、套装和精确单价；官方发长用量与步骤</p></td><td><p>颜色效果知识可用；价格推荐关闭</p></td><td><p><a href="https://v.douyin.com/RQdPRWy_SEU/">原抖音商品链接</a></p></td></tr>
+    <tr><td><p>染鲤臻萃染发膏</p></td><td><p>品牌和染发膏商品页</p></td><td><p>抖音商品页区间¥54–114</p></td><td><p>全部逐色、容量、价格、用量和方法</p></td><td><p>补数队列</p></td><td><p><a href="https://v.douyin.com/GaET6Ou9hU8/">原抖音商品链接</a></p></td></tr>
+    <tr><td><p>施华蔻斐丝丽直染</p></td><td><p>榛果米棕6-1、黑紫等具体色号页面线索</p></td><td><p>抖音商品页曾显示¥109，但未对应具体色号</p></td><td><p>逐色精确价、容量、盒数和底色效果</p></td><td><p>颜色目录线索</p></td><td><p><a href="https://item.jd.com/10121498377448.html">京东榛果米棕6-1</a>；<a href="https://tao.hooos.com/goods_yz3xQPyFRt25oWGr20TozysvtA-jdZqqnCXp8zM7gNc8.html">天猫索引黑紫</a></p></td></tr>
+    <tr><td><p>施华蔻斐丝丽泡泡染</p></td><td><p>已收集18个色名，包括蜜糖醇棕、迷雾茶棕、暗夜蓝黑、极光灰棕、落日脏橘等</p></td><td><p>仅璀璨灰棕找到¥35.75页面精确色名价；抖音页¥99不作逐色价</p></td><td><p>其余色号的精确价、容量、发长用量和步骤</p></td><td><p>璀璨灰棕补数后启用；其余颜色目录</p></td><td><p><a href="https://www.jd.com/jiage/16750a7fb0c603f6260bd.html">京东色号索引</a></p></td></tr>
+    <tr><td><p>首品固色发膜</p></td><td><p>粉、红、紫、灰、棕、绿、蓝、青等大色系</p></td><td><p>原抖音页价格未与具体色号确认</p></td><td><p>逐色官方名、容量、精确价、底色效果、方法</p></td><td><p>补数队列</p></td><td><p><a href="https://v.douyin.com/MFfvNjEQhwA/">原抖音商品链接</a></p></td></tr>
+  </tbody>
+</table>
+
+<h1>6. 商品级用量与官方方法</h1>
+<table>
+  <colgroup><col width="170"/><col width="210"/><col width="220"/><col width="220"/><col width="230"/></colgroup>
+  <thead><tr><th><p>商品</p></th><th><p>发长用量</p></th><th><p>干发方法</p></th><th><p>湿发方法</p></th><th><p>后端处理</p></th></tr></thead>
+  <tbody>
+    <tr><td><p>COLORLOMO 180ml固色发膜/护发素</p></td><td><p>湿发单次：齐耳榛子大小；齐肩乒乓球大小；过肩2个乒乓球大小。干发：齐耳1支；齐肩1–1.5支；过肩2–3支。</p></td><td><p>戴手套；头发分4区；从发根到发尾涂匀；梳理/按摩覆盖；停留至少15分钟；冷水或温水冲洗。</p></td><td><p>洗发后毛巾吸至湿润；均匀涂抹；约3分钟后冲洗。</p></td><td><p>保存官方“使用量范围”和“购买整数”两套字段。齐肩购买数=2，过肩购买数=3是代码向上取整结果，必须标注为计算值，不冒充官方原文。</p></td></tr>
+    <tr><td><p>RENATA 250ml补色洗发水</p></td><td><p>不同发长单次用量待核实；首购只能显示1瓶，不计算能用几次。</p></td><td><p>没有官方干发方法，不适用。</p></td><td><p>湿发使用并起泡，停留10–20分钟后冲洗。</p></td><td><p>方法可用于教程；quantity_rule缺失，所以不能承诺使用次数。</p></td></tr>
+    <tr><td><p>OKCS盒装染发膏</p></td><td><p>齐耳、齐肩、齐胸1盒；齐腰、超长2盒；发量多或粗硬再＋1盒。</p></td><td><p>完整官方步骤待核实。</p></td><td><p>不适用。</p></td><td><p>只有容量和用量均与具体SKU对应时才能计算总价。</p></td></tr>
+    <tr><td><p>花王Liese泡泡染</p></td><td><p>官方发长盒数待核实。</p></td><td><p>每次染前48小时皮试；按官方说明配制泡沫；充分覆盖发根；冲洗后洗发两次。</p></td><td><p>不适用。</p></td><td><p>操作知识可进入教程库，但缺逐色SKU和盒数时不进入商品总价推荐。</p></td></tr>
+  </tbody>
+</table>
+
+<h1>7. 后端准确召回流程</h1>
+<ol>
+  <li><b>接收结构化输入。</b>至少包含 target_color、product_type、hair_length、budget_min、budget_max；已有 current_level 时一并传入。</li>
+  <li><b>颜色归一。</b>把“宝蓝、克莱因蓝、冰蓝”等归到 color_family=blue，同时保留用户原词与 color_name、aliases 做语义排序。</li>
+  <li><b>先做硬过滤。</b>过滤 product_type、color_family、is_recommendable=true、price_status=exact_sku_price。不要先做纯向量检索。</li>
+  <li><b>过滤底色。</b>有 current_level 时，根据 recommended_levels 排除官方不推荐的记录；偏色但仍可用的记录降低排序并保留风险。</li>
+  <li><b>按商品自己的用量规则计算数量。</b>只能读取当前 sku_id 的 quantity_rule。字段缺失时不能借用别的品牌规则。</li>
+  <li><b>计算总价。</b><code>total_price = unit_price × purchase_quantity</code>。币种不同的记录不能直接混排，除非后端先锁定并记录汇率时间。</li>
+  <li><b>预算过滤。</b>只保留总价落在用户预算内的精确价记录。商品页区间价和待核实价格完全不参加。</li>
+  <li><b>品牌去重。</b>同品牌保留颜色、底色、总价和资料完整度最高的一个 SKU；候选池建议保留4–6个品牌。</li>
+  <li><b>模型只写解释。</b>把已经通过规则的事实交给模型，生成一条推荐理由、优点和可能风险；模型不能改价格、用量、底色或使用时间。</li>
+  <li><b>返回前端。</b>第1名为最佳推荐，最多再返回3个次推荐；不足4个就按实际数量展示，不用错误商品凑数。</li>
+</ol>
+
+<h1>8. 返回前端的单张商品卡</h1>
+<pre caption="商品卡返回示例" lang="json"><code>{
+  "sku_id": "clm-cond-blue-us-180",
+  "brand_name": "COLORLOMO",
+  "product_name": "Color Depositing Conditioner",
+  "product_type": "color_deposit_conditioner",
+  "color_name": "BLUE",
+  "color_family": "blue",
+  "capacity": "180ml",
+  "unit_price": 18.90,
+  "currency": "USD",
+  "purchase_quantity": 2,
+  "total_price": 37.80,
+  "quantity_basis": "齐肩发官方用量1–1.5支，购买数按上限向上取整",
+  "recommended_levels": [8, 9],
+  "strengths": ["宝蓝色方向明确", "有不同底色效果证据"],
+  "risks": ["偏黄底色可能发绿", "跨境运费未计入"],
+  "recommendation_reason": "你的目标是蓝色，当前底色达到8度，且两支商品费用在预算内。",
+  "product_image_url": null,
+  "image_status": "pending_object_storage",
+  "purchase_url": "https://colorlomo.com/products/color-depositing-conditioner",
+  "captured_at": "2026-07-26"
+}</code></pre>
+<callout background-color="rgb(254,246,246)" border-color="rgb(245,74,69)" emoji="⚠️">
+  <p><b>注意：</b>product_image_url 不能直接填飞书内部图片下载地址，也不能把整个商品页 URL 当图片 URL。需要把商品主图下载、审核后上传到后端可长期访问的对象存储，再写入该字段。</p>
+</callout>
+
+<h1>9. 当前可用程度与补数优先级</h1>
+<table>
+  <colgroup><col width="155"/><col width="220"/><col width="270"/><col width="280"/></colgroup>
+  <thead><tr><th><p>优先级</p></th><th><p>品牌 / 商品</p></th><th><p>目前能做什么</p></th><th><p>下一步必须补什么</p></th></tr></thead>
+  <tbody>
+    <tr><td><p>P0：可先联调</p></td><td><p>COLORLOMO 180ml固色发膜/护发素</p></td><td><p>颜色检索、底色风险、精确外币SKU价、发长购买量、干湿方法</p></td><td><p>国内逐色精确价格、商品主图永久URL、运费或人民币价</p></td></tr>
+    <tr><td><p>P0：部分联调</p></td><td><p>OKCS自然黑200ml</p></td><td><p>精确价格、容量、发长盒数</p></td><td><p>官方完整步骤和底色效果</p></td></tr>
+    <tr><td><p>P1：补齐后启用</p></td><td><p>RENATA 250ml补色洗发水</p></td><td><p>颜色目录和官方湿发方法</p></td><td><p>逐色精确SKU价、底色效果、单次用量</p></td></tr>
+    <tr><td><p>P1：补齐后启用</p></td><td><p>欧莱雅#5.64朗姆酒红</p></td><td><p>精确色号和平台价</p></td><td><p>容量、发长用量、官方步骤和底色结果</p></td></tr>
+    <tr><td><p>P2：采集线索</p></td><td><p>UYEE、LITI、NV、TOCU、忆丝芸、染鲤、施华蔻其他色号、首品</p></td><td><p>品牌目录、部分色名或商品页信息</p></td><td><p>逐SKU截图：选中色号＋容量/套装＋实付价＋官方用量＋官方步骤</p></td></tr>
+  </tbody>
+</table>
+<p><b>最省时间的补数截图格式：</b>每个品牌只截四类页面：①选中色号后的SKU名称；②选中容量/套装后的单价；③官方发长用量；④官方使用步骤。四类信息能对应到同一个 SKU 后，才把 is_recommendable 改为 true。</p>

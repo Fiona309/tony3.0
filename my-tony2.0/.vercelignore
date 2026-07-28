@@ -1,0 +1,12 @@
+.git
+.next
+node_modules
+.codex_tmp
+release
+design-extractor
+samples
+.env*
+!.env.example
+public/posters
+public/video-uploads/5c74f7db6af0
+public/video-uploads/e5b45c149875

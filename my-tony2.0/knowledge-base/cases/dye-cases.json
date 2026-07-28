@@ -1,0 +1,155 @@
+{
+  "schema_version": 3,
+  "cases": [
+    {
+      "id": "case_1q8z0et",
+      "title": "染粉色固色洗发水使用教程",
+      "source_id": "src_1gf0gm2",
+      "before": {
+        "description": "粉色染后发",
+        "base_level": null,
+        "dye_history": null
+      },
+      "method": "固色洗发水固色",
+      "products_mentioned": [
+        "首品固色洗发水",
+        "卡洛美固色发膜"
+      ],
+      "steps": [
+        {
+          "step": 1,
+          "action": "起泡器中打出泡沫，均匀涂抹在头发上，静置后冲洗",
+          "duration_min": 3
+        },
+        {
+          "step": 2,
+          "action": "第二次涂抹固色洗发水，像平时正常洗头发那样起泡冲洗",
+          "duration_min": 0
+        }
+      ],
+      "tips": [
+        "每次洗头用两遍固色洗发水效果更好",
+        "掉色后用固色发膜补色效果加倍"
+      ],
+      "result": {
+        "description": "粉色维持一个半月仍好看",
+        "canonical_color_id": null
+      },
+      "completeness": {
+        "fields": {
+          "before_base": true,
+          "history": false,
+          "products": true,
+          "formula": false,
+          "process": true,
+          "result": true
+        },
+        "score": 0.67
+      },
+      "review_status": "incomplete",
+      "confidence": "low"
+    },
+    {
+      "id": "case_pq3u2f",
+      "title": "NV紫瓶粉毛固色教程",
+      "source_id": "src_4f4vaq",
+      "before": {
+        "description": "漂过的白金色底色",
+        "base_level": null,
+        "dye_history": null
+      },
+      "method": "固色发膜上色（泡水法）",
+      "products_mentioned": [
+        "NV紫瓶固色发膜",
+        "NV紫瓶洗发水",
+        "护发素"
+      ],
+      "steps": [
+        {
+          "step": 1,
+          "action": "发膜和护发素混合调成想要的深浅度，分层涂抹于头发",
+          "duration_min": 0
+        },
+        {
+          "step": 2,
+          "action": "等待发膜上色",
+          "duration_min": 15
+        },
+        {
+          "step": 3,
+          "action": "紫瓶发膜兑温水泡发",
+          "duration_min": 7
+        },
+        {
+          "step": 4,
+          "action": "用紫瓶洗发水冲洗干净",
+          "duration_min": 0
+        }
+      ],
+      "tips": [
+        "发膜兑护发素调浓淡，分层涂抹更均匀",
+        "泡水法上色更均匀",
+        "植物固色不伤发质"
+      ],
+      "result": {
+        "description": "均匀淡粉色，不毛躁不打结",
+        "canonical_color_id": null
+      },
+      "completeness": {
+        "fields": {
+          "before_base": true,
+          "history": false,
+          "products": true,
+          "formula": false,
+          "process": true,
+          "result": true
+        },
+        "score": 0.67
+      },
+      "review_status": "incomplete",
+      "confidence": "low"
+    },
+    {
+      "id": "case_lcjej8",
+      "title": "黑发一次性喷雾使用教程",
+      "source_id": "src_h3q88t",
+      "before": {
+        "description": "需要临时变黑发（如证件照）",
+        "base_level": null,
+        "dye_history": null
+      },
+      "method": "一次性染发喷雾",
+      "products_mentioned": [
+        "黑发一次性喷雾"
+      ],
+      "steps": [
+        {
+          "step": 1,
+          "action": "使用一次性黑发喷雾喷涂头发",
+          "duration_min": 0
+        }
+      ],
+      "tips": [
+        "手残党也能成功",
+        "适合证件照临时变黑"
+      ],
+      "result": {
+        "description": "自然的黑发效果",
+        "canonical_color_id": null
+      },
+      "completeness": {
+        "fields": {
+          "before_base": true,
+          "history": false,
+          "products": true,
+          "formula": false,
+          "process": true,
+          "result": true
+        },
+        "score": 0.67
+      },
+      "review_status": "incomplete",
+      "confidence": "low"
+    }
+  ]
+}

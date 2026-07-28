@@ -1,0 +1,14 @@
+做自己的 Tony · 前端联调包
+
+GitHub: https://github.com/Fiona309/my-tony2.0
+Commit: 9d81c86
+Branch: main
+Build verified: 2026-07-26
+
+启动：
+1. npm install
+2. 复制 .env.example 为 .env.local，并按联调环境填写后端地址
+3. npm run dev
+
+接口协议：
+docs/frontend-backend-api-contract.md
