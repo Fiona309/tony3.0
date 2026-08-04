@@ -66,19 +66,21 @@ const lum = a => a[0] * 0.299 + a[1] * 0.587 + a[2] * 0.114;
  /* amount = 底色残留的污染程度。1.0 是完全减色混合，会得到鲜艳的纯绿——
   * 那是过冲。真实偏色是染膏只被"部分"污染，呈现发闷的蓝绿，数据库描述
   * 雾霾灰偏色用的词正是"偏脏"。所以只混一部分，再压一点饱和度。 */
- /* 调校轴：AMOUNT 越大越偏绿（0.30→202° / 0.38→198° / 0.45→196° / 0.62→186°）
-  * DESAT 越小越淡。当前取"候选 B"：色相 198° 的蓝绿，饱和 51%。 */
-const BIAS_AMOUNT = 0.38;
-const BIAS_DESAT  = 0.55;
+ /* 调校轴：amount 越大越偏绿（0.30→202° / 0.45→196° / 0.62→186° / 0.80→175°）
+  * desat 越小越淡。挂在 state 上是为了支持页面上的实时调参滑块（?tune=1）。 */
+ /* 判定标准不是"看着像不像绿"，而是要跟「偏浅偏淡」(色相209°) 拉开足够色相差，
+  * 否则两格在真机上会糊成一个颜色（实测 amount=0.38 时只差 11°，用户反馈"看起来一样"）。
+  * desat 压住饱和度上限，所以往绿走不会变艳 —— 整条轴饱和度都在 45~56%。 */
+export const bias = { amount: 0.72, desat: 0.62 };
 
-export function biasedColor(rgb, amount = BIAS_AMOUNT) {
+export function biasedColor(rgb, amount = bias.amount, desat = bias.desat) {
   const b = rgb.map(v => v / 255);
   const w = RESIDUAL_WARM.map(v => v / 255);
   const mixed = b.map((v, i) => v * w[i]);              // 完全减色混合
   const k = lum(b) / Math.max(lum(mixed), 1e-3);        // 亮度拉回原水平
   const full = mixed.map(v => v * k);
   const part = b.map((v, i) => clamp255((v + (full[i] - v) * amount) * 255));
-  return scaleSat(part, BIAS_DESAT);                    // 偏色是"脏"，不是"艳"
+  return scaleSat(part, desat);                         // 偏色是"脏"，不是"艳"
 }
 
 /* ============================ 规则查询 ============================ */

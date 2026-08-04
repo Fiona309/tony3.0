@@ -110,6 +110,18 @@
     <div id="labels"></div>
     <div class="hud3"><span id="fps">–</span> FPS · 分割 <span id="segms">–</span>ms</div>
   </div>
+  <!-- 调参面板：仅 ?tune=1 显示。对着真实摄像头拖到满意，把数字报回来即可定稿 -->
+  <div id="tune" style="display:none;padding:12px 20px;border-top:1px solid var(--line);font-size:12px">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">
+      <span style="min-width:96px">偏绿程度 <b id="tvA">–</b></span>
+      <input type="range" id="tA" min="0" max="100" value="72" style="flex:1;accent-color:var(--accent)">
+    </div>
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">
+      <span style="min-width:96px">鲜艳程度 <b id="tvD">–</b></span>
+      <input type="range" id="tD" min="10" max="120" value="62" style="flex:1;accent-color:var(--accent)">
+    </div>
+    <div style="color:var(--dim)">偏色实际色值 <b id="tOut">–</b>　把这两个数字报给我即可定稿</div>
+  </div>
   <div class="note" id="note3"></div>
   <div class="foot">
     <button class="btn ghost" id="back2">返回改颜色</button>
@@ -277,6 +289,35 @@ $("#back2").onclick = () => {
   video.srcObject?.getTracks().forEach(t => t.stop());
   video.srcObject = null; show("s2");
 };
+
+/* ---------------- 实时调参（?tune=1） ---------------- */
+if (new URLSearchParams(location.search).has("tune")) {
+  $("#tune").style.display = "block";
+  const apply = () => {
+    core.bias.amount = +$("#tA").value / 100;
+    core.bias.desat  = +$("#tD").value / 100;
+    $("#tvA").textContent = core.bias.amount.toFixed(2);
+    $("#tvD").textContent = core.bias.desat.toFixed(2);
+    // 重算变体，摄像头不用重开，下一帧就生效
+    if (core.state.family && core.state.level) {
+      const v = core.variantsFor(core.state.family, core.state.level);
+      variants = v.variants;
+      const b = variants.find(x => x.key === "biased");
+      if (b) {
+        const [r,g,bl] = b.rgb;
+        const mx = Math.max(r,g,bl)/255, mn = Math.min(r,g,bl)/255, d = mx-mn;
+        let h = 0;
+        if (d > 1e-6) h = mx === r/255 ? 60*(((g-bl)/255/d)%6)
+                       : mx === g/255 ? 60*((bl-r)/255/d + 2)
+                                      : 60*((r-g)/255/d + 4);
+        if (h < 0) h += 360;
+        $("#tOut").textContent = `rgb(${r},${g},${bl}) 色相 ${h.toFixed(0)}° 饱和 ${(mx?d/mx*100:0).toFixed(0)}%`;
+      }
+    }
+  };
+  $("#tA").oninput = apply; $("#tD").oninput = apply;
+  apply();
+}
 
 function drawLabels(cw, ch){
   const box = $("#labels"); box.innerHTML = "";
