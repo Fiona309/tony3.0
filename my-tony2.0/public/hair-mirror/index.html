@@ -331,7 +331,7 @@ function loop(){
     const cx = i%gx, cy = gy-1-((i/gx)|0);
     gl.viewport(cx*vw, cy*vh, vw, vh);
     gl.uniform3f(uT, v.rgb[0]/255, v.rgb[1]/255, v.rgb[2]/255);
-    gl.uniform1f(uS, 1.0);
+    gl.uniform1f(uS, v.str ?? 1.0);
     gl.uniform1f(uL, v.lift || 0);
     gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
   });

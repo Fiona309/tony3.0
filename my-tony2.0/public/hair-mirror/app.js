@@ -54,12 +54,21 @@ export function scaleSat(rgb, k) {
 }
 
 /* 偏色：低度数底色残留的黄橙色会污染染膏色。
- * 这不是我编的方向 —— 数据库 color_result_rules 里 5 条 biased 记录写明了：
+ * 方向不是我编的 —— 数据库 color_result_rules 的 5 条 biased 记录写明了：
  *   蓝色→偏青绿 / 紫色→偏红棕 / 雾霾灰→偏灰绿 / 橙色→偏暗红棕 / 脏橘色→偏暗棕
- * 全部可由"往黄橙底混合"复现。 */
+ *
+ * 关键：染膏和底色残留是【颜料混合】，属减色过程，必须用乘法。
+ * 线性 RGB 平均是加色模型，蓝+黄只会得到灰蓝 —— 那是错的，蓝+黄必须是绿。
+ * 乘法混合后亮度会掉下去，再按原亮度拉回，否则只是"变暗"而不是"偏色"。 */
 const RESIDUAL_WARM = [196, 138, 58];
-export function biasedColor(rgb, amount = 0.38) {
-  return rgb.map((v, i) => clamp255(v * (1 - amount) + RESIDUAL_WARM[i] * amount));
+const lum = a => a[0] * 0.299 + a[1] * 0.587 + a[2] * 0.114;
+
+export function biasedColor(rgb) {
+  const b = rgb.map(v => v / 255);
+  const w = RESIDUAL_WARM.map(v => v / 255);
+  const mixed = b.map((v, i) => v * w[i]);              // 减色混合
+  const k = lum(b) / Math.max(lum(mixed), 1e-3);        // 亮度拉回原水平
+  return mixed.map(v => clamp255(v * k * 255));
 }
 
 /* ============================ 规则查询 ============================ */
@@ -109,12 +118,14 @@ export function variantsFor(family, level) {
   const base = d.entry.rgb;
 
   if (d.can) {
-    // 能染：标准 + 用量/手法导致的饱和度差异 + 偏色风险。都不涉及漂浅，lift=0。
+    /* 能染：标准 + 用量/手法差异 + 偏色风险。都不涉及漂浅，lift=0。
+     * str = 上色强度。用量少/停留短不只是"饱和度低"，是染料本身上得少、
+     * 露出更多原发色 —— 同时压饱和度和强度，四格才拉得开。 */
     return { decision: d, variants: [
-      { key: "standard", label: "标准效果",  rgb: base,                 lift: 0, note: "按说明书用量" },
-      { key: "low",      label: "偏低饱和",  rgb: scaleSat(base, 0.72), lift: 0, note: "用量偏少 / 停留短" },
-      { key: "high",     label: "偏高饱和",  rgb: scaleSat(base, 1.30), lift: 0, note: "用量偏多 / 停留久" },
-      { key: "biased",   label: "偏色风险",  rgb: biasedColor(base),    lift: 0,
+      { key: "standard", label: "标准效果", rgb: base,               str: 1.00, lift: 0, note: "按说明书用量" },
+      { key: "low",      label: "偏浅偏淡", rgb: scaleSat(base, 0.50), str: 0.58, lift: 0, note: "用量偏少 / 停留短" },
+      { key: "high",     label: "偏深偏艳", rgb: scaleSat(base, 1.65), str: 1.00, lift: 0.06, note: "用量偏多 / 停留久" },
+      { key: "biased",   label: "偏色风险", rgb: biasedColor(base),   str: 1.00, lift: 0,
         note: d.q === "biased" ? "底色残留污染" : "底色残留导致" },
     ]};
   }
@@ -136,6 +147,7 @@ export function variantsFor(family, level) {
       label: s.label,
       rgb: e?.rgb || base,
       lift: s.lift,
+      str: 1.00,
       note: `底色 ${lv} 度` + (e?.extrapolated ? "（模拟）" : ""),
       warn: i === 0,
     };
