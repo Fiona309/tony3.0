@@ -66,8 +66,10 @@ const lum = a => a[0] * 0.299 + a[1] * 0.587 + a[2] * 0.114;
  /* amount = 底色残留的污染程度。1.0 是完全减色混合，会得到鲜艳的纯绿——
   * 那是过冲。真实偏色是染膏只被"部分"污染，呈现发闷的蓝绿，数据库描述
   * 雾霾灰偏色用的词正是"偏脏"。所以只混一部分，再压一点饱和度。 */
-const BIAS_AMOUNT = 0.62;
-const BIAS_DESAT  = 0.82;
+ /* 调校轴：AMOUNT 越大越偏绿（0.30→202° / 0.38→198° / 0.45→196° / 0.62→186°）
+  * DESAT 越小越淡。当前取"候选 B"：色相 198° 的蓝绿，饱和 51%。 */
+const BIAS_AMOUNT = 0.38;
+const BIAS_DESAT  = 0.55;
 
 export function biasedColor(rgb, amount = BIAS_AMOUNT) {
   const b = rgb.map(v => v / 255);
