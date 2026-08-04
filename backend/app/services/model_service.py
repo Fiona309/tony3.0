@@ -102,6 +102,19 @@ class ModelService:
         fallback = self.analyze_hair_color(current_image_path)
         if fallback is None:
             return None
+        # Report which precondition actually failed. This used to always say
+        # "openai_next_not_configured", which sent people looking for a missing
+        # API key when the real cause was usually a missing target reference image.
+        if self.settings.vision_provider != "openai_next":
+            skip_reason = f"vision_provider_is_{self.settings.vision_provider}"
+        elif not self.settings.openai_next_api_key:
+            skip_reason = "openai_next_api_key_missing"
+        elif target_image_path is None:
+            skip_reason = "target_reference_not_mapped"
+        elif not target_image_path.exists():
+            skip_reason = f"target_reference_file_missing:{target_image_path.name}"
+        else:
+            skip_reason = None
         return HairProfileVisionAnalysis(
             current_color=fallback.color,
             current_color_options=fallback.color_options,
@@ -112,10 +125,7 @@ class ModelService:
             dye_history=None,
             attribute_confidences={"current_color": fallback.color.get("confidence", 0.0)},
             raw=fallback.raw,
-            fallback_reason=(
-                fallback.fallback_reason
-                or ("openai_next_not_configured" if self.settings.vision_provider == "openai_next" else None)
-            ),
+            fallback_reason=fallback.fallback_reason or skip_reason,
         )
 
     def analyze_hair_color(self, image_path: Path) -> HairColorAnalysis | None:
