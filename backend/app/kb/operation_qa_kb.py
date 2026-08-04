@@ -53,20 +53,56 @@ class OperationQAKB:
         product_id: str | None,
         top_k: int = 5,
     ) -> dict | None:
-        query = query.strip()
-        if not query:
+        return self.search_many(
+            queries=[query],
+            current_step_id=current_step_id,
+            product_id=product_id,
+            top_k=top_k,
+        )
+
+    def search_many(
+        self,
+        *,
+        queries: list[str],
+        current_step_id: str,
+        product_id: str | None,
+        top_k: int = 5,
+    ) -> dict | None:
+        """Search several phrasings of the same question and keep the best hit.
+
+        All query embeddings are requested in a single embedding API round trip,
+        so adding a rephrased query no longer costs an extra network call.
+        Per-query fallback order (chroma first, SQLite keywords second) is the
+        same as the previous single-query implementation.
+        """
+        cleaned = list(dict.fromkeys(item.strip() for item in queries if item.strip()))
+        if not cleaned:
             return None
 
+        embeddings: list[list[float]] | None = None
         if self._chroma_available and self._collection is not None:
-            hit = self._search_chroma(
-                query=query,
-                current_step_id=current_step_id,
-                product_id=product_id,
-                top_k=top_k,
-            )
-            if hit is not None:
-                return hit
-        return self._search_sqlite_keywords(query=query, top_k=top_k)
+            embeddings = self._embed_texts(cleaned)
+            if embeddings is not None and len(embeddings) != len(cleaned):
+                embeddings = None
+
+        best: dict | None = None
+        for index, query in enumerate(cleaned):
+            hit = None
+            if embeddings is not None:
+                hit = self._search_chroma(
+                    query=query,
+                    current_step_id=current_step_id,
+                    product_id=product_id,
+                    top_k=top_k,
+                    query_embedding=embeddings[index],
+                )
+            if hit is None:
+                hit = self._search_sqlite_keywords(query=query, top_k=top_k)
+            if hit is None:
+                continue
+            if best is None or float(hit.get("score") or 0.0) > float(best.get("score") or 0.0):
+                best = hit
+        return best
 
     def _sync_chroma_collection(self) -> None:
         rows = self._rows()
@@ -103,14 +139,16 @@ class OperationQAKB:
         current_step_id: str,
         product_id: str | None,
         top_k: int,
+        query_embedding: list[float] | None = None,
     ) -> dict | None:
         if self._collection is None:
             return None
 
-        embeddings = self._embed_texts([query])
-        if embeddings is None:
-            return None
-        query_embedding = embeddings[0]
+        if query_embedding is None:
+            embeddings = self._embed_texts([query])
+            if embeddings is None:
+                return None
+            query_embedding = embeddings[0]
         result = self._collection.query(
             query_embeddings=[query_embedding],
             n_results=max(top_k, 10),

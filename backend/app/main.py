@@ -13,7 +13,9 @@ from threading import Lock
 from typing import Any
 from uuid import uuid4
 
+import anyio.to_thread
 from fastapi import FastAPI, File, Form, Request, UploadFile
+from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -52,8 +54,14 @@ tutorial_service = TutorialService(
     operation_qa_kb=operation_qa_kb,
 )
 transition_video_service = TransitionVideoService(settings)
-preview_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="preview-generator")
-after_video_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="after-video-generator")
+preview_executor = ThreadPoolExecutor(
+    max_workers=settings.preview_worker_count,
+    thread_name_prefix="preview-generator",
+)
+after_video_executor = ThreadPoolExecutor(
+    max_workers=settings.after_video_worker_count,
+    thread_name_prefix="after-video-generator",
+)
 asr_prewarm_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="asr-prewarm")
 preview_task_lock = Lock()
 after_video_task_lock = Lock()
@@ -104,6 +112,11 @@ def prewarm_asr_model() -> None:
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    # Sync endpoints run here; the default cap of 40 is too low once a single
+    # vision request can occupy a thread for the full 30s timeout window.
+    anyio.to_thread.current_default_thread_limiter().total_tokens = (
+        settings.request_worker_threads
+    )
     settings.media_dir.mkdir(parents=True, exist_ok=True)
     settings.audio_upload_dir.mkdir(parents=True, exist_ok=True)
     settings.model_cache_dir.mkdir(parents=True, exist_ok=True)
@@ -170,7 +183,7 @@ async def health():
 
 
 @app.get("/api/debug/state")
-async def debug_state(request: Request):
+def debug_state(request: Request):
     current_user_key = user_key(request)
     persisted_rows = database.load_state()
     total_counts: dict[str, int] = {}
@@ -223,8 +236,10 @@ async def upload_image(
     content = await file.read()
     if len(content) > 10 * 1024 * 1024:
         return failure("单张图片不能超过 10 MB")
+    # save_image writes up to 10 MB to disk; keep that off the event loop.
     return ok(
-        store.save_image(
+        await run_in_threadpool(
+            store.save_image,
             content=content,
             suffix=Path(file.filename or "").suffix.lower(),
             media_type=media_type,
@@ -233,7 +248,7 @@ async def upload_image(
 
 
 @app.post("/api/hair-profiles")
-async def create_hair_profile(payload: dict[str, Any], request: Request):
+def create_hair_profile(payload: dict[str, Any], request: Request):
     for key in ("entry_video_id", "current_image_id"):
         if key not in payload:
             return failure(f"缺少字段: {key}")
@@ -268,12 +283,12 @@ async def create_hair_profile(payload: dict[str, Any], request: Request):
 
 
 @app.patch("/api/hair-profiles/{profile_id}")
-async def update_hair_profile(profile_id: str, payload: dict[str, Any], request: Request):
+def update_hair_profile(profile_id: str, payload: dict[str, Any], request: Request):
     return ok(store.update_profile(profile_id, payload, user_key=user_key(request)))
 
 
 @app.post("/api/demo-profiles")
-async def create_demo_profile(payload: dict[str, Any], request: Request):
+def create_demo_profile(payload: dict[str, Any], request: Request):
     for key in ("source_profile_id", "entry_video_id"):
         if key not in payload:
             return failure(f"缺少字段: {key}")
@@ -287,7 +302,7 @@ async def create_demo_profile(payload: dict[str, Any], request: Request):
 
 
 @app.post("/api/agent/plan-result")
-async def get_plan_result(payload: dict[str, Any], request: Request):
+def get_plan_result(payload: dict[str, Any], request: Request):
     current_user_key = user_key(request)
     profile = store.profile_for_rules(payload["profile_id"], user_key=current_user_key)
     rule_decision = color_rule_kb.evaluate_profile(profile)
@@ -298,7 +313,7 @@ async def get_plan_result(payload: dict[str, Any], request: Request):
 
 
 @app.get("/api/preview-tasks/{preview_task_id}")
-async def get_preview_task(preview_task_id: str, request: Request):
+def get_preview_task(preview_task_id: str, request: Request):
     return ok(store.preview_task(preview_task_id, user_key=user_key(request)))
 
 
@@ -561,7 +576,7 @@ def _int_or_default(value: Any, default: int) -> int:
 
 
 @app.post("/api/agent/product-recommendations")
-async def get_product_recommendations(payload: dict[str, Any], request: Request):
+def get_product_recommendations(payload: dict[str, Any], request: Request):
     for key in ("profile_id", "plan_id", "selected_route", "selected_preview_level", "budget"):
         if key not in payload:
             return failure(f"缺少字段: {key}")
@@ -569,7 +584,7 @@ async def get_product_recommendations(payload: dict[str, Any], request: Request)
 
 
 @app.post("/api/hair-dye-archives")
-async def create_archive(payload: dict[str, Any], request: Request):
+def create_archive(payload: dict[str, Any], request: Request):
     for key in ("profile_id", "plan_id", "recommendation_id", "sku_id", "purchase_status"):
         if key not in payload:
             return failure(f"缺少字段: {key}")
@@ -577,27 +592,27 @@ async def create_archive(payload: dict[str, Any], request: Request):
 
 
 @app.get("/api/hair-dye-archives")
-async def get_archives(request: Request):
+def get_archives(request: Request):
     return ok(store.archive_list(user_key=user_key(request)))
 
 
 @app.get("/api/hair-dye-archives/{archive_id}")
-async def get_archive(archive_id: str, request: Request):
+def get_archive(archive_id: str, request: Request):
     return ok(store.archive(archive_id, user_key=user_key(request)))
 
 
 @app.post("/api/tutorial-sessions")
-async def create_tutorial_session(payload: dict[str, Any], request: Request):
+def create_tutorial_session(payload: dict[str, Any], request: Request):
     return ok(store.create_session(payload["archive_id"], user_key=user_key(request)))
 
 
 @app.get("/api/tutorial-sessions/{tutorial_session_id}")
-async def get_tutorial_session(tutorial_session_id: str, request: Request):
+def get_tutorial_session(tutorial_session_id: str, request: Request):
     return ok(store.session(tutorial_session_id, user_key=user_key(request)))
 
 
 @app.post("/api/tutorial-sessions/{tutorial_session_id}/completion-record")
-async def complete_tutorial(tutorial_session_id: str, payload: dict[str, Any], request: Request):
+def complete_tutorial(tutorial_session_id: str, payload: dict[str, Any], request: Request):
     qa_summary = payload.get("qa_summary") or []
     if not isinstance(qa_summary, list):
         return failure("qa_summary 必须是数组")
@@ -625,6 +640,31 @@ async def voice_input(
         tutorial_session_id=tutorial_session_id,
         client_event_id=client_event_id,
     )
+
+    # ffmpeg transcoding, local ASR inference and the downstream LLM/KB calls are
+    # all synchronous and slow. Running them inline would block the event loop for
+    # the whole request, stalling every other user. Hand them to the threadpool.
+    return ok(
+        await run_in_threadpool(
+            _process_voice_input,
+            stored_audio=stored_audio,
+            tutorial_session_id=tutorial_session_id,
+            current_step_id=current_step_id,
+            client_event_id=client_event_id,
+            current_user_key=current_user_key,
+        )
+    )
+
+
+def _process_voice_input(
+    *,
+    stored_audio: Any,
+    tutorial_session_id: str,
+    current_step_id: str,
+    client_event_id: str,
+    current_user_key: str,
+) -> dict[str, Any]:
+    """Blocking half of the voice pipeline, executed off the event loop."""
     asr_input_path = stored_audio.original_path
     if not settings.mock_models:
         asr_input_path = audio_converter.to_sensevoice_wav(stored_audio.original_path)
@@ -633,19 +673,17 @@ async def voice_input(
         asr_input_path,
         original_filename=stored_audio.original_filename,
     )
-    return ok(
-        tutorial_service.handle_voice_input(
-            tutorial_session_id=tutorial_session_id,
-            current_step_id=current_step_id,
-            client_event_id=client_event_id,
-            transcribe_result=transcribe_result,
-            user_key=current_user_key,
-        )
+    return tutorial_service.handle_voice_input(
+        tutorial_session_id=tutorial_session_id,
+        current_step_id=current_step_id,
+        client_event_id=client_event_id,
+        transcribe_result=transcribe_result,
+        user_key=current_user_key,
     )
 
 
 @app.post("/api/tutorial-sessions/{tutorial_session_id}/after-photo")
-async def submit_after_photo(tutorial_session_id: str, payload: dict[str, Any], request: Request):
+def submit_after_photo(tutorial_session_id: str, payload: dict[str, Any], request: Request):
     current_user_key = user_key(request)
     result = store.after_photo(tutorial_session_id, payload["after_image_id"], user_key=current_user_key)
     enqueue_after_video_generation(result["generation_task_id"], current_user_key)
@@ -653,5 +691,5 @@ async def submit_after_photo(tutorial_session_id: str, payload: dict[str, Any], 
 
 
 @app.get("/api/after-video-tasks/{generation_task_id}")
-async def get_after_video_task(generation_task_id: str, request: Request):
+def get_after_video_task(generation_task_id: str, request: Request):
     return ok(store.after_task(generation_task_id, user_key=user_key(request)))

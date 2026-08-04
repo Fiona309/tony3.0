@@ -65,6 +65,9 @@ class Settings:
     asr_timeout_seconds: int
     tts_provider: str
     tts_timeout_seconds: int
+    request_worker_threads: int
+    preview_worker_count: int
+    after_video_worker_count: int
 
 
 def _origins() -> tuple[str, ...]:
@@ -122,4 +125,12 @@ def get_settings() -> Settings:
         asr_timeout_seconds=int(os.getenv("ASR_TIMEOUT_SECONDS", "8")),
         tts_provider=os.getenv("TTS_PROVIDER", "browser_fallback"),
         tts_timeout_seconds=int(os.getenv("TTS_TIMEOUT_SECONDS", "10")),
+        # Sync endpoints and run_in_threadpool calls share this pool. Slow
+        # upstreams (vision ~10s, ASR ~1s) hold a thread for their whole
+        # duration, so the pool must be larger than anyio's default of 40.
+        request_worker_threads=int(os.getenv("REQUEST_WORKER_THREADS", "64")),
+        # Background generators. Raising these increases upstream concurrency,
+        # so lower them again if OpenRouter / draw API rate limits bite.
+        preview_worker_count=int(os.getenv("PREVIEW_WORKER_COUNT", "2")),
+        after_video_worker_count=int(os.getenv("AFTER_VIDEO_WORKER_COUNT", "2")),
     )

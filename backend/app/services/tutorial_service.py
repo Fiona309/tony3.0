@@ -58,11 +58,10 @@ class TutorialService:
                 "sku_id": archive.get("product_snapshot", {}).get("sku_id"),
                 "product_name": archive.get("product_snapshot", {}).get("product_name"),
             }
-            query = self.model_service.rewrite_operation_question(
-                transcript=transcribe_result.transcript,
-                context=context,
-            )
+            query = ""
             if not _looks_like_question(transcribe_result.transcript):
+                # The clarify reply below never uses the rewritten query, so the
+                # rewrite LLM round trip is skipped entirely on this branch.
                 answer_text = "我没太理解你的问题。你可以说具体一点，比如问要等多久、怎么涂、能不能碰头皮。"
                 answer_meta = {
                     "answer_id": "clarify",
@@ -70,6 +69,10 @@ class TutorialService:
                     "source": "voice_guard",
                 }
             else:
+                query = self.model_service.rewrite_operation_question(
+                    transcript=transcribe_result.transcript,
+                    context=context,
+                )
                 hit = self._best_kb_hit(
                     queries=[transcribe_result.transcript, query],
                     current_step_id=str(context.get("step_id") or ""),
@@ -119,18 +122,13 @@ class TutorialService:
         current_step_id: str,
         product_id: str | None,
     ) -> dict | None:
-        best: dict | None = None
-        for query in dict.fromkeys(item.strip() for item in queries if item.strip()):
-            hit = self.operation_qa_kb.search(
-                query=query,
-                current_step_id=current_step_id,
-                product_id=product_id,
-            )
-            if hit is None:
-                continue
-            if best is None or float(hit.get("score") or 0.0) > float(best.get("score") or 0.0):
-                best = hit
-        return best
+        # search_many embeds every phrasing in one API call and applies the same
+        # "highest score wins" rule this method used to apply query by query.
+        return self.operation_qa_kb.search_many(
+            queries=queries,
+            current_step_id=current_step_id,
+            product_id=product_id,
+        )
 
 
 def _looks_like_question(text: str) -> bool:
