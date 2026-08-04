@@ -668,7 +668,11 @@ def _process_voice_input(
 ) -> dict[str, Any]:
     """Blocking half of the voice pipeline, executed off the event loop."""
     asr_input_path = stored_audio.original_path
-    if not settings.mock_models:
+    # Only the local SenseVoice model needs a 16 kHz mono WAV. Cloud endpoints
+    # accept the browser's native recording directly, so transcoding there just
+    # spawns an ffmpeg subprocess for nothing — and makes ffmpeg a hard install
+    # requirement it does not need to be.
+    if not settings.mock_models and settings.asr_provider == "sensevoice":
         asr_input_path = audio_converter.to_sensevoice_wav(stored_audio.original_path)
 
     transcribe_result = model_service.transcribe_audio(

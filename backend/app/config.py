@@ -63,7 +63,7 @@ class Settings:
     transition_video_poll_interval_seconds: int
     siliconflow_base_url: str
     siliconflow_api_key: str | None
-    siliconflow_asr_model: str
+    cloud_asr_model: str
     audio_upload_dir: Path
     model_cache_dir: Path
     asr_provider: str
@@ -76,6 +76,19 @@ class Settings:
     request_worker_threads: int
     preview_worker_count: int
     after_video_worker_count: int
+
+
+def _default_cloud_asr_model() -> str:
+    """Pick the transcription model that matches the configured ASR relay.
+
+    openai-next hosts OpenAI-family models; whisper-large-v3-turbo is the best
+    price/latency option there that is actually reachable (gpt-4o-mini-transcribe
+    is cheaper on paper but its upstream group returns 429 on this relay).
+    siliconflow hosts SenseVoiceSmall, which is free.
+    """
+    if os.getenv("ASR_PROVIDER", "openai_next") == "siliconflow":
+        return "FunAudioLLM/SenseVoiceSmall"
+    return "whisper-large-v3-turbo"
 
 
 def _origins() -> tuple[str, ...]:
@@ -140,12 +153,12 @@ def get_settings() -> Settings:
         ),
         siliconflow_base_url=os.getenv("SILICONFLOW_BASE_URL", "https://api.siliconflow.cn"),
         siliconflow_api_key=os.getenv("SILICONFLOW_API_KEY"),
-        siliconflow_asr_model=os.getenv("SILICONFLOW_ASR_MODEL", "FunAudioLLM/SenseVoiceSmall"),
+        cloud_asr_model=os.getenv("CLOUD_ASR_MODEL", _default_cloud_asr_model()),
         audio_upload_dir=audio_upload_dir,
         model_cache_dir=model_cache_dir,
         # Defaults to the cloud SenseVoiceSmall endpoint (same model as the local
         # path). Set ASR_PROVIDER=sensevoice to force local torch/funasr inference.
-        asr_provider=os.getenv("ASR_PROVIDER", "siliconflow"),
+        asr_provider=os.getenv("ASR_PROVIDER", "openai_next"),
         sensevoice_model=os.getenv("SENSEVOICE_MODEL", "iic/SenseVoiceSmall"),
         sensevoice_device=os.getenv("SENSEVOICE_DEVICE", "cpu"),
         sensevoice_vad_model=os.getenv("SENSEVOICE_VAD_MODEL", "fsmn-vad"),

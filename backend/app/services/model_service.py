@@ -68,7 +68,7 @@ class ModelService:
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
         self._sensevoice = None
-        self._siliconflow_asr = None
+        self._cloud_asr = None
         self._hair_vision_color_recognizer: ModuleType | None = None
         self._hair_full_pipeline_engine: ModuleType | None = None
 
@@ -175,16 +175,15 @@ class ModelService:
         if self.settings.mock_models:
             return self._mock_transcribe(original_filename)
 
-        if self.settings.asr_provider == "siliconflow":
-            if not self.settings.siliconflow_api_key:
-                # Never fail the tutorial over a missing key: fall back to the
-                # local model, which is still bundled and fully supported.
-                logger.warning("SILICONFLOW_API_KEY missing, falling back to local SenseVoice")
-                return self._sensevoice_transcribe(audio_path)
+        if self.settings.asr_provider in {"openai_next", "siliconflow"}:
             try:
-                return self._siliconflow_transcribe(audio_path)
+                return self._cloud_transcribe(audio_path)
             except UpstreamError:
-                logger.exception("SiliconFlow ASR failed, falling back to local SenseVoice")
+                # Never fail the tutorial over an upstream hiccup: fall back to the
+                # local model, which is still bundled and fully supported.
+                logger.exception(
+                    "%s ASR failed, falling back to local SenseVoice", self.settings.asr_provider
+                )
                 return self._sensevoice_transcribe(audio_path)
 
         return self._sensevoice_transcribe(audio_path)
@@ -658,12 +657,24 @@ class ModelService:
             self._sensevoice = SenseVoiceService(self.settings)
         return self._sensevoice.transcribe(audio_path)
 
-    def _siliconflow_transcribe(self, audio_path: Path) -> TranscribeResult:
-        if self._siliconflow_asr is None:
-            from .siliconflow_asr_service import SiliconFlowASRService
+    def _cloud_transcribe(self, audio_path: Path) -> TranscribeResult:
+        if self._cloud_asr is None:
+            from .cloud_asr_service import CloudASRService
 
-            self._siliconflow_asr = SiliconFlowASRService(self.settings)
-        return self._siliconflow_asr.transcribe(audio_path)
+            if self.settings.asr_provider == "openai_next":
+                base_url = self.settings.openai_next_base_url
+                api_key = self.settings.openai_next_api_key
+            else:
+                base_url = self.settings.siliconflow_base_url
+                api_key = self.settings.siliconflow_api_key
+            self._cloud_asr = CloudASRService(
+                self.settings,
+                provider=self.settings.asr_provider,
+                base_url=base_url,
+                api_key=api_key,
+                model=self.settings.cloud_asr_model,
+            )
+        return self._cloud_asr.transcribe(audio_path)
 
     def _load_hair_vision_color_recognizer(self) -> ModuleType:
         if self._hair_vision_color_recognizer is not None:
