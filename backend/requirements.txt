@@ -1,11 +1,14 @@
 fastapi==0.115.12
 uvicorn[standard]==0.34.2
 python-multipart==0.0.20
+httpx==0.28.1
 numpy==1.26.4
 opencv-python-headless==4.10.0.84
 Pillow==10.4.0
 chromadb==0.5.23
-funasr==1.2.6
-modelscope==1.25.0
-torch==2.7.1
-torchaudio==2.7.1
+
+# Local ASR (only needed when ASR_PROVIDER=sensevoice).
+# The default ASR_PROVIDER=siliconflow calls the same SenseVoiceSmall model over
+# HTTP and needs none of the packages below — installing them adds ~2 GB and a
+# multi-second model load to cold start.
+#   pip install -r requirements-local-asr.txt

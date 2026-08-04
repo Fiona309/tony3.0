@@ -5,17 +5,22 @@ from __future__ import annotations
 import base64
 import colorsys
 import importlib.util
+import io
 import json
-import mimetypes
+import logging
 import re
 from dataclasses import dataclass
 from pathlib import Path
 from types import ModuleType
 from typing import Any, Literal
-from urllib import request as urlrequest
-from urllib.error import HTTPError, URLError
+
+from PIL import Image
 
 from ..config import Settings
+from .http_client import UpstreamError, post_json
+
+
+logger = logging.getLogger(__name__)
 
 
 TutorialIntent = Literal["next", "finish", "question", "silence", "replay"]
@@ -63,6 +68,7 @@ class ModelService:
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
         self._sensevoice = None
+        self._siliconflow_asr = None
         self._hair_vision_color_recognizer: ModuleType | None = None
         self._hair_full_pipeline_engine: ModuleType | None = None
 
@@ -158,6 +164,19 @@ class ModelService:
     def transcribe_audio(self, audio_path: Path, *, original_filename: str = "") -> TranscribeResult:
         if self.settings.mock_models:
             return self._mock_transcribe(original_filename)
+
+        if self.settings.asr_provider == "siliconflow":
+            if not self.settings.siliconflow_api_key:
+                # Never fail the tutorial over a missing key: fall back to the
+                # local model, which is still bundled and fully supported.
+                logger.warning("SILICONFLOW_API_KEY missing, falling back to local SenseVoice")
+                return self._sensevoice_transcribe(audio_path)
+            try:
+                return self._siliconflow_transcribe(audio_path)
+            except UpstreamError:
+                logger.exception("SiliconFlow ASR failed, falling back to local SenseVoice")
+                return self._sensevoice_transcribe(audio_path)
+
         return self._sensevoice_transcribe(audio_path)
 
     def classify_tutorial_intent(self, transcript: str) -> TutorialIntent:
@@ -210,6 +229,7 @@ class ModelService:
             user=prompt,
             max_tokens=80,
             temperature=0.1,
+            timeout=self.settings.llm_fast_timeout_seconds,
         )
         return (answer or fallback).strip()[:120]
 
@@ -237,6 +257,7 @@ class ModelService:
             ),
             max_tokens=180,
             temperature=0.2,
+            timeout=self.settings.llm_answer_timeout_seconds,
         )
         return (answer or fallback).strip()
 
@@ -274,16 +295,14 @@ class ModelService:
                 },
             ],
         }
-        request = urlrequest.Request(
-            endpoint,
-            data=json.dumps(payload).encode("utf-8"),
-            headers=self._openai_next_headers(),
-            method="POST",
-        )
         try:
-            with urlrequest.urlopen(request, timeout=self.settings.vision_timeout_seconds) as response:
-                response_body = response.read().decode("utf-8")
-            raw_response = json.loads(response_body)
+            raw_response = post_json(
+                endpoint,
+                payload=payload,
+                api_key=self.settings.openai_next_api_key,
+                timeout=self.settings.llm_answer_timeout_seconds,
+                label="tutorial_answer",
+            )
             answer = raw_response["choices"][0]["message"]["content"].strip()
             return answer or fallback
         except Exception:
@@ -331,21 +350,14 @@ class ModelService:
             "input": texts,
             "encoding_format": "float",
         }
-        request = urlrequest.Request(
-            endpoint,
-            data=json.dumps(payload).encode("utf-8"),
-            headers={
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json",
-                "Accept": "application/json",
-                "User-Agent": "Mozilla/5.0 AppleWebKit/537.36 Chrome/126 Safari/537.36",
-            },
-            method="POST",
-        )
         try:
-            with urlrequest.urlopen(request, timeout=20) as response:
-                response_body = response.read().decode("utf-8")
-            raw_response = json.loads(response_body)
+            raw_response = post_json(
+                endpoint,
+                payload=payload,
+                api_key=api_key,
+                timeout=self.settings.embedding_timeout_seconds,
+                label="embedding",
+            )
             data = sorted(raw_response.get("data", []), key=lambda item: item.get("index", 0))
             embeddings: list[list[float] | None] = []
             for item in data:
@@ -371,14 +383,6 @@ class ModelService:
             fallback_reason="tts_provider_not_implemented",
         )
 
-    def _openai_next_headers(self) -> dict[str, str]:
-        return {
-            "Authorization": f"Bearer {self.settings.openai_next_api_key}",
-            "Content-Type": "application/json",
-            "Accept": "application/json",
-            "User-Agent": "Mozilla/5.0 AppleWebKit/537.36 Chrome/126 Safari/537.36",
-        }
-
     def _openai_next_classify_intent(self, transcript: str) -> TutorialIntent | None:
         if self.settings.mock_models or not self.settings.openai_next_api_key:
             return None
@@ -391,6 +395,7 @@ class ModelService:
             user=f"用户语音转写：{transcript}",
             max_tokens=10,
             temperature=0.0,
+            timeout=self.settings.llm_fast_timeout_seconds,
         )
         value = (content or "").strip().lower()
         if value in {"next", "finish", "question", "silence", "replay"}:
@@ -404,6 +409,7 @@ class ModelService:
         user: str,
         max_tokens: int,
         temperature: float,
+        timeout: float,
     ) -> str | None:
         if not self.settings.openai_next_api_key:
             return None
@@ -417,16 +423,14 @@ class ModelService:
                 {"role": "user", "content": user},
             ],
         }
-        request = urlrequest.Request(
-            endpoint,
-            data=json.dumps(payload).encode("utf-8"),
-            headers=self._openai_next_headers(),
-            method="POST",
-        )
         try:
-            with urlrequest.urlopen(request, timeout=self.settings.vision_timeout_seconds) as response:
-                response_body = response.read().decode("utf-8")
-            raw_response = json.loads(response_body)
+            raw_response = post_json(
+                endpoint,
+                payload=payload,
+                api_key=self.settings.openai_next_api_key,
+                timeout=timeout,
+                label="chat_completion",
+            )
             return raw_response["choices"][0]["message"]["content"].strip()
         except Exception:
             return None
@@ -466,36 +470,27 @@ class ModelService:
                             "type": "image_url",
                             "image_url": {
                                 "url": self._image_data_url(current_image_path),
-                                "detail": "high",
+                                "detail": self.settings.vision_image_detail,
                             },
                         },
                         {
                             "type": "image_url",
                             "image_url": {
                                 "url": self._image_data_url(target_image_path),
-                                "detail": "high",
+                                "detail": self.settings.vision_image_detail,
                             },
                         },
                     ],
                 },
             ],
         }
-        request = urlrequest.Request(
+        raw_response = post_json(
             endpoint,
-            data=json.dumps(payload).encode("utf-8"),
-            headers=self._openai_next_headers(),
-            method="POST",
+            payload=payload,
+            api_key=self.settings.openai_next_api_key,
+            timeout=self.settings.vision_timeout_seconds,
+            label="openai_next",
         )
-        try:
-            with urlrequest.urlopen(request, timeout=self.settings.vision_timeout_seconds) as response:
-                response_body = response.read().decode("utf-8")
-        except HTTPError as error:
-            detail = error.read().decode("utf-8", errors="replace")
-            raise RuntimeError(f"openai_next_http_{error.code}: {detail[:300]}") from error
-        except URLError as error:
-            raise RuntimeError(f"openai_next_url_error: {error.reason}") from error
-
-        raw_response = json.loads(response_body)
         content = raw_response["choices"][0]["message"]["content"]
         parsed = self._parse_json_content(content)
         return self._hair_profile_analysis_from_vlm_json(parsed, raw_response)
@@ -652,6 +647,13 @@ class ModelService:
 
             self._sensevoice = SenseVoiceService(self.settings)
         return self._sensevoice.transcribe(audio_path)
+
+    def _siliconflow_transcribe(self, audio_path: Path) -> TranscribeResult:
+        if self._siliconflow_asr is None:
+            from .siliconflow_asr_service import SiliconFlowASRService
+
+            self._siliconflow_asr = SiliconFlowASRService(self.settings)
+        return self._siliconflow_asr.transcribe(audio_path)
 
     def _load_hair_vision_color_recognizer(self) -> ModuleType:
         if self._hair_vision_color_recognizer is not None:
@@ -821,11 +823,34 @@ class ModelService:
             return f"{title} 要少量多次涂抹，尽量覆盖均匀，发尾和边缘位置可以再检查一遍。"
         return f"{title} 先按当前视频步骤操作。若商品包装说明和教程不同，请以商品官方说明为准。"
 
-    @staticmethod
-    def _image_data_url(path: Path) -> str:
-        mime_type = mimetypes.guess_type(path.name)[0] or "image/jpeg"
-        data = base64.b64encode(path.read_bytes()).decode("ascii")
-        return f"data:{mime_type};base64,{data}"
+    def _image_data_url(self, path: Path) -> str:
+        """Base64 a JPEG-encoded, downscaled copy of the image.
+
+        Phone photos routinely arrive at 3000-4000px. Sending them untouched
+        made the request body several megabytes and multiplied the image tiles
+        the vision model bills for. Longest edge is capped at
+        VISION_IMAGE_MAX_EDGE; smaller images are left at their native size.
+        Falls back to the original bytes if the file cannot be decoded.
+        """
+        max_edge = self.settings.vision_image_max_edge
+        try:
+            with Image.open(path) as image:
+                image = image.convert("RGB")
+                if max(image.size) > max_edge:
+                    image.thumbnail((max_edge, max_edge), Image.LANCZOS)
+                buffer = io.BytesIO()
+                image.save(
+                    buffer,
+                    format="JPEG",
+                    quality=self.settings.vision_image_quality,
+                    optimize=True,
+                )
+            data = base64.b64encode(buffer.getvalue()).decode("ascii")
+            return f"data:image/jpeg;base64,{data}"
+        except Exception:
+            logger.warning("vision image downscale failed for %s, sending original", path.name)
+            data = base64.b64encode(path.read_bytes()).decode("ascii")
+            return f"data:image/jpeg;base64,{data}"
 
     @staticmethod
     def _parse_json_content(content: str) -> dict[str, Any]:

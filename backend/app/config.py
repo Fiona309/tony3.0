@@ -45,6 +45,12 @@ class Settings:
     openrouter_api_key: str | None
     openrouter_image_model: str
     vision_timeout_seconds: int
+    llm_fast_timeout_seconds: int
+    llm_answer_timeout_seconds: int
+    embedding_timeout_seconds: int
+    vision_image_max_edge: int
+    vision_image_quality: int
+    vision_image_detail: str
     openai_next_base_url: str
     openai_next_api_key: str | None
     draw_base_url: str
@@ -54,8 +60,10 @@ class Settings:
     transition_video_endpoint: str
     transition_video_wan_resolution: str
     transition_video_timeout_seconds: int
+    transition_video_poll_interval_seconds: int
     siliconflow_base_url: str
     siliconflow_api_key: str | None
+    siliconflow_asr_model: str
     audio_upload_dir: Path
     model_cache_dir: Path
     asr_provider: str
@@ -105,6 +113,17 @@ def get_settings() -> Settings:
         openrouter_api_key=os.getenv("OPENROUTER_API_KEY"),
         openrouter_image_model=os.getenv("OPENROUTER_IMAGE_MODEL", "google/gemini-2.5-flash-image"),
         vision_timeout_seconds=int(os.getenv("VISION_TIMEOUT_SECONDS", "30")),
+        # Tiered timeouts. Intent classification returns ~10 tokens and query
+        # rewriting ~80; making them wait out the 30s vision budget turns a
+        # hiccup into a half-minute stall on the voice path.
+        llm_fast_timeout_seconds=int(os.getenv("LLM_FAST_TIMEOUT_SECONDS", "8")),
+        llm_answer_timeout_seconds=int(os.getenv("LLM_ANSWER_TIMEOUT_SECONDS", "15")),
+        embedding_timeout_seconds=int(os.getenv("EMBEDDING_TIMEOUT_SECONDS", "10")),
+        # Phone photos are often 3000px+. Downscaling before base64 shrinks both
+        # the upload and the number of image tiles the vision model is billed for.
+        vision_image_max_edge=int(os.getenv("VISION_IMAGE_MAX_EDGE", "1024")),
+        vision_image_quality=int(os.getenv("VISION_IMAGE_QUALITY", "85")),
+        vision_image_detail=os.getenv("VISION_IMAGE_DETAIL", "high"),
         openai_next_base_url=os.getenv("OPENAI_NEXT_BASE_URL", "https://api.openai-next.com"),
         openai_next_api_key=os.getenv("OPENAI_NEXT_API_KEY"),
         draw_base_url=os.getenv("DRAW_BASE_URL", "https://draw.openai-next.com"),
@@ -114,11 +133,19 @@ def get_settings() -> Settings:
         transition_video_endpoint=os.getenv("TRANSITION_VIDEO_ENDPOINT", "/v1/video/generations"),
         transition_video_wan_resolution=os.getenv("TRANSITION_VIDEO_WAN_RESOLUTION", "480P"),
         transition_video_timeout_seconds=int(os.getenv("TRANSITION_VIDEO_TIMEOUT_SECONDS", "360")),
+        # Was hardcoded to 30s for wan, so a task finishing right after a poll
+        # sat idle for up to 30 extra seconds before anyone noticed.
+        transition_video_poll_interval_seconds=int(
+            os.getenv("TRANSITION_VIDEO_POLL_INTERVAL_SECONDS", "5")
+        ),
         siliconflow_base_url=os.getenv("SILICONFLOW_BASE_URL", "https://api.siliconflow.cn"),
         siliconflow_api_key=os.getenv("SILICONFLOW_API_KEY"),
+        siliconflow_asr_model=os.getenv("SILICONFLOW_ASR_MODEL", "FunAudioLLM/SenseVoiceSmall"),
         audio_upload_dir=audio_upload_dir,
         model_cache_dir=model_cache_dir,
-        asr_provider=os.getenv("ASR_PROVIDER", "sensevoice"),
+        # Defaults to the cloud SenseVoiceSmall endpoint (same model as the local
+        # path). Set ASR_PROVIDER=sensevoice to force local torch/funasr inference.
+        asr_provider=os.getenv("ASR_PROVIDER", "siliconflow"),
         sensevoice_model=os.getenv("SENSEVOICE_MODEL", "iic/SenseVoiceSmall"),
         sensevoice_device=os.getenv("SENSEVOICE_DEVICE", "cpu"),
         sensevoice_vad_model=os.getenv("SENSEVOICE_VAD_MODEL", "fsmn-vad"),

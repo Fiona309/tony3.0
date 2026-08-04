@@ -26,6 +26,8 @@ class OperationQAKB:
         self.embedding_function = embedding_function
         self._collection = None
         self._chroma_available = False
+        self._rows_cache: list[sqlite3.Row] | None = None
+        self._rows_by_id: dict[str, sqlite3.Row] | None = None
 
     def initialize(self) -> None:
         self.chroma_dir.mkdir(parents=True, exist_ok=True)
@@ -203,27 +205,28 @@ class OperationQAKB:
         return self._result(best[1], score=round(best[0], 3), source="sqlite_keyword")
 
     def _rows(self) -> list[sqlite3.Row]:
-        with self._connect() as connection:
-            return connection.execute(
-                """
-                SELECT qa_id, category, query, original_user_questions,
-                       original_comment_answer_clues, answer, product_id, step_id
-                FROM operation_qa
-                ORDER BY qa_id
-                """
-            ).fetchall()
+        """Rows are seeded once by Database.initialize() and never mutated at
+        runtime, so they are cached in memory after the first read. This removes
+        a full table scan per keyword search and the N+1 _row_by_id lookups that
+        every chroma search used to issue.
+        """
+        if self._rows_cache is None:
+            with self._connect() as connection:
+                rows = connection.execute(
+                    """
+                    SELECT qa_id, category, query, original_user_questions,
+                           original_comment_answer_clues, answer, product_id, step_id
+                    FROM operation_qa
+                    ORDER BY qa_id
+                    """
+                ).fetchall()
+            self._rows_cache = rows
+            self._rows_by_id = {str(row["qa_id"]): row for row in rows}
+        return self._rows_cache
 
     def _row_by_id(self, qa_id: str) -> sqlite3.Row | None:
-        with self._connect() as connection:
-            return connection.execute(
-                """
-                SELECT qa_id, category, query, original_user_questions,
-                       original_comment_answer_clues, answer, product_id, step_id
-                FROM operation_qa
-                WHERE qa_id = ?
-                """,
-                (qa_id,),
-            ).fetchone()
+        self._rows()
+        return (self._rows_by_id or {}).get(qa_id)
 
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.database_path)

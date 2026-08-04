@@ -29,6 +29,7 @@ from .kb.product_kb import ProductKB
 from .mock_data import MockStore
 from .services.audio_converter import AudioConverter
 from .services.audio_storage import AudioStorage
+from .services.http_client import close_client
 from .services.model_service import ModelService
 from .services.transition_video_service import TransitionVideoService
 from .services.tutorial_service import TutorialService
@@ -133,6 +134,7 @@ async def lifespan(_: FastAPI):
     preview_executor.shutdown(wait=False, cancel_futures=False)
     after_video_executor.shutdown(wait=False, cancel_futures=False)
     asr_prewarm_executor.shutdown(wait=False, cancel_futures=False)
+    close_client()
 
 
 app = FastAPI(title=settings.app_name, lifespan=lifespan)

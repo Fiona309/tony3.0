@@ -1,0 +1,9 @@
+# Optional: local SenseVoice ASR (ASR_PROVIDER=sensevoice).
+# Only install these if you deliberately want ASR to run on this machine instead
+# of through the SiliconFlow API. Install requirements.txt first.
+-r requirements.txt
+
+funasr==1.2.6
+modelscope==1.25.0
+torch==2.7.1
+torchaudio==2.7.1

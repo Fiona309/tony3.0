@@ -9,10 +9,11 @@ import mimetypes
 import time
 from pathlib import Path
 from typing import Any, Optional
-from urllib import request as urlrequest
-from urllib.error import HTTPError, URLError
+
+import httpx
 
 from ..config import Settings
+from .http_client import get_client
 
 
 MAX_TRANSITION_IMAGE_SIZE = 1024
@@ -116,30 +117,21 @@ class TransitionVideoService:
         }
         if extra_headers:
             headers.update(extra_headers)
-        request = urlrequest.Request(
-            url,
-            data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
-            headers=headers,
-            method="POST",
-        )
+        provider = self.settings.transition_video_provider
         try:
-            with urlrequest.urlopen(
-                request,
+            response = get_client().post(
+                url,
+                content=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+                headers=headers,
                 timeout=self.settings.transition_video_timeout_seconds,
-            ) as response:
-                body = response.read().decode("utf-8")
-        except HTTPError as error:
-            detail = error.read().decode("utf-8", errors="replace")
-            raise RuntimeError(
-                f"{self.settings.transition_video_provider}_api_http_{error.code}:{detail[:500]}"
-            ) from error
-        except URLError as error:
-            raise RuntimeError(
-                f"{self.settings.transition_video_provider}_api_network_error:{error.reason}"
-            ) from error
-        parsed = json.loads(body)
+            )
+        except httpx.HTTPError as error:
+            raise RuntimeError(f"{provider}_api_network_error:{error}") from error
+        if response.status_code >= 400:
+            raise RuntimeError(f"{provider}_api_http_{response.status_code}:{response.text[:500]}")
+        parsed = json.loads(response.text)
         if not isinstance(parsed, dict):
-            raise RuntimeError(f"{self.settings.transition_video_provider}_api_response_not_object")
+            raise RuntimeError(f"{provider}_api_response_not_object")
         return parsed
 
     def _extract_video_bytes(self, response: dict[str, Any]) -> bytes:
@@ -174,7 +166,9 @@ class TransitionVideoService:
         deadline = time.monotonic() + self.settings.transition_video_timeout_seconds
         last_response: dict[str, Any] | None = None
         while time.monotonic() < deadline:
-            time.sleep(30 if self._is_wan else 5)
+            # Was hardcoded 30s for wan, so a task that finished one second after
+            # a poll still sat idle for another 29 before the user saw it.
+            time.sleep(self.settings.transition_video_poll_interval_seconds)
             last_response = self._request_task(task_id)
             video_bytes = self._video_bytes_from_response(last_response)
             if video_bytes is not None:
@@ -194,26 +188,20 @@ class TransitionVideoService:
     def _request_task(self, task_id: str) -> dict[str, Any]:
         endpoint = f"/wan/api/v1/tasks/{task_id}" if self._is_wan else f"/v1/tasks/{task_id}"
         url = f"{self._base_url.rstrip('/')}/{endpoint.lstrip('/')}"
-        request = urlrequest.Request(
-            url,
-            headers={
-                "Authorization": f"Bearer {self._api_key}",
-                "User-Agent": "meifa-backend/1.0",
-            },
-            method="GET",
-        )
         try:
-            with urlrequest.urlopen(
-                request,
+            response = get_client().get(
+                url,
+                headers={
+                    "Authorization": f"Bearer {self._api_key}",
+                    "User-Agent": "meifa-backend/1.0",
+                },
                 timeout=self.settings.transition_video_timeout_seconds,
-            ) as response:
-                body = response.read().decode("utf-8")
-        except HTTPError as error:
-            detail = error.read().decode("utf-8", errors="replace")
-            raise RuntimeError(f"draw_task_http_{error.code}:{detail[:500]}") from error
-        except URLError as error:
-            raise RuntimeError(f"draw_task_network_error:{error.reason}") from error
-        parsed = json.loads(body)
+            )
+        except httpx.HTTPError as error:
+            raise RuntimeError(f"draw_task_network_error:{error}") from error
+        if response.status_code >= 400:
+            raise RuntimeError(f"draw_task_http_{response.status_code}:{response.text[:500]}")
+        parsed = json.loads(response.text)
         if not isinstance(parsed, dict):
             raise RuntimeError("draw_task_response_not_object")
         return parsed
@@ -221,25 +209,22 @@ class TransitionVideoService:
     def _download_task_content(self, task_id: str) -> bytes:
         endpoint = self.settings.transition_video_endpoint.rstrip("/")
         url = f"{self._base_url.rstrip('/')}/{endpoint.lstrip('/')}/{task_id}/content"
-        request = urlrequest.Request(
-            url,
-            headers={
-                "Authorization": f"Bearer {self._api_key}",
-                "User-Agent": "meifa-backend/1.0",
-            },
-            method="GET",
-        )
         try:
-            with urlrequest.urlopen(
-                request,
+            response = get_client().get(
+                url,
+                headers={
+                    "Authorization": f"Bearer {self._api_key}",
+                    "User-Agent": "meifa-backend/1.0",
+                },
                 timeout=self.settings.transition_video_timeout_seconds,
-            ) as response:
-                return response.read()
-        except HTTPError as error:
-            detail = error.read().decode("utf-8", errors="replace")
-            raise RuntimeError(f"draw_task_content_http_{error.code}:{detail[:500]}") from error
-        except URLError as error:
-            raise RuntimeError(f"draw_task_content_network_error:{error.reason}") from error
+            )
+        except httpx.HTTPError as error:
+            raise RuntimeError(f"draw_task_content_network_error:{error}") from error
+        if response.status_code >= 400:
+            raise RuntimeError(
+                f"draw_task_content_http_{response.status_code}:{response.text[:500]}"
+            )
+        return response.content
 
     @property
     def _is_wan(self) -> bool:
@@ -305,22 +290,19 @@ class TransitionVideoService:
         return None
 
     def _download_video(self, video_url: str) -> bytes:
-        request = urlrequest.Request(
-            video_url,
-            headers={"User-Agent": "meifa-backend/1.0"},
-            method="GET",
-        )
         try:
-            with urlrequest.urlopen(
-                request,
+            response = get_client().get(
+                video_url,
+                headers={"User-Agent": "meifa-backend/1.0"},
                 timeout=self.settings.transition_video_timeout_seconds,
-            ) as response:
-                return response.read()
-        except HTTPError as error:
-            detail = error.read().decode("utf-8", errors="replace")
-            raise RuntimeError(f"draw_video_download_http_{error.code}:{detail[:500]}") from error
-        except URLError as error:
-            raise RuntimeError(f"draw_video_download_network_error:{error.reason}") from error
+            )
+        except httpx.HTTPError as error:
+            raise RuntimeError(f"draw_video_download_network_error:{error}") from error
+        if response.status_code >= 400:
+            raise RuntimeError(
+                f"draw_video_download_http_{response.status_code}:{response.text[:500]}"
+            )
+        return response.content
 
     @staticmethod
     def _image_data_url(path: Path) -> str:

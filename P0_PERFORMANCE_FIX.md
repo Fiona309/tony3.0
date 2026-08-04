@@ -219,6 +219,9 @@ git checkout -- backend/app/main.py backend/app/config.py backend/app/kb/operati
 
 ## 6. 本次未做，建议排入 P1
 
+> ✅ **下表内容已在 P1 完成，详见 [`P1_PERFORMANCE_FIX.md`](./P1_PERFORMANCE_FIX.md)。**
+> 唯一例外是「删除死代码」——排查后发现 `run_pipeline.py` 仍会调用它，已改为待你决策，理由见 P1 文档第 5 节。
+
 按收益从高到低：
 
 | 项 | 说明 | 预期收益 |
