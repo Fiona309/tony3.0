@@ -191,7 +191,43 @@ pip install -r backend/requirements-local-asr.txt
 
 ---
 
-## 5. 关于「删除死代码」——这一项我没做，需要你决定
+## 5. 关于「删除死代码」——已按选项 B 修复（2026-08-04 追加）
+
+> **决策结果：不删除，修好 import 让分割真正可用。** 实施细节见下方补充说明，原始分析保留作为记录。
+
+### 实际做了什么
+
+**改动文件**：`hair_full_pipeline/hair_dye_engine.py`、`hair_full_pipeline/config.py`、新增 `hair_full_pipeline/requirements.txt`
+
+1. **修复 import 路径**：新增 `_load_segmentation_service()`，按**本文件所在目录**解析 `segmentation.py`，而不是原来错误的 `services.segmentation`。这样无论是 `run_pipeline.py` 直接跑，还是后端用 importlib 加载（sys.path 只在 import 期间临时挂载），都能正确找到模块。服务实例会缓存复用。
+
+2. **不再静默吞异常**：原来的 `except Exception: pass` 正是这个 bug 藏了这么久的原因 —— 取色一直悄悄降级成中心裁剪，没有任何提示。现在会打 warning 日志说明降级原因。
+
+3. **关闭 face detection**：`FACE_DETECTION_ENABLED` 由 `True` 改为 `False`。原因是 `segmentation.py` 引用的 `services/face_detection.py` **在这个仓库里根本不存在**（从未交付），每次调用都是必然失败的 import。同时这意味着 **`blaze_face.tflite`（224 KB）目前是真正无用的**——需要那个模块被补上才有意义。
+
+4. **新增 `hair_full_pipeline/requirements.txt`**：声明分割后端依赖（`mediapipe` 优先 / `onnxruntime` 回退）。两者都没装时会降级到中心裁剪并打日志，不会崩。
+
+### 验证
+
+```
+[INFO] hair segmentation backend: smp_onnx
+提取到 RGB: (124, 125, 124) | Lab L: 52.2
+```
+
+分割后端确实加载起来了（当前环境只装了 onnxruntime，所以走 SMP ONNX 回退分支），`hair_seg_smp.onnx`（8.3 MB）从死文件变成了真正在用的模型。
+
+### 对后端服务的影响：无
+
+后端调用仍是 `extract_color_from_image(use_hair_segmentation=False)`，这条路径本来也只是 vision API 未配置时的兜底。**没有给后端主链路增加任何耗时。**
+
+### 仍需你决定的一件事
+
+`blaze_face.tflite` + `FACE_DETECTION_*` 配置目前是孤儿状态（代码从未交付）。要么补写 `face_detection.py`，要么把这个权重和相关配置删掉。我没有替你选，因为补写等于凭空发明一套 ROI 逻辑。
+
+---
+
+<details>
+<summary>原始分析记录（决策前）</summary>
 
 P0 文档里我把三个权重文件列为死代码建议删除。**深入排查后发现不能直接删**：
 
@@ -206,6 +242,8 @@ P0 文档里我把三个权重文件列为死代码建议删除。**深入排查
 | **C. 删除文件** | 省 9 MB 仓库体积；后端零影响，但独立脚本永久失去分割能力 |
 
 后端主路径（`use_hair_segmentation=False`）三种选项下**完全不受影响**，纯粹是独立脚本的取舍。因为涉及删除且影响另一条使用路径，我没有替你决定。
+
+</details>
 
 ---
 

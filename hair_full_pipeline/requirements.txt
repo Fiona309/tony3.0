@@ -1,0 +1,20 @@
+# Dependencies for running hair_full_pipeline standalone (run_pipeline.py).
+#
+# Hair segmentation picks a backend at runtime:
+#   1. mediapipe      -> models/weights/hair_segmenter.tflite   (preferred)
+#   2. onnxruntime    -> models/weights/hair_seg_smp.onnx       (fallback)
+# With neither installed, colour extraction falls back to a center crop and logs
+# a warning (it no longer fails silently).
+#
+# The backend service does NOT need this file: it calls
+# extract_color_from_image(use_hair_segmentation=False).
+
+numpy==1.26.4
+opencv-python-headless==4.10.0.84
+Pillow==10.4.0
+requests>=2.31.0
+pydantic-settings>=2.0.0
+
+# Segmentation backends — install at least one to enable segmentation.
+mediapipe>=0.10.14
+onnxruntime>=1.18.0

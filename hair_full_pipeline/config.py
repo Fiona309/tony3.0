@@ -88,7 +88,7 @@ class Settings(BaseSettings):
     DEBUG_MASKS_DIR: str = "tests/debug_masks"
 
     # 浜鸿劯杈呭姪瀹氫綅閰嶇疆
-    FACE_DETECTION_ENABLED: bool = True
+    FACE_DETECTION_ENABLED: bool = False  # services/face_detection.py was never delivered; blaze_face.tflite is unused until it is
     FACE_DETECTION_MODEL: str = "blaze_face.tflite"
     FACE_DETECTION_MIN_CONFIDENCE: float = 0.5
     FACE_ROI_EXPANSION: str = "conservative"  # conservative / aggressive / adaptive

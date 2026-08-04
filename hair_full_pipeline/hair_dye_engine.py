@@ -17,8 +17,10 @@
 """
 
 import json
+import logging
 import math
 import os
+import sys
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 from dataclasses import dataclass
@@ -26,6 +28,8 @@ from dataclasses import dataclass
 import cv2
 import numpy as np
 from PIL import Image
+
+logger = logging.getLogger(__name__)
 
 
 # ============================================================
@@ -150,6 +154,37 @@ def rgb_to_hex(rgb):
 # 图片颜色提取
 # ============================================================
 
+_segmentation_service = None
+
+
+def _load_segmentation_service():
+    """Import segmentation.py regardless of how this module was loaded.
+
+    The old code did ``from services.segmentation import SegmentationService``,
+    but there is no ``services/`` package here — segmentation.py sits next to
+    this file. That import always raised ImportError, was swallowed by a bare
+    ``except``, and every call silently degraded to a center crop.
+
+    The backend also loads this module through importlib with the pipeline dir
+    only temporarily on sys.path, so a plain ``from segmentation import ...``
+    would still fail at call time. Resolving against this file's own directory
+    works in both cases.
+    """
+    global _segmentation_service
+    if _segmentation_service is not None:
+        return _segmentation_service
+
+    package_dir = str(Path(__file__).resolve().parent)
+    if package_dir not in sys.path:
+        sys.path.insert(0, package_dir)
+
+    from segmentation import SegmentationService
+
+    _segmentation_service = SegmentationService()
+    logger.info("hair segmentation backend: %s", _segmentation_service.backend_name)
+    return _segmentation_service
+
+
 def extract_color_from_image(image_path_or_pil, center_ratio=0.5, use_hair_segmentation=True):
     if isinstance(image_path_or_pil, (str, Path)):
         img = Image.open(str(image_path_or_pil)).convert("RGB")
@@ -159,14 +194,18 @@ def extract_color_from_image(image_path_or_pil, center_ratio=0.5, use_hair_segme
     hair_pixels = None
     if use_hair_segmentation:
         try:
-            from services.segmentation import SegmentationService
-            seg = SegmentationService()
+            seg = _load_segmentation_service()
             mask, conf = seg.segment_hair(img)
             arr = np.array(img)
             hair_pixels = arr[mask > 127]
             if len(hair_pixels) < 50:
+                logger.warning("hair mask too small (%d px), falling back to center crop", len(hair_pixels))
                 hair_pixels = None
-        except Exception:
+        except Exception as error:
+            # Previously this swallowed everything silently, which is why a broken
+            # import path went unnoticed and colour extraction quietly ran on a
+            # center crop instead of the segmented hair region.
+            logger.warning("hair segmentation unavailable (%s), falling back to center crop", error)
             hair_pixels = None
 
     if hair_pixels is not None and len(hair_pixels) > 0:

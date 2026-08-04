@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "backend",
+      "runtimeExecutable": "backend/.venv/bin/uvicorn",
+      "runtimeArgs": ["app.main:app", "--host", "127.0.0.1", "--port", "8000", "--app-dir", "backend"],
+      "port": 8000
+    },
+    {
+      "name": "tony",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "my-tony2.0", "run", "dev"],
+      "port": 3000
+    }
+  ]
+}
