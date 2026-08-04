@@ -1,0 +1,349 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>染发魔镜 · 实时试色</title>
+<style>
+  :root{--bg:#0d0c0f;--panel:rgba(20,18,24,.86);--line:rgba(255,255,255,.13);
+        --fg:#f4f1ee;--dim:#9a938f;--accent:#c4614f;--warn:#d9a441}
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);overscroll-behavior:none;
+    font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Helvetica Neue",sans-serif;
+    -webkit-tap-highlight-color:transparent}
+  button{font-family:inherit}
+  .screen{position:fixed;inset:0;display:none;flex-direction:column}
+  .screen.on{display:flex}
+
+  .pad{padding:24px 20px;padding-top:max(24px,env(safe-area-inset-top))}
+  h1{font-size:20px;margin:0 0 8px;font-weight:600}
+  .sub{color:var(--dim);font-size:13px;line-height:1.7;margin:0}
+  .btn{padding:14px 28px;border-radius:999px;border:0;background:var(--accent);color:#fff;
+    font-size:15px;font-weight:600;cursor:pointer}
+  .btn:disabled{opacity:.5}
+  .btn.ghost{background:transparent;border:1px solid var(--line);color:var(--fg)}
+
+  /* 屏1 */
+  #s1{align-items:center;justify-content:center;text-align:center;gap:18px;padding:32px}
+  #s1 .sub{max-width:32em}
+  .pick{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;margin-top:6px}
+
+  /* 屏2 */
+  #shot{width:100%;max-height:34vh;object-fit:contain;background:#000}
+  .row{display:flex;align-items:center;gap:14px;padding:14px 20px;border-bottom:1px solid var(--line)}
+  .row b{font-size:15px}
+  .chip{font-size:12px;padding:3px 9px;border-radius:999px;background:rgba(255,255,255,.09);color:var(--dim)}
+  .lv{display:flex;gap:6px;flex-wrap:wrap;padding:0 20px 14px}
+  .lv button{flex:1;min-width:42px;padding:9px 0;border-radius:10px;border:1px solid var(--line);
+    background:transparent;color:var(--dim);font-size:14px;cursor:pointer}
+  .lv button[aria-pressed=true]{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+  .fams{display:flex;gap:14px;overflow-x:auto;padding:14px 20px;scrollbar-width:none}
+  .fams::-webkit-scrollbar{display:none}
+  .fam{flex:0 0 auto;width:64px;text-align:center;background:none;border:0;padding:0;cursor:pointer;color:inherit}
+  .fam .dot{width:56px;height:56px;border-radius:50%;border:2px solid transparent;box-shadow:0 2px 10px rgba(0,0,0,.5)}
+  .fam[aria-pressed=true] .dot{border-color:var(--accent);transform:scale(1.07)}
+  .fam span{display:block;font-size:11px;margin-top:6px;color:var(--dim)}
+  .fam[aria-pressed=true] span{color:var(--fg)}
+  .fam .x{position:absolute;font-size:20px}
+  .verdict{margin:0 20px 14px;padding:13px 15px;border-radius:12px;font-size:13px;line-height:1.65;
+    background:rgba(255,255,255,.06);border-left:3px solid var(--dim)}
+  .verdict.ok{border-color:#5c9e6a}.verdict.bias{border-color:var(--warn)}
+  .verdict.no{border-color:var(--accent)}
+  .foot{margin-top:auto;padding:16px 20px max(16px,env(safe-area-inset-bottom));
+    display:flex;gap:12px;border-top:1px solid var(--line)}
+  .foot .btn{flex:1}
+
+  /* 屏3 */
+  #stage{flex:1;position:relative;background:#000;display:flex;align-items:center;justify-content:center;overflow:hidden}
+  #gl{max-width:100%;max-height:100%}
+  #labels{position:absolute;inset:0;pointer-events:none}
+  .lab{position:absolute;font-size:12px;font-weight:600;padding:4px 9px;border-radius:8px;
+    background:rgba(0,0,0,.62);backdrop-filter:blur(8px);line-height:1.35}
+  .lab small{display:block;font-weight:400;opacity:.72;font-size:10px}
+  .hud3{position:absolute;top:10px;right:12px;font-size:11px;color:var(--dim);
+    background:rgba(0,0,0,.5);padding:4px 9px;border-radius:8px;font-variant-numeric:tabular-nums}
+  .note{padding:10px 20px;font-size:12px;color:var(--dim);line-height:1.6;border-top:1px solid var(--line)}
+
+  .msg{position:fixed;inset:0;z-index:30;display:none;align-items:center;justify-content:center;
+    flex-direction:column;gap:16px;padding:32px;text-align:center;background:var(--bg)}
+  .msg.on{display:flex}
+  code{background:rgba(255,255,255,.09);padding:2px 6px;border-radius:4px;font-size:12px}
+  video,#work{display:none}
+</style>
+</head>
+<body>
+
+<!-- 屏1：拍照 -->
+<div class="screen on" id="s1">
+  <h1>染发魔镜</h1>
+  <p class="sub">先拍一张<b>露出头发</b>的照片，识别你的底色度数。<br>
+     识别与渲染<b>全部在你手机本地完成</b>，照片不上传。</p>
+  <div class="pick">
+    <button class="btn" id="pickFile">拍照 / 选照片</button>
+    <button class="btn ghost" id="useDemo">用示例照片</button>
+  </div>
+  <p class="sub" id="preloadTip" style="margin-top:10px"></p>
+  <input type="file" id="file" accept="image/*" capture="user" hidden>
+</div>
+
+<!-- 屏2：底色 + 选色 -->
+<div class="screen" id="s2">
+  <img id="shot" alt="">
+  <div class="row">
+    <b>底色 <span id="lvShow">–</span> 度</b>
+    <span class="chip" id="lvSrc"></span>
+    <span class="chip" id="cov"></span>
+  </div>
+  <div class="lv" id="lvBtns"></div>
+  <div class="fams" id="fams"></div>
+  <div class="verdict" id="verdict">选一个目标发色</div>
+  <div class="foot">
+    <button class="btn ghost" id="back1">重拍</button>
+    <button class="btn" id="toCam" disabled>开摄像头实时看</button>
+  </div>
+</div>
+
+<!-- 屏3：实时渲染 -->
+<div class="screen" id="s3">
+  <div id="stage">
+    <canvas id="gl"></canvas>
+    <div id="labels"></div>
+    <div class="hud3"><span id="fps">–</span> FPS · 分割 <span id="segms">–</span>ms</div>
+  </div>
+  <div class="note" id="note3"></div>
+  <div class="foot">
+    <button class="btn ghost" id="back2">返回改颜色</button>
+  </div>
+</div>
+
+<div class="msg" id="msg"><h1 id="msgT"></h1><p class="sub" id="msgB"></p>
+  <button class="btn ghost" onclick="location.reload()">重新开始</button></div>
+
+<video id="cam" playsinline muted></video>
+<canvas id="work"></canvas>
+
+<script type="module">
+import * as core from "./app.js";
+
+const $ = s => document.querySelector(s);
+const show = id => document.querySelectorAll(".screen").forEach(e => e.classList.toggle("on", e.id === id));
+const fail = (t, b) => { $("#msgT").textContent = t; $("#msgB").innerHTML = b; $("#msg").classList.add("on"); };
+
+/* 预热：用户还在看屏1 时就把模型和规则下好 */
+core.preload()
+  .then(() => $("#preloadTip").textContent = "✅ 模型已就绪")
+  .catch(e => $("#preloadTip").textContent = "模型预加载失败：" + e.message);
+
+/* ---------------- 屏1 ---------------- */
+$("#pickFile").onclick = () => $("#file").click();
+$("#file").onchange = e => { const f = e.target.files?.[0]; if (f) loadPhoto(URL.createObjectURL(f)); };
+// 同源，且不依赖后端 —— 整个试色页零 API 调用
+$("#useDemo").onclick = () => loadPhoto("/mock-videos/blue.jpg");
+$("#back1").onclick = () => show("s1");
+
+async function loadPhoto(src){
+  const img = new Image();
+  img.crossOrigin = "anonymous";
+  img.src = src;
+  try { await img.decode(); } catch { return fail("图片读不出来", "换一张试试。"); }
+  $("#shot").src = src;
+  show("s2");
+  $("#verdict").textContent = "识别底色中…";
+  try {
+    const r = await core.detectBaseLevel(img);
+    if (!r.ok) { $("#verdict").className = "verdict no"; $("#verdict").textContent = r.reason; return; }
+    core.state.detected = r.level;
+    setLevel(r.level, false);
+    $("#cov").textContent = `头发占比 ${(r.coverage*100).toFixed(0)}%`;
+  } catch (e){ fail("识别失败", e.message); }
+}
+
+/* ---------------- 屏2 ---------------- */
+function setLevel(lv, manual){
+  core.state.level = lv;
+  $("#lvShow").textContent = lv;
+  $("#lvSrc").textContent = manual ? "手动修改" : "自动识别";
+  renderLevels(); renderFams(); renderVerdict();
+}
+function renderLevels(){
+  const box = $("#lvBtns"); box.innerHTML = "";
+  for (let lv = 3; lv <= 9; lv++){
+    const b = document.createElement("button");
+    b.textContent = lv + "度";
+    b.setAttribute("aria-pressed", String(lv === core.state.level));
+    b.onclick = () => setLevel(lv, true);
+    box.appendChild(b);
+  }
+}
+function renderFams(){
+  const box = $("#fams"); box.innerHTML = "";
+  for (const name of Object.keys(core.state.rules.colors)){
+    const e = core.lookup(name, core.state.level);
+    const d = core.decide(name, core.state.level);
+    const b = document.createElement("button");
+    b.className = "fam";
+    b.setAttribute("aria-pressed", String(name === core.state.family));
+    b.innerHTML = `<div class="dot" style="background:${e?.hex || "#333"}"></div><span>${name}</span>`;
+    b.style.opacity = d.q === "not_recommended" ? ".55" : "1";
+    b.onclick = () => { core.state.family = name; renderFams(); renderVerdict(); };
+    box.appendChild(b);
+  }
+}
+function renderVerdict(){
+  const v = $("#verdict"), btn = $("#toCam");
+  if (!core.state.family){ v.className = "verdict"; v.textContent = "选一个目标发色"; btn.disabled = true; return; }
+  const { decision } = core.variantsFor(core.state.family, core.state.level);
+  btn.disabled = false;
+  const map = { normal:["ok","可以染"], biased:["bias","可以染，但有偏色风险"],
+                not_recommended:["no","不推荐直接染"], unknown:["","暂无该组合数据"] };
+  let [cls, head] = map[decision.q] || ["", "—"];
+  if (decision.extrapolated && cls === "ok") cls = "bias";
+  v.className = "verdict " + cls;
+  v.innerHTML = `<b>${head}</b><br>${decision.why}<br>
+    <span style="color:var(--dim)">下一屏将实时渲染：${
+      decision.can ? "标准 / 低饱和 / 高饱和 / 偏色风险" : "不漂 / 漂1次 / 漂2次"}</span>`;
+}
+
+/* ---------------- 屏3：WebGL 多路渲染 ---------------- */
+const video = $("#cam"), canvas = $("#gl"), gl = canvas.getContext("webgl", { alpha:false });
+if (!gl) fail("浏览器不支持 WebGL", "换新版 Chrome / Safari。");
+
+const VS = `attribute vec2 p;varying vec2 uv;
+void main(){uv=vec2(1.0-(p.x*.5+.5),1.0-(p.y*.5+.5));gl_Position=vec4(p,0.,1.);}`;
+
+/* 亮度保留换色：只换 YCbCr 的色度，保留亮度 Y。
+   发丝纹理/高光/层次全编码在 Y 里，保住 Y 就保住"还是那束头发"。
+   recept 让亮的（漂过的）发丝吃色深、暗的发根几乎不上色 —— 即布丁头。 */
+const FS = `precision mediump float;varying vec2 uv;
+uniform sampler2D cam,mask;uniform vec3 target;uniform float strength;uniform float lift;
+void main(){
+  vec3 c=texture2D(cam,uv).rgb; float m=texture2D(mask,uv).r;
+  float Y0=dot(c,vec3(.299,.587,.114));
+  /* lift 模拟漂浅：把发丝提亮，暗部提得更多（漂粉对黑发作用最明显）。
+     提亮后 recept 变大，颜色才吃得上去 —— 这是漂 0/1/2 次三格能拉开差距的原因。 */
+  float Y=clamp(Y0+lift*(1.0-Y0)*mix(1.4,0.6,Y0),0.,1.);
+  float Cb=(c.b-Y0)*.564*mix(1.0,0.35,lift), Cr=(c.r-Y0)*.713*mix(1.0,0.35,lift);
+  float tY=dot(target,vec3(.299,.587,.114));
+  float tCb=(target.b-tY)*.564, tCr=(target.r-tY)*.713;
+  float recept=clamp((Y-.10)/.45,0.,1.);
+  float a=m*mix(.30,1.,recept)*strength;
+  float nCb=mix(Cb,tCb,a), nCr=mix(Cr,tCr,a);
+  float nY=mix(Y,Y*.72+tY*.28,a*.65);
+  gl_FragColor=vec4(clamp(vec3(nY+1.403*nCr,nY-.714*nCr-.344*nCb,nY+1.773*nCb),0.,1.),1.);
+}`;
+function sh(t,s){const o=gl.createShader(t);gl.shaderSource(o,s);gl.compileShader(o);
+  if(!gl.getShaderParameter(o,gl.COMPILE_STATUS))throw new Error(gl.getShaderInfoLog(o));return o;}
+const prog=gl.createProgram();
+gl.attachShader(prog,sh(gl.VERTEX_SHADER,VS));gl.attachShader(prog,sh(gl.FRAGMENT_SHADER,FS));
+gl.linkProgram(prog);gl.useProgram(prog);
+const buf=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buf);
+gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,1,1]),gl.STATIC_DRAW);
+const loc=gl.getAttribLocation(prog,"p");gl.enableVertexAttribArray(loc);
+gl.vertexAttribPointer(loc,2,gl.FLOAT,false,0,0);
+function tex(u){const t=gl.createTexture();gl.activeTexture(gl.TEXTURE0+u);gl.bindTexture(gl.TEXTURE_2D,t);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);return t;}
+const camTex=tex(0), maskTex=tex(1);
+gl.uniform1i(gl.getUniformLocation(prog,"cam"),0);
+gl.uniform1i(gl.getUniformLocation(prog,"mask"),1);
+const uT=gl.getUniformLocation(prog,"target"), uS=gl.getUniformLocation(prog,"strength"),
+      uL=gl.getUniformLocation(prog,"lift");
+
+let variants=[], grid=[1,1], running=false, lastT=-1, frames=0, clk=performance.now(), segMs=0;
+
+$("#toCam").onclick = async () => {
+  const v = core.variantsFor(core.state.family, core.state.level);
+  variants = v.variants;
+  grid = variants.length >= 4 ? [2,2] : [variants.length,1];
+  $("#note3").innerHTML = v.decision.why +
+    (v.decision.q === "extrapolated" ? " <b>此档为模拟效果，仅供参考。</b>" : "");
+  show("s3");
+  try {
+    await core.ensureVideoSegmenter();
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video:{ facingMode:"user", width:{ideal:1280}, height:{ideal:720} }, audio:false });
+    video.srcObject = stream; await video.play();
+    running = true; loop();
+  } catch(e){
+    if (/NotAllowed|denied|permission/i.test(e.message))
+      fail("需要摄像头权限","在浏览器里允许摄像头后刷新页面。");
+    else fail("摄像头打不开", e.message);
+  }
+};
+$("#back2").onclick = () => {
+  running = false;
+  video.srcObject?.getTracks().forEach(t => t.stop());
+  video.srcObject = null; show("s2");
+};
+
+function drawLabels(cw, ch){
+  const box = $("#labels"); box.innerHTML = "";
+  const [gx, gy] = grid, w = cw/gx, h = ch/gy;
+  const rect = canvas.getBoundingClientRect(), st = $("#stage").getBoundingClientRect();
+  const sx = rect.width/cw, sy = rect.height/ch;
+  variants.forEach((v,i) => {
+    const cx = i % gx, cy = (i/gx)|0;
+    const d = document.createElement("div");
+    d.className = "lab";
+    d.style.left = ((rect.left-st.left) + cx*w*sx + 8) + "px";
+    d.style.top  = ((rect.top -st.top ) + cy*h*sy + 8) + "px";
+    d.style.color = v.warn ? "var(--warn)" : "#fff";
+    d.innerHTML = `${v.label}<small>${v.note||""}</small>`;
+    box.appendChild(d);
+  });
+}
+
+function uploadMask(res){
+  const cm = res.confidenceMasks?.[res.confidenceMasks.length-1];
+  if (!cm) return;
+  const f = cm.getAsFloat32Array(), b = new Uint8Array(f.length);
+  for (let i=0;i<f.length;i++) b[i] = f[i]*255;
+  gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, maskTex);
+  gl.pixelStorei(gl.UNPACK_ALIGNMENT,1);
+  gl.texImage2D(gl.TEXTURE_2D,0,gl.LUMINANCE,cm.width,cm.height,0,gl.LUMINANCE,gl.UNSIGNED_BYTE,b);
+  cm.close();
+}
+
+function loop(){
+  if (!running) return;
+  requestAnimationFrame(loop);
+  if (video.readyState < 2 || video.currentTime === lastT) return;
+  lastT = video.currentTime;
+
+  const vw = video.videoWidth, vh = video.videoHeight;
+  const [gx,gy] = grid, cw = vw*gx, ch = vh*gy;
+  if (canvas.width !== cw || canvas.height !== ch){
+    canvas.width = cw; canvas.height = ch; drawLabels(cw,ch);
+  }
+
+  // 分割每帧只跑一次 —— 这是最贵的一步，所有变体共享
+  const t0 = performance.now();
+  core.state.segVideo.segmentForVideo(video, performance.now(), uploadMask);
+  segMs = segMs*0.85 + (performance.now()-t0)*0.15;
+
+  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, camTex);
+  gl.texImage2D(gl.TEXTURE_2D,0,gl.RGB,gl.RGB,gl.UNSIGNED_BYTE,video);
+
+  // 每个变体只是换个 target 再画一次，<1ms
+  variants.forEach((v,i) => {
+    const cx = i%gx, cy = gy-1-((i/gx)|0);
+    gl.viewport(cx*vw, cy*vh, vw, vh);
+    gl.uniform3f(uT, v.rgb[0]/255, v.rgb[1]/255, v.rgb[2]/255);
+    gl.uniform1f(uS, 1.0);
+    gl.uniform1f(uL, v.lift || 0);
+    gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
+  });
+
+  frames++;
+  const now = performance.now();
+  if (now-clk >= 500){
+    $("#fps").textContent = (frames*1000/(now-clk)).toFixed(0);
+    $("#segms").textContent = segMs.toFixed(1);
+    frames = 0; clk = now;
+  }
+}
+</script>
+</body>
+</html>
