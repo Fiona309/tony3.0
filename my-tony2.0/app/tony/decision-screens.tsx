@@ -1405,6 +1405,32 @@ export function CalculatingScreen({
   );
 }
 
+export type PlanVerdict = {
+  level: number;
+  canDye: boolean;
+  canDyeWhy: string;
+  biasRisky: boolean;
+  biasWhy: string;
+  saturation: number;
+  vibrancyNote: string;
+};
+
+function VerdictRow({
+  index, title, ok, value, note,
+}: { index: string; title: string; ok: boolean; value: string; note: string }) {
+  return (
+    <div className={cx('rounded-[16px] border p-3',
+      ok ? 'border-[#8bc79c] bg-[#eef7f0]' : 'border-[#e8c47a] bg-[#fff8e4]')}>
+      <div className="flex items-baseline gap-2">
+        <span className="text-[13px] font-black text-ink-3">{index}</span>
+        <span className="text-[12px] font-bold text-ink-3">{title}</span>
+        <span className="ml-auto text-[13px] font-black">{value}</span>
+      </div>
+      {note ? <p className="mt-1.5 text-[11px] leading-[1.6] text-ink-2">{note}</p> : null}
+    </div>
+  );
+}
+
 function feasibilityLabel(plan: PlanResultData) {
   if (plan.feasibility === 'salon_required' || plan.feasibility === 'not_reachable') {
     return '不建议在家操作';
@@ -1435,6 +1461,7 @@ export function PlanScreen({
   onBack,
   onProducts,
   onDemoPreview,
+  verdict,
 }: {
   plan: PlanResultData;
   selectedRoute: RouteType;
@@ -1449,6 +1476,8 @@ export function PlanScreen({
   onBack: () => void;
   onProducts: () => void;
   onDemoPreview?: () => void;
+  /** 结论屏算好的三层结果。判定只发生一次，本屏只展示，不重算 */
+  verdict?: PlanVerdict;
 }) {
   const carouselRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -1495,43 +1524,51 @@ export function PlanScreen({
           </div>
         ) : null}
 
-        {/* 先回答最重要的问题 */}
-        <p className="inline-block text-[13px] font-black text-pink-dark decoration-[3px] underline-offset-[6px] [text-decoration-line:underline] [text-decoration-color:var(--pink-soft)]">
-          先回答最重要的问题
-        </p>
-
-        {/* 结论（左） + 目标色接近度（右） */}
-        <div className="mt-3 flex items-start justify-between gap-2">
-          <div className="min-w-0 flex-1">
-            <h1 className="text-[26px] font-black leading-[1.14] tracking-[-.05em]">
-              {feasibilityLabel(plan)}
-            </h1>
-            <p className="mt-2.5 text-[13px] leading-[1.6] text-ink-2">{plan.summary}</p>
-          </div>
-          <div className="w-[112px] shrink-0 text-center">
-            <div
-              className="sketch-reachability sketch-reachability--sm"
-              aria-label={`目标色接近度 ${plan.reachability_score}%`}
-            >
-              <svg viewBox="0 0 180 154" aria-hidden="true">
-                <path
-                  d="M90 143 C79 132 22 91 20 55 C18 25 42 11 64 18 C78 22 86 34 91 44 C97 31 107 20 123 18 C148 16 164 35 160 60 C156 92 111 130 90 143 Z"
-                  fill="#FFF9F2"
-                  stroke="#F08EAE"
-                  strokeWidth="4"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-                <path d="M34 35 L22 27 M30 49 L15 48 M145 31 L157 20" fill="none" stroke="#F08EAE" strokeWidth="4" strokeLinecap="round" />
-              </svg>
-              <p className="sketch-reachability__value numerals">
-                {plan.reachability_score}<small>%</small>
-              </p>
+        {/* 三层结论。这里不重新判定——判定只在结论屏发生一次，本屏只做展示。
+            此前本屏独立跑 evaluate_profile，与结论屏用不同输入、不同规则表，
+            导致"试色说能染、方案说不能染"的直接矛盾。 */}
+        {verdict ? (
+          <>
+            <p className="inline-block text-[13px] font-black text-pink-dark decoration-[3px] underline-offset-[6px] [text-decoration-line:underline] [text-decoration-color:var(--pink-soft)]">
+              你的三层判断结果
+            </p>
+            <div className="mt-3 space-y-2">
+              <VerdictRow
+                index="①"
+                title="能不能染"
+                ok={verdict.canDye}
+                value={verdict.canDye ? `能染 · 你的底色 ${verdict.level} 度` : `不建议 · 底色 ${verdict.level} 度还不够浅`}
+                note={verdict.canDyeWhy}
+              />
+              <VerdictRow
+                index="②"
+                title="会不会偏色"
+                ok={!verdict.biasRisky}
+                value={verdict.biasRisky ? '有偏色风险' : '无明显偏色风险'}
+                note={verdict.biasWhy}
+              />
+              <VerdictRow
+                index="③"
+                title="出来多鲜艳"
+                ok={verdict.saturation >= 70}
+                value={`显色饱和度 ${Math.round(verdict.saturation)}%`}
+                note={verdict.vibrancyNote}
+              />
             </div>
-            <p className="-mt-1 text-[11px] font-black leading-4">目标色接近度</p>
-            <p className="text-[10px] leading-4 text-ink-3">不是成功概率</p>
-          </div>
-        </div>
+          </>
+        ) : (
+          <>
+            <p className="inline-block text-[13px] font-black text-pink-dark decoration-[3px] underline-offset-[6px] [text-decoration-line:underline] [text-decoration-color:var(--pink-soft)]">
+              先回答最重要的问题
+            </p>
+            <div className="mt-3">
+              <h1 className="text-[26px] font-black leading-[1.14] tracking-[-.05em]">
+                {feasibilityLabel(plan)}
+              </h1>
+              <p className="mt-2.5 text-[13px] leading-[1.6] text-ink-2">{plan.summary}</p>
+            </div>
+          </>
+        )}
 
         {/* 需要注意的风险 */}
         {plan.risks.length ? (

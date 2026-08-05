@@ -43,7 +43,13 @@ import {
 } from './decision-screens';
 import { HairMirror } from './hair-mirror';
 import { VerdictScreen, type VerdictIntent } from './verdict-screen';
-import type { ColorMatrix } from './hair-mirror-core';
+import type { PlanVerdict } from './decision-screens';
+import {
+  layer1CanDye,
+  layer2BiasRisk,
+  layer3Vibrancy,
+  type ColorMatrix,
+} from './hair-mirror-core';
 import { LandingScreen, ReturnHomeScreen } from './home-screens';
 import { OperationPreviewScreen } from './operation-preview-screen';
 import {
@@ -140,6 +146,35 @@ export default function TonyApp() {
     },
     [profile],
   );
+  /* 三层判断结果。与结论屏、试色屏调用同一组函数、同一个底色，
+     所以三屏的结论物理上不可能不一致。方案页只展示它，不重算。 */
+  const planVerdict: PlanVerdict | undefined = (() => {
+    if (!colorMatrix || !selectedVideo) return undefined;
+    const kb = colorMatrix.videos.find((v) => v.video_id === selectedVideo.video_id)?.kb_color;
+    if (!kb) return undefined;
+    const l1 = layer1CanDye(colorMatrix, kb, mirrorLevel);
+    const l2 = layer2BiasRisk(colorMatrix, kb, mirrorLevel, profile?.current_hair?.color?.tone);
+    const l3 = layer3Vibrancy(colorMatrix, kb, mirrorLevel);
+    const biasWhy = [
+      l2.officialNote,
+      l2.undertoneName ? `你的 ${mirrorLevel} 度底色残留${l2.undertoneName}，会把染膏色带偏。` : '',
+      l2.transition?.why ?? '',
+    ].filter(Boolean).join(' ');
+    const vibrancyNote =
+      l3.best && l3.best.level !== mirrorLevel
+        ? `漂浅到 ${l3.best.level} 度可达 ${Math.round(l3.best.saturation)}%，会更鲜艳。`
+        : '这是该色系能达到的最鲜艳状态。';
+    return {
+      level: mirrorLevel,
+      canDye: l1.can,
+      canDyeWhy: l1.why + (l1.smoothed ? '（由相邻度数推断，非官方原始标注）' : ''),
+      biasRisky: l2.risky,
+      biasWhy,
+      saturation: l3.saturation,
+      vibrancyNote,
+    };
+  })();
+
   const [previewProgress, setPreviewProgress] = useState(0);
   const [previewNotice, setPreviewNotice] = useState('');
   const planRequestRef = useRef(0);
@@ -904,7 +939,7 @@ export default function TonyApp() {
         selectedIntensity={selectedIntensity}
         previewProgress={previewProgress}
         previewNotice={previewNotice}
-        demoMode={Boolean(profile?.demo_mode)}
+        demoMode={false}
         demoLoading={demoLoading}
         demoError={demoError}
         onRouteChange={(route) => {
@@ -917,7 +952,7 @@ export default function TonyApp() {
         }}
         onBack={() => setScreen('mirror')}
         onProducts={openProducts}
-        onDemoPreview={handleDemoPreview}
+        verdict={planVerdict}
       /></AgentShell>
     );
   }
