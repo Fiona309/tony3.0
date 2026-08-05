@@ -70,6 +70,33 @@ TARGET_COLOR_ALIASES = {
 }
 
 
+CAN_DYE_QUALITIES = {"normal", "biased"}
+
+
+def smooth_single_dip(by_level: dict[int, str]) -> dict[int, tuple[str, bool]]:
+    """单点凹陷平滑。
+
+    官方效果矩阵里存在这样的曲线：红色 3度可染、4度可染、5度不推荐、6度又可染。
+    底色漂浅一度反而从"能染"变成"不能染"，再漂一度又能染——染发学上讲不通，
+    多半是该度数没做样本却被录成了不推荐。
+
+    这里不修改官方数据，只在判定层做平滑：若某度数判为不可染，而其相邻两侧
+    度数都可染，则视为可染，并回传 smoothed=True 供 UI 注明是推断而非官方结论。
+    只平滑宽度为 1 的凹陷；连续两度以上不可染属真实断层，保留原样。
+    """
+    out: dict[int, tuple[str, bool]] = {}
+    for level, quality in by_level.items():
+        prev_q = by_level.get(level - 1)
+        next_q = by_level.get(level + 1)
+        dip = (
+            quality not in CAN_DYE_QUALITIES
+            and prev_q in CAN_DYE_QUALITIES
+            and next_q in CAN_DYE_QUALITIES
+        )
+        out[level] = ("normal", True) if dip else (quality, False)
+    return out
+
+
 class ColorRuleKB:
     def __init__(self, database_path: Path) -> None:
         self.database_path = database_path

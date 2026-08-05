@@ -24,7 +24,7 @@ from PIL import Image
 
 from .config import get_settings
 from .database import Database
-from .kb.color_rule_kb import ColorRuleKB
+from .kb.color_rule_kb import ColorRuleKB, smooth_single_dip
 from .kb.operation_qa_kb import OperationQAKB
 from .kb.product_kb import ProductKB
 from .mock_data import MockStore
@@ -287,6 +287,20 @@ def get_color_matrix():
                 entry["rgb"] = [row["r"], row["g"], row["b"]]
                 entry["hex"] = row["hex"]
             matrix.setdefault(row["color_zh"], {})[str(row["base_level"])] = entry
+
+    # 单点凹陷平滑：不改官方数据，只在判定层修正"4度能染、5度不能、6度又能"这类
+    # 讲不通的曲线。被平滑的条目带 smoothed 标记，UI 需注明是推断而非官方结论。
+    for color_zh, levels in matrix.items():
+        by_level = {int(lv): e["q"] for lv, e in levels.items()}
+        for level, (quality, smoothed) in smooth_single_dip(by_level).items():
+            entry = levels[str(level)]
+            if smoothed:
+                entry["q"] = quality
+                entry["smoothed"] = True
+                entry["why"] = (
+                    f"官方矩阵在 {level} 度标注为不推荐，但相邻的 {level - 1} 度与 "
+                    f"{level + 1} 度都可染，判定为可染（推断，非官方结论）。"
+                )
 
     return ok({"videos": videos, "matrix": matrix, "undertone": RESIDUAL_UNDERTONE})
 

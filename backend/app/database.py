@@ -123,6 +123,7 @@ class Database:
             self._create_tables(connection)
             self._seed_color_knowledge_base(connection)
             self._seed_operation_qa(connection)
+            self._seed_dark_base_levels(connection)
             self._seed_product_knowledge_base(connection)
 
     def record_event(
@@ -738,6 +739,71 @@ class Database:
                     now,
                 ),
             )
+
+    def _seed_dark_base_levels(self, connection: sqlite3.Connection) -> None:
+        """补录 3~4 度（天生黑发）的结论。
+
+        官方效果矩阵只覆盖 5~9 度，3~4 度整列是空的。此前代码把"查不到"当成
+        "不能染"，导致天生黑发用户被告知六个颜色全都染不了——那是错误结论，
+        不是数据缺失的正确表达（中国用户绝大多数正是 3~4 度）。
+
+        本表只录结论，不录 RGB：色值仍由 lookup() 借最近有色值的度数做物理外推，
+        并标记 extrapolated，UI 会提示"模拟效果"。这样既纠正了结论，又不伪造
+        官方没有给过的精确色值。
+
+        source 标为 product_owner_judgment 以便与官方效果图来源区分。
+        """
+        DIRECT_DYE = {
+            "黑茶色": "深色暖调，天生黑发可直接上色。",
+            "奶茶灰棕": "棕调足够深，天生黑发可直接上色。",
+            "红色": "红色分子可在深色底上显色，天生黑发可直接上色。",
+        }
+        NEEDS_BLEACH = {
+            "蓝色": "冷色需要浅底才显色，天生黑发必须先漂浅。",
+            "紫色": "冷色需要浅底才显色，天生黑发必须先漂浅。",
+            "粉色": "浅色需要更浅的底，天生黑发必须先漂浅。",
+        }
+        now = _now()
+        source = "product_owner_judgment"
+
+        for level in (3, 4):
+            for color_zh, reason in {**DIRECT_DYE, **NEEDS_BLEACH}.items():
+                row = connection.execute(
+                    "SELECT color_id, color_en FROM color_effect_matrix WHERE color_zh = ? LIMIT 1",
+                    (color_zh,),
+                ).fetchone()
+                if row is None:
+                    continue
+                base_color_id, color_en = row[0], row[1]
+                color_id = f"{str(base_color_id).rsplit('_', 1)[0]}_{level}"
+                quality = "normal" if color_zh in DIRECT_DYE else "not_recommended"
+
+                connection.execute(
+                    """
+                    INSERT INTO color_effect_matrix (
+                        color_id, color_en, color_zh, base_level, recommended,
+                        r, g, b, hex, rgb_quality, source, updated_at
+                    )
+                    VALUES (?, ?, ?, ?, ?, NULL, NULL, NULL, NULL, 'not_sampled', ?, ?)
+                    ON CONFLICT(color_id) DO NOTHING
+                    """,
+                    (color_id, color_en, color_zh, level,
+                     1 if quality == "normal" else 0, source, now),
+                )
+                connection.execute(
+                    """
+                    INSERT INTO color_result_rules (
+                        color_id, color_zh, base_level, result_quality, reason, source, updated_at
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(color_id) DO UPDATE SET
+                        result_quality = excluded.result_quality,
+                        reason = excluded.reason,
+                        source = excluded.source,
+                        updated_at = excluded.updated_at
+                    """,
+                    (color_id, color_zh, level, quality, reason, source, now),
+                )
 
     def _seed_operation_qa(self, connection: sqlite3.Connection) -> None:
         if not OPERATION_QA_TSV.exists():
