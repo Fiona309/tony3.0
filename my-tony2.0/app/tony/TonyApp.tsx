@@ -120,6 +120,26 @@ export default function TonyApp() {
   const [colorMatrix, setColorMatrix] = useState<ColorMatrix | null>(null);
   const [mirrorLevel, setMirrorLevel] = useState(5);
   const [mirrorIntent, setMirrorIntent] = useState<VerdictIntent>('preview');
+
+  /* 底色是三层判断共同的输入。用户在结论屏改了它，必须同步回后端，
+     否则方案页仍用 vision 识别的原值计算，会与试色屏的结论直接矛盾。 */
+  const changeBaseLevel = useCallback(
+    (nextLevel: number) => {
+      setMirrorLevel(nextLevel);
+      if (!profile) return;
+      const currentHair = profile.current_hair;
+      const color = currentHair?.color;
+      if (!color) return;
+      void updateHairProfile(profile.profile_id, {
+        current_hair: { ...currentHair, color: { ...color, level: nextLevel } },
+      } as HairProfileUpdate).catch(() => undefined);
+      setProfile({
+        ...profile,
+        current_hair: { ...currentHair, color: { ...color, level: nextLevel } },
+      });
+    },
+    [profile],
+  );
   const [previewProgress, setPreviewProgress] = useState(0);
   const [previewNotice, setPreviewNotice] = useState('');
   const planRequestRef = useRef(0);
@@ -819,7 +839,7 @@ export default function TonyApp() {
             level={mirrorLevel}
             video={entry}
             photoUrl={currentPhotoUrl}
-            onLevelChange={setMirrorLevel}
+            onLevelChange={changeBaseLevel}
             onBack={() => setScreen('profile')}
             onGo={(intent) => {
               setMirrorIntent(intent);
@@ -849,7 +869,7 @@ export default function TonyApp() {
                   )?.video_id ?? selectedVideo.video_id
                 : selectedVideo.video_id
             }
-            onLevelChange={setMirrorLevel}
+            onLevelChange={changeBaseLevel}
             onBack={() => setScreen('verdict')}
             // 接受风险 -> 此刻才算方案（并触发那唯一一张存档图的生成）
             onAccept={() => void calculatePlan(profile.profile_id)}

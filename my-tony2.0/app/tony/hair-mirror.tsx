@@ -153,8 +153,7 @@ export function HairMirror({ matrix, level, entryVideoId, onLevelChange, onBack,
     if (!kb) return { variants: [] as Variant[], decision: null as Decision | null };
     const d = decide(matrix, kb, level);
     if (needBleach) return { variants: bleachVariants(matrix, kb, level), decision: d };
-    const base = d.entry?.rgb ?? ([0, 0, 0] as [number, number, number]);
-    return { variants: toneVariants(base, undertoneOf(matrix, level), d.q), decision: d };
+    return { variants: toneVariants(matrix, kb, level), decision: d };
   }, [matrix, kb, level, needBleach]);
 
   // 切换颜色/度数后把滑块落到有意义的位置：能染时停在"和博主一样"

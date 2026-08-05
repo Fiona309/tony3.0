@@ -302,7 +302,34 @@ def get_color_matrix():
                     f"{level + 1} 度都可染，判定为可染（推断，非官方结论）。"
                 )
 
-    return ok({"videos": videos, "matrix": matrix, "undertone": RESIDUAL_UNDERTONE})
+    # 第二层的另一半：当前发色色相 × 目标色的中和矩阵。
+    # 与 undertone 回答的问题不同——undertone 说"会偏成什么颜色"（用于渲染），
+    # 中和矩阵说"要不要先中和、补什么色"（用于建议）。两者互补，都要给前端。
+    transitions: dict[str, dict[str, Any]] = {}
+    with database._connect() as connection:
+        connection.row_factory = sqlite3.Row
+        for row in connection.execute(
+            """
+            SELECT target_color_zh, current_color_zh, decision, result_quality,
+                   add_color, reason
+            FROM color_transition_rules
+            """
+        ):
+            transitions.setdefault(row["target_color_zh"], {})[row["current_color_zh"]] = {
+                "decision": row["decision"],
+                "q": row["result_quality"],
+                "add": row["add_color"],
+                "why": row["reason"],
+            }
+
+    return ok(
+        {
+            "videos": videos,
+            "matrix": matrix,
+            "undertone": RESIDUAL_UNDERTONE,
+            "transitions": transitions,
+        }
+    )
 
 
 @app.post("/api/media/images")

@@ -28,11 +28,20 @@ export type VideoColor = {
   kb_color: string | null;
 };
 
+export type TransitionRule = {
+  decision: string;
+  q: Quality;
+  add: string | null;
+  why: string;
+};
+
 export type ColorMatrix = {
   videos: VideoColor[];
   matrix: Record<string, Record<string, MatrixEntry>>;
   /** 底色度数 -> 漂浅过程中残留的底色，决定偏色方向 */
   undertone: Record<string, { rgb: [number, number, number]; name: string }>;
+  /** 目标色 -> 当前发色色相 -> 中和判定 */
+  transitions: Record<string, Record<string, TransitionRule>>;
 };
 
 export type Resolved = MatrixEntry & {
@@ -134,6 +143,114 @@ export function undertoneOf(cm: ColorMatrix, level: number): [number, number, nu
   return cm.undertone[String(near)].rgb;
 }
 
+/* ==================== 三层判断 ====================
+ *
+ * 这三层回答的是三个不同的问题，互相独立，任何一层有问题都单独告诉用户，
+ * 不互相否决。此前把第二层塞进第一层（拿 biased 当否决权），是错的。
+ *
+ *   第一层  能不能染      底色度数 vs 该色所需度数
+ *   第二层  会不会偏色    ①底色残留色相 + 染膏色  ②当前发色 × 目标色中和矩阵
+ *   第三层  出来多鲜艳    该度数下的真实呈色饱和度
+ */
+
+/** 某色系在某度数下的官方呈色。没有色值 = 官方不给样本 = 不建议染 */
+export function entryAt(cm: ColorMatrix, kbColor: string, level: number): MatrixEntry | null {
+  return cm.matrix?.[kbColor]?.[String(level)] ?? null;
+}
+
+/* -------- 第一层：能不能染 -------- */
+
+export type Layer1 = {
+  can: boolean;
+  why: string;
+  /** 结论由相邻度数推断而来，非官方原始标注 */
+  smoothed: boolean;
+};
+
+export function layer1CanDye(cm: ColorMatrix, kbColor: string, level: number): Layer1 {
+  const e = entryAt(cm, kbColor, level);
+  if (!e) {
+    return { can: false, why: `官方效果矩阵未覆盖 ${level} 度底色，无法判断。`, smoothed: false };
+  }
+  // 没有色值意味着官方效果图没给这个组合出样本——即不建议染。
+  // 例外：补录的 3~4 度只录了结论没录色值，靠 q 明确表态。
+  const blocked = e.q === 'not_recommended' || e.q === 'unknown';
+  return { can: !blocked, why: e.why || '', smoothed: Boolean(e.smoothed) };
+}
+
+/* -------- 第二层：会不会偏色 -------- */
+
+export type Layer2 = {
+  risky: boolean;
+  /** 偏色后的实际色值，用于渲染 */
+  biasedRgb: [number, number, number] | null;
+  /** 底色残留色的名字，如"橙黄" */
+  undertoneName: string;
+  /** 来自官方矩阵的偏色标注 */
+  officialNote: string;
+  /** 来自中和矩阵：当前发色能否直接往目标色染、需要补什么 */
+  transition: TransitionRule | null;
+};
+
+export function layer2BiasRisk(
+  cm: ColorMatrix,
+  kbColor: string,
+  level: number,
+  /** 用户当前发色的中文色相，如"棕""金"。取自 vision 识别结果 */
+  currentTone?: string,
+): Layer2 {
+  const e = entryAt(cm, kbColor, level);
+  const residual = undertoneOf(cm, level);
+  const uName = undertoneNameOf(cm, level);
+  const transition = currentTone ? cm.transitions?.[kbColor]?.[currentTone] ?? null : null;
+
+  const officialBiased = e?.q === 'biased';
+  const transitionBiased = Boolean(transition && transition.q !== 'normal');
+
+  return {
+    risky: officialBiased || transitionBiased,
+    biasedRgb: e?.rgb ? biasedColor(e.rgb, residual) : null,
+    undertoneName: uName,
+    officialNote: officialBiased ? e?.why ?? '' : '',
+    transition,
+  };
+}
+
+export function undertoneNameOf(cm: ColorMatrix, level: number): string {
+  const keys = Object.keys(cm.undertone).map(Number).sort((a, b) => a - b);
+  if (!keys.length) return '';
+  const near = keys.reduce((p, c) => (Math.abs(c - level) < Math.abs(p - level) ? c : p));
+  return cm.undertone[String(near)].name;
+}
+
+/* -------- 第三层：出来多鲜艳 -------- */
+
+export type Layer3 = {
+  /** 当前度数的真实呈色饱和度，0~100 */
+  saturation: number;
+  /** 该色系所有有色值的度数里，饱和度最高的那个 */
+  best: { level: number; saturation: number } | null;
+};
+
+function satOf(rgb: [number, number, number]) {
+  const [r, g, b] = rgb.map((v) => v / 255);
+  const mx = Math.max(r, g, b);
+  const mn = Math.min(r, g, b);
+  return mx ? ((mx - mn) / mx) * 100 : 0;
+}
+
+export function layer3Vibrancy(cm: ColorMatrix, kbColor: string, level: number): Layer3 {
+  const fam = cm.matrix?.[kbColor] ?? {};
+  const here = fam[String(level)]?.rgb;
+  let best: { level: number; saturation: number } | null = null;
+  for (const [lv, e] of Object.entries(fam)) {
+    if (!e.rgb) continue;
+    const s = satOf(e.rgb);
+    if (!best || s > best.saturation) best = { level: Number(lv), saturation: s };
+  }
+  return { saturation: here ? satOf(here) : 0, best };
+}
+
 /* ============================ 规则查询 ============================ */
 
 /**
@@ -222,31 +339,53 @@ export const BLEACH_STOPS = [
 ] as const;
 
 /**
- * 能染时的四档。中间那档就是"和博主一样"。
+ * 能染时的效果档位 —— 第三层（显色程度）+ 第二层（偏色）。
  *
- * 措辞上刻意不写"用量多少"——真实成因是底色深浅不均、发质吸色快慢（受损发吸色快）、
- * 水温、停留时间、光线等多因素叠加，归因到单一原因会误导用户。
- * 所以只描述结果范围，不解释成因。
+ * 关键：浅/深两档用【相邻度数的真实呈色】，不是人为缩放饱和度。
+ * 真实数据本来就带着这个差异（蓝色 6度饱和 46%、8度 96%），
+ * 编一个 scaleSat(0.5) 去覆盖真数据是错的。
+ *
+ * 相邻度数没有官方色值时不造数据——按"没有色值即不建议"的原则直接不出这一档。
  */
 export function toneVariants(
-  base: [number, number, number],
-  residual: number[],
-  q: Quality,
+  cm: ColorMatrix,
+  kbColor: string,
+  level: number,
 ): Variant[] {
-  return [
-    { key: 'light', label: '比博主浅', note: '显色偏淡', rgb: scaleSat(base, 0.5), str: 0.58, lift: 0 },
-    { key: 'same', label: '和博主一样', note: '官方标准效果', rgb: base, str: 1, lift: 0 },
-    { key: 'deep', label: '比博主深', note: '显色偏浓', rgb: scaleSat(base, 1.65), str: 1, lift: 0.06 },
-    {
-      key: 'biased',
-      label: '可能偏色',
-      note: q === 'biased' ? '官方标注该底色易偏色' : '底色残留会影响呈色',
-      rgb: biasedColor(base, residual),
-      str: 1,
-      lift: 0,
-      risk: true,
-    },
-  ];
+  const here = entryAt(cm, kbColor, level);
+  if (!here?.rgb) return [];
+
+  const out: Variant[] = [];
+  const lighter = entryAt(cm, kbColor, level - 1);
+  const deeper = entryAt(cm, kbColor, level + 1);
+
+  // 底色更深一度 -> 显色更闷；更浅一度 -> 显色更亮。方向与度数一致。
+  if (lighter?.rgb) {
+    out.push({
+      key: 'deep', label: '比博主深', note: `底色偏深时的呈色（${level - 1} 度实测）`,
+      rgb: lighter.rgb, str: 1, lift: 0,
+    });
+  }
+  out.push({
+    key: 'same', label: '和博主一样', note: `你的 ${level} 度底色的官方呈色`,
+    rgb: here.rgb, str: 1, lift: 0,
+  });
+  if (deeper?.rgb) {
+    out.push({
+      key: 'light', label: '比博主浅', note: `底色偏浅时的呈色（${level + 1} 度实测）`,
+      rgb: deeper.rgb, str: 1, lift: 0,
+    });
+  }
+
+  const bias2 = layer2BiasRisk(cm, kbColor, level);
+  if (bias2.biasedRgb) {
+    out.push({
+      key: 'biased', label: '可能偏色',
+      note: bias2.undertoneName ? `${bias2.undertoneName}底残留会把颜色带偏` : '底色残留会影响呈色',
+      rgb: bias2.biasedRgb, str: 1, lift: 0, risk: true,
+    });
+  }
+  return out;
 }
 
 /** 不能染时的三档：不漂 / 漂1次 / 漂2次 */
