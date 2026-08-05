@@ -49,8 +49,12 @@ uniform sampler2D cam,mask;uniform vec3 target;uniform float strength;uniform fl
 void main(){
   vec3 c=texture2D(cam,uv).rgb; float m=texture2D(mask,uv).r;
   float Y0=dot(c,vec3(.299,.587,.114));
-  float Y=clamp(Y0+lift*(1.0-Y0)*mix(1.4,0.6,Y0),0.,1.);
-  float Cb=(c.b-Y0)*.564*mix(1.0,0.35,lift), Cr=(c.r-Y0)*.713*mix(1.0,0.35,lift);
+  /* lift 与去饱和必须乘以 mask —— 否则整幅画面（脸、背景）都会被提亮去色，
+     表现为漂浅档位上蒙了一层白纱。这是必须保证的：无论换什么发色，
+     非头发像素都要原样透传。 */
+  float lm=lift*m;
+  float Y=clamp(Y0+lm*(1.0-Y0)*mix(1.4,0.6,Y0),0.,1.);
+  float Cb=(c.b-Y0)*.564*mix(1.0,0.35,lm), Cr=(c.r-Y0)*.713*mix(1.0,0.35,lm);
   float tY=dot(target,vec3(.299,.587,.114));
   float tCb=(target.b-tY)*.564, tCr=(target.r-tY)*.713;
   float recept=clamp((Y-.10)/.45,0.,1.);
