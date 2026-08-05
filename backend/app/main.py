@@ -8,6 +8,7 @@ import importlib
 import logging
 import os
 from pathlib import Path
+import sqlite3
 import sys
 from threading import Lock
 from typing import Any
@@ -224,6 +225,70 @@ def debug_state(request: Request):
 @app.get("/api/mock/videos")
 async def get_mock_videos():
     return ok(store.videos())
+
+
+# 漂浅过程中头发依次呈现的残留底色（标准染发色彩学：黑→深棕→橙棕→橙→橙黄→黄→浅黄）。
+# 偏色 = 染膏色与该残留色的减色混合，所以同一支染膏在不同底色上偏色方向不同：
+# 蓝色 + 8度黄底 → 偏绿；蓝色 + 6度橙底 → 蓝橙互补，中和为灰浊。
+RESIDUAL_UNDERTONE = {
+    3: {"rgb": [74, 48, 34], "name": "深棕"},
+    4: {"rgb": [110, 68, 42], "name": "棕"},
+    5: {"rgb": [150, 85, 42], "name": "橙棕"},
+    6: {"rgb": [196, 110, 40], "name": "橙"},
+    7: {"rgb": [220, 150, 50], "name": "橙黄"},
+    8: {"rgb": [230, 190, 70], "name": "黄"},
+    9: {"rgb": [240, 215, 120], "name": "浅黄"},
+}
+
+
+@app.get("/api/color-matrix")
+def get_color_matrix():
+    """实时试色所需的全部决策数据，全部取自数据库与既有常量，前端不再需要本地副本。
+
+    - videos:  6 个种草视频的目标色，以及它在知识库里对应的色系（走后端同一套别名解析）
+    - matrix:  (色系, 底色度数) -> 呈色 RGB + normal/biased/not_recommended + 中文原因
+    - undertone: 底色度数 -> 残留底色，用于按度数推算偏色方向
+    """
+    videos = []
+    for video in store.videos().get("videos", []):
+        name = video.get("color_name") or ""
+        row = color_rule_kb._find_target_color(name)
+        videos.append(
+            {
+                "video_id": video.get("video_id"),
+                "title": video.get("title"),
+                "color_name": name,
+                "accent": video.get("accent"),
+                "cover_url": video.get("cover_url"),
+                # 视频色名（冷茶色）与知识库色系（黑茶色）不同名，用后端别名表归一化
+                "kb_color": row["color_zh"] if row else None,
+            }
+        )
+
+    matrix: dict[str, dict[str, Any]] = {}
+    with database._connect() as connection:
+        connection.row_factory = sqlite3.Row  # Database._connect 默认返回 tuple
+        for row in connection.execute(
+            """
+            SELECT m.color_zh, m.base_level, m.r, m.g, m.b, m.hex, m.recommended,
+                   r.result_quality, r.reason
+            FROM color_effect_matrix m
+            LEFT JOIN color_result_rules r
+              ON r.color_zh = m.color_zh AND r.base_level = m.base_level
+            """
+        ):
+            entry: dict[str, Any] = {
+                "q": row["result_quality"] or "unknown",
+                "why": row["reason"] or "",
+                "rec": bool(row["recommended"]),
+            }
+            # 官方效果图对 not_recommended 的组合不给色值，此处保持缺省，由前端外推
+            if row["r"] is not None:
+                entry["rgb"] = [row["r"], row["g"], row["b"]]
+                entry["hex"] = row["hex"]
+            matrix.setdefault(row["color_zh"], {})[str(row["base_level"])] = entry
+
+    return ok({"videos": videos, "matrix": matrix, "undertone": RESIDUAL_UNDERTONE})
 
 
 @app.post("/api/media/images")
