@@ -659,6 +659,21 @@ export function CameraScreen({
     void openCamera();
   };
 
+  /* 相册兜底：摄像头权限拿不到时至少能把流程走通。
+     默认不鼓励用——相册照片常带美颜/滤镜，而底色识别本质是测明度，
+     实测仅光照差异就能让识别偏 2~3 度，滤镜只会更糟。所以仅在
+     摄像头失败后才显示，并提示用户务必核对结论屏上的度数。 */
+  const pickFromAlbum = (file: File | undefined) => {
+    if (!file) return;
+    if (preview.startsWith('blob:')) URL.revokeObjectURL(preview);
+    const url = URL.createObjectURL(file);
+    stopCamera();
+    setCameraError('');
+    setCapturedFile(file);
+    setPreview(url);
+    setStage('review');
+  };
+
   const submit = async () => {
     if (!capturedFile || !preview) return;
     setSubmitting(true);
@@ -708,10 +723,27 @@ export function CameraScreen({
               </div>
             </div>
             {cameraError ? (
-              <div className="mt-3 shrink-0">
+              <div className="mt-3 shrink-0 space-y-2">
                 <StatusNotice tone="danger" title="无法打开摄像头">
                   {cameraError}
                 </StatusNotice>
+                <label className="tap flex cursor-pointer items-center justify-center gap-2 rounded-[16px] border-2 border-dashed border-ink/25 bg-white px-4 py-3 text-[13px] font-black">
+                  <ImageSquare size={18} weight="bold" />
+                  从相册选一张继续
+                  <input
+                    type="file"
+                    accept="image/*"
+                    hidden
+                    onChange={(event) => {
+                      pickFromAlbum(event.target.files?.[0]);
+                      event.target.value = '';
+                    }}
+                  />
+                </label>
+                <p className="px-1 text-[11px] leading-4 text-ink-3">
+                  底色识别测的是明度，相册照片若带美颜或滤镜会明显影响准确度。
+                  下一屏请务必核对识别出的度数。
+                </p>
               </div>
             ) : null}
           </div>
