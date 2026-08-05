@@ -11,6 +11,7 @@ import {
   getAfterVideoTask,
   getArchive,
   getArchives,
+  getColorMatrix,
   getMockVideos,
   getPlanResult,
   getPreviewTask,
@@ -40,6 +41,8 @@ import {
   ProductsScreen,
   ProfileScreen,
 } from './decision-screens';
+import { HairMirror } from './hair-mirror';
+import type { ColorMatrix } from './hair-mirror-core';
 import { LandingScreen, ReturnHomeScreen } from './home-screens';
 import { OperationPreviewScreen } from './operation-preview-screen';
 import {
@@ -75,6 +78,7 @@ type Screen =
   | 'discover'
   | 'camera'
   | 'profile'
+  | 'mirror'
   | 'calculating'
   | 'plan'
   | 'products'
@@ -111,6 +115,8 @@ export default function TonyApp() {
   const [planError, setPlanError] = useState('');
   const [demoLoading, setDemoLoading] = useState(false);
   const [demoError, setDemoError] = useState('');
+  const [colorMatrix, setColorMatrix] = useState<ColorMatrix | null>(null);
+  const [mirrorLevel, setMirrorLevel] = useState(5);
   const [previewProgress, setPreviewProgress] = useState(0);
   const [previewNotice, setPreviewNotice] = useState('');
   const planRequestRef = useRef(0);
@@ -415,13 +421,23 @@ export default function TonyApp() {
     };
     saveFlowDraft(nextDraft);
     setDraft(nextDraft);
-    await calculatePlan(profile.profile_id);
+
+    // B 方案：先进实时试色，用户接受风险后才调 getPlanResult。
+    // 后端"调用 plan-result 即触发生图"，所以推迟调用 = 只有高意向用户才花那一张生图的钱。
+    const level = confirmed.current_hair?.color?.level;
+    if (typeof level === 'number') setMirrorLevel(level);
+    if (!colorMatrix) {
+      void getColorMatrix()
+        .then(setColorMatrix)
+        .catch(() => setColorMatrix(null));
+    }
+    setScreen('mirror');
   };
 
   const backFromCalculating = () => {
     planRequestRef.current += 1;
     setPlanError('');
-    setScreen('profile');
+    setScreen('mirror');
   };
 
   const openProducts = () => {
@@ -790,6 +806,28 @@ export default function TonyApp() {
     );
   }
 
+  if (screen === 'mirror' && selectedVideo && profile) {
+    return (
+      <AgentShell active="analysis" onChange={changeMainTab}>
+        {colorMatrix ? (
+          <HairMirror
+            matrix={colorMatrix}
+            level={mirrorLevel}
+            entryVideoId={selectedVideo.video_id}
+            onLevelChange={setMirrorLevel}
+            onBack={() => setScreen('profile')}
+            // 接受风险 -> 此刻才算方案（并触发那唯一一张存档图的生成）
+            onAccept={() => void calculatePlan(profile.profile_id)}
+          />
+        ) : (
+          <div className="grid h-full place-items-center bg-cream px-8 text-center text-sm text-ink-3">
+            正在加载底色效果矩阵…
+          </div>
+        )}
+      </AgentShell>
+    );
+  }
+
   if (screen === 'calculating') {
     return (
       <AgentShell active="analysis" onChange={changeMainTab}><CalculatingScreen
@@ -822,7 +860,7 @@ export default function TonyApp() {
           setSelectedIntensity(intensity);
           setRecommendation(null);
         }}
-        onBack={() => setScreen('profile')}
+        onBack={() => setScreen('mirror')}
         onProducts={openProducts}
         onDemoPreview={handleDemoPreview}
       /></AgentShell>

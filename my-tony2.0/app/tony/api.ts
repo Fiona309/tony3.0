@@ -35,6 +35,8 @@ import type {
   TutorialSessionData,
 } from './types';
 
+import type { ColorMatrix } from './hair-mirror-core';
+
 const API_BASE_URL = (process.env.NEXT_PUBLIC_API_BASE_URL ?? '/api').replace(/\/$/, '');
 export const API_MODE = (process.env.NEXT_PUBLIC_API_MODE === 'real' ? 'real' : 'mock') satisfies ApiMode;
 
@@ -321,6 +323,12 @@ export async function getMockVideos(signal?: AbortSignal) {
   }
   await sleep(360);
   return { videos: MOCK_VIDEOS };
+}
+
+/** 实时试色所需的决策数据。仅 real 模式可用——这套数据没有 mock 版本，
+ *  拿不到时试色屏会自行降级提示，不会伪造色值。 */
+export async function getColorMatrix(signal?: AbortSignal) {
+  return request<ColorMatrix>('/color-matrix', {}, signal);
 }
 
 export async function uploadImage(
