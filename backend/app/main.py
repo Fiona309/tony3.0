@@ -498,7 +498,11 @@ def generate_preview_images(
     if target_rgb is None:
         raise RuntimeError("hair_full_pipeline_target_rgb_unavailable")
     target_hex = str(base_color.get("hex") or _hex_from_rgb(target_rgb))
-    has_risk = result_quality == "biased" or bool(pipeline_plan.get("risk_variant"))
+    # 只生一张标准效果图作为存档。偏色/深浅的差异已由实时试色免费呈现，
+    # 生图的唯一职责是给"确定要染"的用户留一张高保真存档，因此不再生成
+    # risk 变体（省掉一次生图调用），也不再本地衍生 4 张 HSV 变体。
+    has_risk = False
+    _ = result_quality
 
     generator = _hair_full_generator()
     with Image.open(current_image_path).convert("RGB") as before_image:
@@ -513,28 +517,24 @@ def generate_preview_images(
             output_dir=str(generated_dir),
         )
 
-    selected_variants = _select_pipeline_preview_variants(
-        pipeline_result.get("variants") or [],
-        has_risk=has_risk,
-    )
-    if len(selected_variants) < 5:
-        raise RuntimeError(f"hair_full_pipeline_generated_only_{len(selected_variants)}_variants")
+    variants = pipeline_result.get("variants") or []
+    standard = next((v for v in variants if str(v.get("key")) == "standard" and v.get("path")), None)
+    if standard is None:
+        raise RuntimeError("hair_full_pipeline_standard_variant_missing")
 
-    images: list[dict[str, Any]] = []
-    for index, variant in enumerate(selected_variants[:5], start=1):
-        output_path = Path(variant["path"])
-        if not output_path.exists():
-            raise RuntimeError(f"hair_full_pipeline_missing_variant:{variant.get('key')}")
-        url = f"/media/generated/previews/{preview_task_id}/{output_path.name}"
-        images.append({
-            "preview_level": index,
-            "label": variant["label"],
+    output_path = Path(standard["path"])
+    if not output_path.exists():
+        raise RuntimeError("hair_full_pipeline_missing_variant:standard")
+    url = f"/media/generated/previews/{preview_task_id}/{output_path.name}"
+    return [
+        {
+            "preview_level": 1,
+            "label": "标准效果",
             "url": url,
             "storage_key": url.removeprefix("/media/"),
             "enabled": True,
-        })
-
-    return images
+        }
+    ]
 
 
 def _hair_full_generator() -> Any:

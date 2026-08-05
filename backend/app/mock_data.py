@@ -1136,13 +1136,12 @@ class MockStore:
         if task_id and self._owned_by("preview_task", task_id, user_key):
             task = self.preview_tasks.get(task_id) or {}
             preview_images = list(task.get("images") or preview_images)
+        usable = [item for item in preview_images if item.get("url")]
+        # 现在只生成一张标准效果图（preview_level=1），历史上是五档。
+        # 找不到指定档位时退回第一张可用的，避免归档丢图。
         return next(
-            (
-                item
-                for item in preview_images
-                if int(item.get("preview_level") or 0) == preview_level and item.get("url")
-            ),
-            None,
+            (item for item in usable if int(item.get("preview_level") or 0) == preview_level),
+            usable[0] if usable else None,
         )
 
     def create_session(self, archive_id: str, user_key: str | None = None) -> dict:
