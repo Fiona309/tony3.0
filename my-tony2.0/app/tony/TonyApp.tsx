@@ -42,6 +42,7 @@ import {
   ProfileScreen,
 } from './decision-screens';
 import { HairMirror } from './hair-mirror';
+import { VerdictScreen, type VerdictIntent } from './verdict-screen';
 import type { ColorMatrix } from './hair-mirror-core';
 import { LandingScreen, ReturnHomeScreen } from './home-screens';
 import { OperationPreviewScreen } from './operation-preview-screen';
@@ -78,6 +79,7 @@ type Screen =
   | 'discover'
   | 'camera'
   | 'profile'
+  | 'verdict'
   | 'mirror'
   | 'calculating'
   | 'plan'
@@ -117,6 +119,7 @@ export default function TonyApp() {
   const [demoError, setDemoError] = useState('');
   const [colorMatrix, setColorMatrix] = useState<ColorMatrix | null>(null);
   const [mirrorLevel, setMirrorLevel] = useState(5);
+  const [mirrorIntent, setMirrorIntent] = useState<VerdictIntent>('preview');
   const [previewProgress, setPreviewProgress] = useState(0);
   const [previewNotice, setPreviewNotice] = useState('');
   const planRequestRef = useRef(0);
@@ -431,13 +434,13 @@ export default function TonyApp() {
         .then(setColorMatrix)
         .catch(() => setColorMatrix(null));
     }
-    setScreen('mirror');
+    setScreen('verdict');
   };
 
   const backFromCalculating = () => {
     planRequestRef.current += 1;
     setPlanError('');
-    setScreen('mirror');
+    setScreen('verdict');
   };
 
   const openProducts = () => {
@@ -806,6 +809,32 @@ export default function TonyApp() {
     );
   }
 
+  if (screen === 'verdict' && selectedVideo && profile) {
+    const entry = colorMatrix?.videos.find((v) => v.video_id === selectedVideo.video_id);
+    return (
+      <AgentShell active="analysis" onChange={changeMainTab}>
+        {colorMatrix && entry ? (
+          <VerdictScreen
+            matrix={colorMatrix}
+            level={mirrorLevel}
+            video={entry}
+            photoUrl={currentPhotoUrl}
+            onLevelChange={setMirrorLevel}
+            onBack={() => setScreen('profile')}
+            onGo={(intent) => {
+              setMirrorIntent(intent);
+              setScreen('mirror');
+            }}
+          />
+        ) : (
+          <div className="grid h-full place-items-center bg-cream px-8 text-center text-sm text-ink-3">
+            正在读取底色效果矩阵…
+          </div>
+        )}
+      </AgentShell>
+    );
+  }
+
   if (screen === 'mirror' && selectedVideo && profile) {
     return (
       <AgentShell active="analysis" onChange={changeMainTab}>
@@ -813,9 +842,15 @@ export default function TonyApp() {
           <HairMirror
             matrix={colorMatrix}
             level={mirrorLevel}
-            entryVideoId={selectedVideo.video_id}
+            entryVideoId={
+              mirrorIntent === 'switch'
+                ? colorMatrix.videos.find(
+                    (v) => v.kb_color && v.video_id !== selectedVideo.video_id,
+                  )?.video_id ?? selectedVideo.video_id
+                : selectedVideo.video_id
+            }
             onLevelChange={setMirrorLevel}
-            onBack={() => setScreen('profile')}
+            onBack={() => setScreen('verdict')}
             // 接受风险 -> 此刻才算方案（并触发那唯一一张存档图的生成）
             onAccept={() => void calculatePlan(profile.profile_id)}
           />

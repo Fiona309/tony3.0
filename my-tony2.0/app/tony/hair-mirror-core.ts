@@ -14,6 +14,8 @@ export type MatrixEntry = {
   rec: boolean;
   rgb?: [number, number, number];
   hex?: string;
+  /** 该结论由「单点凹陷平滑」推断而来，非官方矩阵原值。UI 需注明 */
+  smoothed?: boolean;
 };
 
 /** 种草视频里的目标色。kb_color 是后端用 TARGET_COLOR_ALIASES 归一化后的知识库色系 */
@@ -183,6 +185,27 @@ export const GROUP_META: Record<RiskGroup, { label: string; short: string }> = {
   bleach2: { label: '需要先漂 2 次', short: '漂2次' },
   no: { label: '不建议自己染', short: '不建议' },
 };
+
+/** 屏2 的色卡只分两组——分组标题本身就是引导语，用户不必理解更细的层级 */
+export type SimpleGroup = 'ok' | 'bleach';
+export const SIMPLE_GROUP_LABEL: Record<SimpleGroup, string> = {
+  ok: '现在就能染',
+  bleach: '需要先漂浅',
+};
+
+export function simpleGroup(cm: ColorMatrix, kbColor: string, level: number): SimpleGroup {
+  return decide(cm, kbColor, level).can ? 'ok' : 'bleach';
+}
+
+/** 把 6 个博主色按能不能染分两组，组内保持视频原顺序 */
+export function groupVideos(cm: ColorMatrix, level: number) {
+  const out: Record<SimpleGroup, VideoColor[]> = { ok: [], bleach: [] };
+  for (const v of cm.videos) {
+    if (!v.kb_color) continue;
+    out[simpleGroup(cm, v.kb_color, level)].push(v);
+  }
+  return out;
+}
 
 export function riskGroup(cm: ColorMatrix, kbColor: string, level: number): RiskGroup {
   if (decide(cm, kbColor, level).can) return 'ok';

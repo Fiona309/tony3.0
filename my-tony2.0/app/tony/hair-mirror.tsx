@@ -19,13 +19,16 @@ import {
   bleachVariants,
   decide,
   GROUP_META,
+  groupVideos,
   lookup,
   riskGroup,
+  SIMPLE_GROUP_LABEL,
   toneVariants,
   undertoneOf,
   type ColorMatrix,
   type Decision,
   type RiskGroup,
+  type SimpleGroup,
   type Variant,
   type VideoColor,
 } from './hair-mirror-core';
@@ -134,6 +137,7 @@ export function HairMirror({ matrix, level, entryVideoId, onLevelChange, onBack,
   const rawRef = useRef(false);
 
   const usable = useMemo(() => matrix.videos.filter((v) => v.kb_color), [matrix]);
+  const groups = useMemo(() => groupVideos(matrix, level), [matrix, level]);
   const [videoId, setVideoId] = useState(() => entryVideoId ?? usable[0]?.video_id ?? '');
   const [stop, setStop] = useState(1);
   const [editLevel, setEditLevel] = useState(false);
@@ -338,29 +342,36 @@ export function HairMirror({ matrix, level, entryVideoId, onLevelChange, onBack,
         </div>
       </div>
 
-      {/* 6 个博主色，按能不能染分组 */}
+      {/* 6 个博主色常驻可见，只分两组——分组标题本身就是引导语。
+          隐藏起来用户根本不会主动点开，所以不做折叠。 */}
       <div className="shrink-0 bg-[#141317] pt-2.5">
-        <div className="flex items-end gap-3 overflow-x-auto px-4 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {usable.map((v) => {
-            const g = riskGroup(matrix, v.kb_color!, level);
-            const e = lookup(matrix, v.kb_color!, level);
-            const on = v.video_id === picked?.video_id;
-            return (
-              <button key={v.video_id} type="button" onClick={() => setVideoId(v.video_id)}
-                aria-pressed={on} className="w-16 shrink-0 text-center">
-                <span className={cx('mx-auto block size-12 rounded-full border-2 transition',
-                  on ? 'border-pink' : 'border-transparent')}
-                  style={{ background: e?.hex ?? v.accent ?? '#3a3a3a' }} />
-                <span className={cx('mt-1 block truncate text-[11px]', on ? 'font-black text-white' : 'text-white/60')}>
-                  {v.color_name}
-                </span>
-                <span className={cx('block text-[10px]',
-                  g === 'ok' ? 'text-[#7fd39a]' : g === 'no' ? 'text-[#e08a84]' : 'text-[#e5c169]')}>
-                  {GROUP_META[g].short}
-                </span>
-              </button>
-            );
-          })}
+        <div className="flex items-start gap-3 overflow-x-auto px-4 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {(['ok', 'bleach'] as SimpleGroup[]).map((g) =>
+            groups[g].length ? (
+              <div key={g} className="flex shrink-0 items-start gap-3 border-l border-white/12 pl-3 first:border-0 first:pl-0">
+                <p className={cx('w-12 shrink-0 pt-3 text-[11px] font-black leading-tight',
+                  g === 'ok' ? 'text-[#7fd39a]' : 'text-[#e5c169]')}>
+                  {SIMPLE_GROUP_LABEL[g]}
+                </p>
+                {groups[g].map((v) => {
+                  const e = lookup(matrix, v.kb_color!, level);
+                  const on = v.video_id === picked?.video_id;
+                  return (
+                    <button key={v.video_id} type="button" onClick={() => setVideoId(v.video_id)}
+                      aria-pressed={on} className="w-14 shrink-0 text-center">
+                      <span className={cx('mx-auto block size-12 rounded-full border-2 transition',
+                        on ? 'border-pink' : 'border-transparent')}
+                        style={{ background: e?.hex ?? v.accent ?? '#3a3a3a' }} />
+                      <span className={cx('mt-1 block truncate text-[11px]',
+                        on ? 'font-black text-white' : 'text-white/60')}>
+                        {v.color_name}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            ) : null,
+          )}
         </div>
       </div>
 
