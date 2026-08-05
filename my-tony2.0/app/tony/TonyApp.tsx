@@ -48,6 +48,7 @@ import {
   layer1CanDye,
   layer2BiasRisk,
   layer3Vibrancy,
+  minDyeableLevel,
   type ColorMatrix,
 } from './hair-mirror-core';
 import { LandingScreen, ReturnHomeScreen } from './home-screens';
@@ -166,6 +167,8 @@ export default function TonyApp() {
         : '这是该色系能达到的最鲜艳状态。';
     return {
       level: mirrorLevel,
+      minLevel: minDyeableLevel(colorMatrix, kb),
+      colorName: selectedVideo.color_name ?? '目标色',
       canDye: l1.can,
       canDyeWhy: l1.why + (l1.smoothed ? '（由相邻度数推断，非官方原始标注）' : ''),
       biasRisky: l2.risky,

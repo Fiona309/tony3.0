@@ -15,6 +15,7 @@ import {
 
 export function NotReachablePlan({
   plan,
+  verdict,
   onBack,
   onDemoPreview,
   demoLoading = false,
@@ -22,14 +23,20 @@ export function NotReachablePlan({
   allowDemoPreview = true,
 }: {
   plan: PlanResultData;
+  /** 结论屏算好的三层结果。有它就以它为准，不再自行估算 */
+  verdict?: { level: number; minLevel: number | null; colorName: string };
   onBack: () => void;
   onDemoPreview?: () => void;
   demoLoading?: boolean;
   demoError?: string;
   allowDemoPreview?: boolean;
 }) {
-  const currentLevel = plan.color_rule?.current_level ?? 3;
-  const requiredLevel = Math.max(8, currentLevel + 4);
+  const currentLevel = verdict?.level ?? plan.color_rule?.current_level ?? 3;
+  /* 要漂到几度，直接取知识库里该色系的最低可染度数。
+     此前写死 max(8, 当前度数+4)，与知识库无关——蓝色其实 6 度起就能染，
+     却会告诉 6 度用户"要漂到 10 度"。 */
+  const requiredLevel = verdict?.minLevel ?? Math.max(8, currentLevel + 4);
+  const colorName = verdict?.colorName ?? '目标色';
   return (
     <AppFrame title="你的染发方案" eyebrow="分析完成" onBack={onBack} progress={{ current: 4, total: 4, label: '查看结果' }}>
       <div className="px-4 pb-5 pt-5">
@@ -38,7 +45,7 @@ export function NotReachablePlan({
           <h1 className="mt-3 text-[31px] font-black leading-none tracking-[-.045em]">
             <ScribbleUnderline>现在还不能直接染</ScribbleUnderline>
           </h1>
-          <p className="mt-3 text-sm text-ink-2">不是永远不能染，是当前底色还不够浅。</p>
+          <p className="mt-3 text-sm text-ink-2">不是永远不能染。{colorName}最低需要 {requiredLevel} 度底色，你现在是 {currentLevel} 度。</p>
           <div className="absolute right-1 top-0 grid size-20 rotate-3 place-items-center rounded-[28%_46%_35%_42%] border-2 border-ink bg-[#ffc7b3] text-[42px] font-black shadow-[3px_4px_0_#f1a4b8]">!</div>
           <DoodleIcon className="absolute -right-1 -top-3" tone="mint" size={26} />
         </div>
@@ -54,7 +61,7 @@ export function NotReachablePlan({
             <ArrowRight size={27} weight="bold" className="text-[#8f7bd1]" />
             <div>
               <p className="text-[10px] font-bold">需要漂至</p>
-              <p className="text-base font-black text-pink-dark">{requiredLevel}-9度浅金</p>
+              <p className="text-base font-black text-pink-dark">{requiredLevel} 度</p>
               <div className="mx-auto mt-2 size-[72px] rounded-[17px] border-2 border-white bg-[linear-gradient(145deg,#dbaa59,#f9dfa6)] shadow-[0_0_0_1px_#8f7bd1]" />
               <p className="mt-1 text-[9px]">更浅，色素少</p>
             </div>
@@ -85,11 +92,11 @@ export function NotReachablePlan({
             <div className="grid size-14 shrink-0 place-items-center rounded-[18px] border border-ink bg-sage/60 text-2xl">✂</div>
             <div>
               <h2 className="text-base font-black">建议先去理发店</h2>
-              <p className="mt-1 text-xs leading-5">请专业理发师将底色安全漂至 {requiredLevel}-9 度，再回来重新拍照分析。</p>
+              <p className="mt-1 text-xs leading-5">请专业理发师将底色安全漂至 {requiredLevel} 度以上，再回来重新拍照分析。</p>
             </div>
           </div>
           <div className="mt-3 grid grid-cols-3 gap-2">
-            {['保存目标色', `理发店漂至 ${requiredLevel}-9 度`, '回来重新分析'].map((item, index) => (
+            {['保存目标色', `理发店漂至 ${requiredLevel} 度以上`, '回来重新分析'].map((item, index) => (
               <div key={item} className="rounded-[12px] border border-[#8f7bd1]/45 bg-white p-2 text-center">
                 <span className="mx-auto grid size-5 place-items-center rounded-full bg-[#8f7bd1] text-[9px] font-black text-white">{index + 1}</span>
                 <p className="mt-1 text-[9px] font-black leading-4">{item}</p>

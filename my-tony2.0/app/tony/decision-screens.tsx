@@ -1407,6 +1407,9 @@ export function CalculatingScreen({
 
 export type PlanVerdict = {
   level: number;
+  /** 该色系最低可染度数，取自知识库，不是估算 */
+  minLevel: number | null;
+  colorName: string;
   canDye: boolean;
   canDyeWhy: string;
   biasRisky: boolean;
@@ -1497,11 +1500,16 @@ export function PlanScreen({
     plan.preview_images.find((item) => item.preview_level === selectedIntensity)?.label ??
     plan.preview_labels[String(selectedIntensity)] ??
     `第 ${selectedIntensity} 档`;
-  const hardStop = !plan.can_recommend_product;
+  /* 只有当三层判断的第一层也说不能染时，才走「不建议在家操作」整屏。
+     此前只看后端的 can_recommend_product，它与结论屏用不同的规则表判定，
+     导致结论屏说"能染"、本屏却整屏渲染"现在还不能直接染"。
+     verdict 存在时以它为准——判定只在结论屏发生一次。 */
+  const hardStop = verdict ? !verdict.canDye : !plan.can_recommend_product;
   if (hardStop) {
     return (
       <NotReachablePlan
         plan={plan}
+        verdict={verdict}
         onBack={onBack}
         onDemoPreview={onDemoPreview}
         demoLoading={demoLoading}

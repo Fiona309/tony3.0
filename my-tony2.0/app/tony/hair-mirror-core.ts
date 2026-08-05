@@ -178,6 +178,17 @@ export function layer1CanDye(cm: ColorMatrix, kbColor: string, level: number): L
   return { can: !blocked, why: e.why || '', smoothed: Boolean(e.smoothed) };
 }
 
+/** 该色系最低可染的底色度数，直接取自知识库。
+ *  用于告诉用户"要漂到几度"——此前 UI 里写死 max(8, 当前度数+4)，
+ *  与知识库无关，导致 6 度用户被告知要漂到 10 度，而蓝色其实 6 度起就能染。 */
+export function minDyeableLevel(cm: ColorMatrix, kbColor: string): number | null {
+  const fam = cm.matrix?.[kbColor] ?? {};
+  const ok = Object.entries(fam)
+    .filter(([, e]) => e.q === 'normal' || e.q === 'biased')
+    .map(([lv]) => Number(lv));
+  return ok.length ? Math.min(...ok) : null;
+}
+
 /* -------- 第二层：会不会偏色 -------- */
 
 export type Layer2 = {
