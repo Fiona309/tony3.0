@@ -180,6 +180,33 @@ export function usageVariants(base: [number, number, number], q: Quality): Varia
   ];
 }
 
+/** 按"能不能染"给色系分组——这是与施华蔻按色系分类的根本差异：
+ *  施华蔻是品牌货架逻辑（要卖全色卡），我们是风险顾问逻辑（帮用户避免翻车）。
+ *  用户不需要理解"冷棕色系"是什么，只需要看懂"我现在能不能染"。 */
+export type RiskGroup = 'ok' | 'bleach1' | 'bleach2' | 'no';
+
+export const GROUP_META: Record<RiskGroup, { label: string; hint: string }> = {
+  ok:      { label: '你现在就能染', hint: '底色符合，可直接上色' },
+  bleach1: { label: '需要先漂 1 次', hint: '漂浅约 2 度后可染' },
+  bleach2: { label: '需要先漂 2 次', hint: '漂浅约 4 度后可染' },
+  no:      { label: '不建议自己染', hint: '漂 2 次仍达不到，建议去发廊' },
+};
+
+/** 某色系在当前底色下属于哪一组 */
+export function riskGroup(rules: Rules, family: string, level: number): RiskGroup {
+  if (decide(rules, family, level).can) return 'ok';
+  if (decide(rules, family, Math.min(9, level + 2)).can) return 'bleach1';
+  if (decide(rules, family, Math.min(9, level + 4)).can) return 'bleach2';
+  return 'no';
+}
+
+/** 全部色系按风险分组，组内保持原顺序 */
+export function groupFamilies(rules: Rules, level: number) {
+  const out: Record<RiskGroup, string[]> = { ok: [], bleach1: [], bleach2: [], no: [] };
+  for (const name of Object.keys(rules.colors)) out[riskGroup(rules, name, level)].push(name);
+  return out;
+}
+
 /** 施华蔻式的底色档位：自然发色 / 漂浅1次 / 漂浅2次。一次漂浅约 +2 度 */
 export const BLEACH_STOPS = [
   { add: 0, lift: 0, label: '自然发色' },
