@@ -37,26 +37,44 @@ import { cx } from './ui';
 const MP = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.18';
 const MODEL = '/hair-mirror/hair_segmenter.tflite';
 
-/* 亮度保留换色：只替换 YCbCr 色度，保留亮度 Y —— 发丝纹理/高光/层次全编码在 Y 里。
-   Y 必须原样输出，一旦把目标色的明度混进来（旧版 nY=mix(Y,Y*.72+tY*.28,a*.65)，
-   等效 Y*0.818+tY*0.182），发丝明暗对比就被压到 81.8%，直接表现为"没有纹理感、很假"。
-   染发本身不会提亮头发，提亮只能靠漂——那是 lift 的职责。
+/* 换色 shader。四条关键设计，每条都对应一个实际翻车过的问题：
 
-   recept 让亮的（漂过的）发丝吃色深、暗的发根几乎不上色，即布丁头。
-   下限 0.05（旧版 0.30）：施华蔻魔镜的真实感主要来自发根保留原生黑色，
-   下限 0.30 会让最暗的发根也吃 30% 的色，整片发根变蓝，一眼假。
+   ① 明度水平对齐（baseY / k）
+   纯保留明度做不出深色：相机里头发的 Y 是亮的，只叠色度上去，得到的必然是浅色调
+   ——红色会渲染成粉色。参考图里红发本身明度就低（V62），而 7 度底色的头发 Y≈0.66。
+   所以把 Y 按 k=tY/baseY 做【乘法】缩放：乘法保留相对对比（纹理是明暗的比例关系），
+   只把整体亮度拉到目标色的水平。旧版用加法 mix(Y,Y*.72+tY*.28,·) 是错的，
+   等效 Y*0.818+tY*0.182，把发丝对比压到 81.8%，直接表现为"没有纹理感"。
+   baseY 由用户的底色度数推出（Lab L≈10×度数），不是拍脑袋的常数。
 
-   mask 用 smoothstep(.45,.75) 做软阈值：MediaPipe 给的是置信度图不是二值图，
-   旧版直接线性当 alpha 用，置信度 0.3 的背景像素也会吃 30% 的色——
-   这就是"背景上的东西被误当成头发"的来源。
+   ② mask 五点模糊 + 缓坡阈值
+   MediaPipe mask 分辨率远低于相机，直接放大边缘是锯齿状的硬边，看起来像抠图。
+   十字五点模糊把边缘摊开，smoothstep(.35,.80) 既砍掉低置信度的背景误判，
+   又给出一段渐变而不是一刀切。阈值太窄（如 .45~.75）会把边缘重新变硬。
+
+   ③ recept 下限 0.05
+   施华蔻魔镜的真实感主要来自发根保留原生黑色。旧版下限 0.30 会让最暗的发根
+   也吃 30% 的色，整片发根变蓝，一眼假。
+
+   ④ a 上限 0.90
+   留 10% 原始色度，头发本身的色彩细微变化不会被抹平成一块死板的纯色。
 
    lift 模拟漂浅：先提亮再上色；必须乘 mask，否则整幅画面会蒙一层白纱。
    mix0=0 时输出原始画面（按住看染前）。 */
 const FRAG = `precision mediump float;varying vec2 uv;
-uniform sampler2D cam,mask;uniform vec3 target;uniform float strength;uniform float lift;uniform float mix0;
+uniform sampler2D cam,mask;uniform vec3 target;
+uniform float strength,lift,mix0,baseY;uniform vec2 texel;
+float maskAt(vec2 p){
+  float s=texture2D(mask,p).r*.36;
+  s+=texture2D(mask,p+vec2(texel.x,0.)).r*.16;
+  s+=texture2D(mask,p-vec2(texel.x,0.)).r*.16;
+  s+=texture2D(mask,p+vec2(0.,texel.y)).r*.16;
+  s+=texture2D(mask,p-vec2(0.,texel.y)).r*.16;
+  return s;
+}
 void main(){
   vec3 c=texture2D(cam,uv).rgb;
-  float m=smoothstep(.45,.75,texture2D(mask,uv).r);
+  float m=smoothstep(.35,.80,maskAt(uv));
   float Y0=dot(c,vec3(.299,.587,.114));
   float lm=lift*m;
   float Y=clamp(Y0+lm*(1.0-Y0)*mix(1.4,0.6,Y0),0.,1.);
@@ -64,11 +82,22 @@ void main(){
   float tY=dot(target,vec3(.299,.587,.114));
   float tCb=(target.b-tY)*.564, tCr=(target.r-tY)*.713;
   float recept=clamp((Y-.10)/.45,0.,1.);
-  float a=m*mix(.05,1.,recept)*strength;
+  float a=m*mix(.05,.90,recept)*strength;
   float nCb=mix(Cb,tCb,a), nCr=mix(Cr,tCr,a);
-  vec3 o=vec3(Y+1.403*nCr, Y-.714*nCr-.344*nCb, Y+1.773*nCb);
+  float k=clamp(tY/max(baseY,.06),.55,1.5);
+  float nY=clamp(Y*mix(1.0,k,a),0.,1.);
+  vec3 o=vec3(nY+1.403*nCr, nY-.714*nCr-.344*nCb, nY+1.773*nCb);
   gl_FragColor=vec4(clamp(mix(c,o,mix0),0.,1.),1.);
 }`;
+
+/** 该底色度数下头发的预期明度（sRGB 编码域）。
+ *  度数本质是明度：levelFromL 的阈值表给出 Lab L 每 10 一档，故 L≈10×度数。
+ *  Lab L → 线性亮度 → sRGB 域，供 shader 算明度缩放系数 k。 */
+function baseLumaOf(level: number) {
+  const L = Math.max(5, Math.min(100, level * 10));
+  const linear = Math.pow((L + 16) / 116, 3);
+  return Math.pow(Math.max(linear, 0.001), 1 / 2.2);
+}
 /* mask 时域平滑系数：上一帧占比。越大越稳但越迟滞，0.55 是消抖与跟手的折中 */
 const MASK_EMA = 0.55;
 
@@ -83,6 +112,8 @@ type GL = {
   uS: WebGLUniformLocation | null;
   uL: WebGLUniformLocation | null;
   uM: WebGLUniformLocation | null;
+  uB: WebGLUniformLocation | null;
+  uTx: WebGLUniformLocation | null;
 };
 
 function initGL(canvas: HTMLCanvasElement): GL | null {
@@ -126,6 +157,8 @@ function initGL(canvas: HTMLCanvasElement): GL | null {
     uS: gl.getUniformLocation(prog, 'strength'),
     uL: gl.getUniformLocation(prog, 'lift'),
     uM: gl.getUniformLocation(prog, 'mix0'),
+    uB: gl.getUniformLocation(prog, 'baseY'),
+    uTx: gl.getUniformLocation(prog, 'texel'),
   };
 }
 
@@ -150,6 +183,9 @@ export function HairMirror({ matrix, level, entryVideoId, onLevelChange, onBack,
   const runRef = useRef(false);
   const variantRef = useRef<Variant | null>(null);
   const rawRef = useRef(false);
+  /* 渲染循环的闭包只在 ready 变化时重建，level 会变旧，用 ref 传当前值 */
+  const levelRef = useRef(level);
+  levelRef.current = level;
 
   const usable = useMemo(() => matrix.videos.filter((v) => v.kb_color), [matrix]);
   const groups = useMemo(() => groupVideos(matrix, level), [matrix, level]);
@@ -237,6 +273,8 @@ export function HairMirror({ matrix, level, entryVideoId, onLevelChange, onBack,
       gl.bindTexture(gl.TEXTURE_2D, maskTex);
       gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.LUMINANCE, cm.width, cm.height, 0, gl.LUMINANCE, gl.UNSIGNED_BYTE, b);
+      // 五点模糊的采样步长必须按 mask 自身分辨率算，不是画布分辨率
+      gl.uniform2f(G.uTx, 1.5 / cm.width, 1.5 / cm.height);
       cm.close();
     };
 
@@ -245,7 +283,7 @@ export function HairMirror({ matrix, level, entryVideoId, onLevelChange, onBack,
       requestAnimationFrame(loop);
       if (video.readyState < 2 || video.currentTime === lastT) return;
       lastT = video.currentTime;
-      const { gl, camTex, uT, uS, uL, uM } = G;
+      const { gl, camTex, uT, uS, uL, uM, uB } = G;
       if (canvas.width !== video.videoWidth) {
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
@@ -260,6 +298,11 @@ export function HairMirror({ matrix, level, entryVideoId, onLevelChange, onBack,
       gl.uniform1f(uS, v?.str ?? 1);
       gl.uniform1f(uL, v?.lift ?? 0);
       gl.uniform1f(uM, rawRef.current || !v ? 0 : 1);
+      /* baseY 要和 shader 里的 Y 处于同一状态：Y 是漂浅之后的，所以这里也要过一遍
+         同样的 lift 公式，否则漂色档的明度缩放系数会算错 */
+      const by0 = baseLumaOf(levelRef.current);
+      const lf = v?.lift ?? 0;
+      gl.uniform1f(uB, Math.min(1, by0 + lf * (1 - by0) * (1.4 + (0.6 - 1.4) * by0)));
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     };
 
