@@ -38,13 +38,25 @@ const MP = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.18';
 const MODEL = '/hair-mirror/hair_segmenter.tflite';
 
 /* 亮度保留换色：只替换 YCbCr 色度，保留亮度 Y —— 发丝纹理/高光/层次全编码在 Y 里。
+   Y 必须原样输出，一旦把目标色的明度混进来（旧版 nY=mix(Y,Y*.72+tY*.28,a*.65)，
+   等效 Y*0.818+tY*0.182），发丝明暗对比就被压到 81.8%，直接表现为"没有纹理感、很假"。
+   染发本身不会提亮头发，提亮只能靠漂——那是 lift 的职责。
+
    recept 让亮的（漂过的）发丝吃色深、暗的发根几乎不上色，即布丁头。
+   下限 0.05（旧版 0.30）：施华蔻魔镜的真实感主要来自发根保留原生黑色，
+   下限 0.30 会让最暗的发根也吃 30% 的色，整片发根变蓝，一眼假。
+
+   mask 用 smoothstep(.45,.75) 做软阈值：MediaPipe 给的是置信度图不是二值图，
+   旧版直接线性当 alpha 用，置信度 0.3 的背景像素也会吃 30% 的色——
+   这就是"背景上的东西被误当成头发"的来源。
+
    lift 模拟漂浅：先提亮再上色；必须乘 mask，否则整幅画面会蒙一层白纱。
    mix0=0 时输出原始画面（按住看染前）。 */
 const FRAG = `precision mediump float;varying vec2 uv;
 uniform sampler2D cam,mask;uniform vec3 target;uniform float strength;uniform float lift;uniform float mix0;
 void main(){
-  vec3 c=texture2D(cam,uv).rgb; float m=texture2D(mask,uv).r;
+  vec3 c=texture2D(cam,uv).rgb;
+  float m=smoothstep(.45,.75,texture2D(mask,uv).r);
   float Y0=dot(c,vec3(.299,.587,.114));
   float lm=lift*m;
   float Y=clamp(Y0+lm*(1.0-Y0)*mix(1.4,0.6,Y0),0.,1.);
@@ -52,12 +64,14 @@ void main(){
   float tY=dot(target,vec3(.299,.587,.114));
   float tCb=(target.b-tY)*.564, tCr=(target.r-tY)*.713;
   float recept=clamp((Y-.10)/.45,0.,1.);
-  float a=m*mix(.30,1.,recept)*strength;
+  float a=m*mix(.05,1.,recept)*strength;
   float nCb=mix(Cb,tCb,a), nCr=mix(Cr,tCr,a);
-  float nY=mix(Y,Y*.72+tY*.28,a*.65);
-  vec3 o=vec3(nY+1.403*nCr, nY-.714*nCr-.344*nCb, nY+1.773*nCb);
+  vec3 o=vec3(Y+1.403*nCr, Y-.714*nCr-.344*nCb, Y+1.773*nCb);
   gl_FragColor=vec4(clamp(mix(c,o,mix0),0.,1.),1.);
 }`;
+/* mask 时域平滑系数：上一帧占比。越大越稳但越迟滞，0.55 是消抖与跟手的折中 */
+const MASK_EMA = 0.55;
+
 const VERT = `attribute vec2 p;varying vec2 uv;
 void main(){uv=vec2(1.0-(p.x*.5+.5),1.0-(p.y*.5+.5));gl_Position=vec4(p,0.,1.);}`;
 
@@ -132,6 +146,7 @@ export function HairMirror({ matrix, level, entryVideoId, onLevelChange, onBack,
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const glRef = useRef<GL | null>(null);
   const segRef = useRef<any>(null);
+  const prevMaskRef = useRef<Float32Array | null>(null);
   const runRef = useRef(false);
   const variantRef = useRef<Variant | null>(null);
   const rawRef = useRef(false);
@@ -203,8 +218,20 @@ export function HairMirror({ matrix, level, entryVideoId, onLevelChange, onBack,
       const cm = res.confidenceMasks?.[res.confidenceMasks.length - 1];
       if (!cm) return;
       const f = cm.getAsFloat32Array();
+      /* 时域平滑：MediaPipe 模型内部本有"上一帧 mask 作为第 4 输入通道"的机制，
+         但 Web 版没暴露这个接口，逐帧独立推理会让 mask 抖动、发际线闪烁。
+         这里自己做一阶 EMA 补上。尺寸变化（切换摄像头/分辨率）时重置。 */
+      let prev = prevMaskRef.current;
+      if (!prev || prev.length !== f.length) {
+        prev = new Float32Array(f);
+        prevMaskRef.current = prev;
+      }
       const b = new Uint8Array(f.length);
-      for (let i = 0; i < f.length; i++) b[i] = f[i] * 255;
+      for (let i = 0; i < f.length; i++) {
+        const v = prev[i] * MASK_EMA + f[i] * (1 - MASK_EMA);
+        prev[i] = v;
+        b[i] = v * 255;
+      }
       const { gl, maskTex } = G;
       gl.activeTexture(gl.TEXTURE1);
       gl.bindTexture(gl.TEXTURE_2D, maskTex);

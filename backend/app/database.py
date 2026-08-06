@@ -240,10 +240,29 @@ class Database:
                 rgb_quality TEXT NOT NULL,
                 source TEXT NOT NULL,
                 updated_at TEXT NOT NULL,
+                -- r/g/b 采自色卡（印刷/渲染的理想效果），鲜艳色系饱和度比真实染后高 2 倍以上。
+                -- *_real 是从种草参考图发区实测标定的真实染后色，渲染与接近度计算用它。
+                -- 色卡原值保留不动，商品页展示色号仍可用。
+                r_real INTEGER,
+                g_real INTEGER,
+                b_real INTEGER,
+                hex_real TEXT,
+                real_source TEXT,
                 UNIQUE(color_zh, base_level)
             )
             """
         )
+        # 老库补列：CREATE TABLE IF NOT EXISTS 不会给已存在的表加字段
+        existing = {row[1] for row in connection.execute("PRAGMA table_info(color_effect_matrix)")}
+        for column, ddl in (
+            ("r_real", "INTEGER"),
+            ("g_real", "INTEGER"),
+            ("b_real", "INTEGER"),
+            ("hex_real", "TEXT"),
+            ("real_source", "TEXT"),
+        ):
+            if column not in existing:
+                connection.execute(f"ALTER TABLE color_effect_matrix ADD COLUMN {column} {ddl}")
         connection.execute(
             """
             CREATE TABLE IF NOT EXISTS operation_qa (

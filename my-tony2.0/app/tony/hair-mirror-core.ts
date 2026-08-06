@@ -12,8 +12,13 @@ export type MatrixEntry = {
   q: Quality;
   why: string;
   rec: boolean;
+  /** 渲染与接近度用的呈色。后端优先给实测标定的真实染后色，缺失时回落到色卡值 */
   rgb?: [number, number, number];
   hex?: string;
+  /** 色卡原值。真实染后色饱和度普遍只有它的一半，仅供商品页展示色号用，不要拿来渲染 */
+  rgb_chart?: [number, number, number];
+  /** rgb 的来源标记，存在即说明是实测标定值 */
+  rgb_source?: string;
   /** 该结论由「单点凹陷平滑」推断而来，非官方矩阵原值。UI 需注明 */
   smoothed?: boolean;
 };

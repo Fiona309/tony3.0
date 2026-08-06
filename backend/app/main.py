@@ -271,6 +271,7 @@ def get_color_matrix():
         for row in connection.execute(
             """
             SELECT m.color_zh, m.base_level, m.r, m.g, m.b, m.hex, m.recommended,
+                   m.r_real, m.g_real, m.b_real, m.hex_real, m.real_source,
                    r.result_quality, r.reason
             FROM color_effect_matrix m
             LEFT JOIN color_result_rules r
@@ -284,8 +285,17 @@ def get_color_matrix():
             }
             # 官方效果图对 not_recommended 的组合不给色值，此处保持缺省，由前端外推
             if row["r"] is not None:
-                entry["rgb"] = [row["r"], row["g"], row["b"]]
-                entry["hex"] = row["hex"]
+                # rgb 优先给实测真实染后色。色卡值（sampled_from_chart）是印刷/渲染的
+                # 理想效果，鲜艳色系饱和度普遍比真实染后高 2 倍以上，直接拿去渲染会很假。
+                # 色卡原值保留在 rgb_chart，商品页展示色号仍可用。
+                if row["r_real"] is not None:
+                    entry["rgb"] = [row["r_real"], row["g_real"], row["b_real"]]
+                    entry["hex"] = row["hex_real"]
+                    entry["rgb_source"] = row["real_source"]
+                else:
+                    entry["rgb"] = [row["r"], row["g"], row["b"]]
+                    entry["hex"] = row["hex"]
+                entry["rgb_chart"] = [row["r"], row["g"], row["b"]]
             matrix.setdefault(row["color_zh"], {})[str(row["base_level"])] = entry
 
     # 单点凹陷平滑：不改官方数据，只在判定层修正"4度能染、5度不能、6度又能"这类
