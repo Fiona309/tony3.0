@@ -369,7 +369,8 @@ def get_color_matrix():
         connection.row_factory = sqlite3.Row
         for row in connection.execute(
             """
-            SELECT color_zh, week, stage_name, hold_weeks_min, hold_weeks_max, source
+            SELECT color_zh, week, stage_name, hold_weeks_min, hold_weeks_max, source,
+                   r, g, b, hex
             FROM color_fade ORDER BY color_zh, week
             """
         ):
@@ -382,7 +383,14 @@ def get_color_matrix():
                     "stages": [],
                 },
             )
-            item["stages"].append({"week": row["week"], "name": row["stage_name"]})
+            stage: dict[str, Any] = {"week": row["week"], "name": row["stage_name"]}
+            # 色值按 stage_name 定色相 + 褪彩推出来，存在库里。
+            # 掉色的色相不能靠物理模型猜：蓝和橙互补，线性插值会穿过灰，
+            # 乘法又出不了黄——中文阶段名本身才是权威答案。
+            if row["r"] is not None:
+                stage["rgb"] = [row["r"], row["g"], row["b"]]
+                stage["hex"] = row["hex"]
+            item["stages"].append(stage)
 
     return ok(
         {

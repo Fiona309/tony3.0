@@ -2,13 +2,16 @@
 
 import {
   ArrowClockwise,
+  ArrowCounterClockwise,
   ArrowLeft,
   BellRinging,
   Camera,
   CaretRight,
+  CaretUp,
   Check,
   CheckCircle,
   FolderOpen,
+  ListBullets,
   Microphone,
   Pause,
   Play,
@@ -16,8 +19,8 @@ import {
   Repeat,
   ShareNetwork,
   SpeakerHigh,
-  Star,
   SpinnerGap,
+  Star,
   Timer,
   VideoCamera,
   Warning,
@@ -924,46 +927,73 @@ function browserSpeechRecognition() {
   return speechWindow.SpeechRecognition ?? speechWindow.webkitSpeechRecognition ?? null;
 }
 
+/** 把秒数格式化成 0:07 */
+function mmss(sec: number) {
+  const t = Math.max(0, Math.floor(sec));
+  return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`;
+}
+
+/**
+ * 教程视频。视频是这一屏的绝对主角，所以控件全部做成浮层压在画面上，
+ * 不额外占用垂直空间。
+ *
+ * 进度和跳转都相对【当前步骤的片段】，不是整条视频——用户的心智是
+ * "这一步演到哪了"，不是"整个教程演到哪了"。
+ */
 function SegmentVideo({
   url,
   step,
   onSegmentEnd,
   replaySignal,
+  chapterLabel,
+  onChapter,
 }: {
   url: string;
   step: TutorialStep;
   onSegmentEnd: () => void;
   replaySignal: number;
+  /** 语义章节按钮，如「回到上色部分」。没有章节数据时不渲染 */
+  chapterLabel?: string;
+  onChapter?: () => void;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const [playing, setPlaying] = useState(false);
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
-  const [playing, setPlaying] = useState(false);
-  const endedRef = useRef(false);
+  const [cur, setCur] = useState(0);
+
+  const start = step.start_time_ms / 1000;
+  const dur = Math.max(0.1, (step.end_time_ms - step.start_time_ms) / 1000);
 
   const playSegment = useCallback(() => {
     const video = videoRef.current;
     if (!video) return;
-    endedRef.current = false;
     setFailed(false);
-    video.currentTime = step.start_time_ms / 1000;
-    void video
-      .play()
-      .then(() => setPlaying(true))
-      .catch(() => setPlaying(false));
-  }, [step.start_time_ms]);
+    video.currentTime = start;
+    setCur(0);
+    void video.play().catch(() => undefined);
+  }, [start]);
 
-  useEffect(() => {
+  useEffect(() => { playSegment(); }, [playSegment, replaySignal, step.step_id]);
+
+  const seek = (delta: number) => {
     const video = videoRef.current;
     if (!video) return;
-    if (video.readyState >= 1) playSegment();
-  }, [playSegment, replaySignal, step.step_id]);
+    video.currentTime = Math.min(start + dur - 0.2, Math.max(start, video.currentTime + delta));
+  };
 
-  const checkEnd = () => {
+  const toggle = () => {
     const video = videoRef.current;
-    if (!video || endedRef.current) return;
+    if (!video) return;
+    if (video.paused) void video.play().catch(() => undefined);
+    else video.pause();
+  };
+
+  const onTime = () => {
+    const video = videoRef.current;
+    if (!video) return;
+    setCur(Math.min(dur, Math.max(0, video.currentTime - start)));
     if (video.currentTime * 1000 >= step.end_time_ms - 120) {
-      endedRef.current = true;
       video.pause();
       setPlaying(false);
       onSegmentEnd();
@@ -971,72 +1001,86 @@ function SegmentVideo({
   };
 
   return (
-    <div className="sketch-photo relative h-full min-h-0 overflow-hidden bg-ink">
+    <div className="relative h-full min-h-0 overflow-hidden rounded-[18px] border-[1.6px] border-ink bg-ink">
       {failed ? (
         <div className="absolute inset-0 grid place-items-center p-5 text-center text-white">
           <div>
             <Warning className="mx-auto" size={26} weight="fill" />
             <p className="mt-3 text-sm font-black">这段视频没有加载出来</p>
-            <p className="mt-1 text-[11px] leading-5 text-white/60">
-              可以阅读下方文字，或重新加载视频。
-            </p>
-            <button
-              type="button"
-              onClick={playSegment}
-              className="tap mt-4 rounded-full bg-white px-4 py-2 text-xs font-bold text-ink"
-            >
-              重新加载
-            </button>
+            <p className="mt-1 text-[11px] leading-5 text-white/60">可以听下方讲解，或重新加载视频。</p>
+            <button type="button" onClick={playSegment}
+              className="tap mt-4 rounded-full bg-white px-4 py-2 text-xs font-bold text-ink">重新加载</button>
           </div>
         </div>
       ) : (
         <video
-          ref={videoRef}
-          src={url}
-          playsInline
-          preload="metadata"
-          onLoadedMetadata={() => {
-            setLoading(false);
-            playSegment();
-          }}
+          ref={videoRef} src={url} playsInline preload="metadata"
+          onLoadedMetadata={() => { setLoading(false); playSegment(); }}
           onCanPlay={() => setLoading(false)}
           onWaiting={() => setLoading(true)}
-          onPlaying={() => {
-            setLoading(false);
-            setPlaying(true);
-          }}
+          onPlaying={() => { setLoading(false); setPlaying(true); }}
           onPause={() => setPlaying(false)}
-          onTimeUpdate={checkEnd}
-          onEnded={checkEnd}
-          onError={() => {
-            setLoading(false);
-            setFailed(true);
-          }}
+          onTimeUpdate={onTime}
+          onEnded={onTime}
+          onError={() => { setLoading(false); setFailed(true); }}
           className="size-full object-cover"
         />
       )}
+
+      {/* 轻点画面暂停/播放。控件很小，主要交互面是整块画面 */}
+      {!failed && !loading ? (
+        <button type="button" onClick={toggle} aria-label={playing ? '暂停' : '播放'}
+          className="absolute inset-x-0 top-0 bottom-[86px]" />
+      ) : null}
+
       {loading && !failed ? (
         <div className="absolute inset-0 grid place-items-center bg-ink/72">
           <SpinnerGap className="animate-spin text-white" size={26} weight="bold" />
         </div>
       ) : null}
-      {!failed && !loading ? (
-        <button
-          type="button"
-          onClick={() => {
-            const video = videoRef.current;
-            if (!video) return;
-            if (video.paused) {
-              void video.play();
-            } else {
-              video.pause();
-            }
-          }}
-          className="absolute bottom-3 left-3 grid size-10 place-items-center rounded-full border border-white/15 bg-ink/55 text-white backdrop-blur-md"
-          aria-label={playing ? '暂停教程视频' : '继续播放教程视频'}
-        >
-          {playing ? <Pause size={17} weight="fill" /> : <Play size={17} weight="fill" />}
-        </button>
+
+      {!failed ? (
+        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent px-3 pb-2.5 pt-8">
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={toggle} aria-label={playing ? '暂停' : '播放'}
+              className="tap shrink-0 text-white">
+              {playing ? <Pause size={17} weight="fill" /> : <Play size={17} weight="fill" />}
+            </button>
+            <div className="relative h-[3px] flex-1 rounded-full bg-white/30">
+              <span className="absolute inset-y-0 left-0 rounded-full bg-pink"
+                style={{ width: `${(cur / dur) * 100}%` }} />
+              <span className="absolute top-1/2 size-[11px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-white"
+                style={{ left: `${(cur / dur) * 100}%` }} />
+            </div>
+            <span className="numerals shrink-0 text-[11px] font-bold text-white/85">
+              {mmss(cur)} / {mmss(dur)}
+            </span>
+          </div>
+          <div className="mt-2 flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <button type="button" onClick={() => seek(-10)} aria-label="后退 10 秒"
+                className="tap flex items-center gap-1 text-[11px] font-bold text-white">
+                <ArrowCounterClockwise size={17} weight="bold" />10秒
+              </button>
+              <button type="button" onClick={toggle}
+                className="tap grid size-9 place-items-center rounded-full bg-white text-ink">
+                {playing ? <Pause size={16} weight="fill" /> : <Play size={16} weight="fill" />}
+              </button>
+              <button type="button" onClick={() => seek(10)} aria-label="前进 10 秒"
+                className="tap flex items-center gap-1 text-[11px] font-bold text-white">
+                10秒<ArrowClockwise size={17} weight="bold" />
+              </button>
+            </div>
+            {/* 语义章节跳转。用户说的是"退回上色部分"而不是"退回 40 秒"，
+                所以按章节时间戳定位，不做机械倒退 */}
+            {chapterLabel && onChapter ? (
+              <button type="button" onClick={onChapter}
+                className="tap flex items-center gap-1.5 rounded-full border border-white/35 px-3 py-1.5 text-[11px] font-bold text-white">
+                <ListBullets size={14} weight="bold" />{chapterLabel}
+              </button>
+            ) : null}
+          </div>
+        </div>
       ) : null}
     </div>
   );

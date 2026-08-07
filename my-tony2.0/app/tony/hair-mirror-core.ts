@@ -48,7 +48,8 @@ export type FadeRule = {
   hold_max: number;
   /** industry_reference = 行业通识参考值，非实测。UI 必须注明 */
   source: string;
-  stages: { week: number; name: string }[];
+  /** rgb 由后端按 stage_name 定色相算好；缺省时前端用 fadeStages 里的物理推算兜底 */
+  stages: { week: number; name: string; rgb?: [number, number, number]; hex?: string }[];
 };
 
 /** 「固色适用发色」六宫格里的命名变体，用于矩阵缺档时替补 */
@@ -329,6 +330,10 @@ export function fadeStages(cm: ColorMatrix, kbColor: string, level: number): Fad
   const last = Math.max(1, rule.stages.length - 1);
 
   return rule.stages.map((s, i) => {
+    // 库里有算好的色值就直接用：色相是按中文阶段名定的（蓝绿→绿→黄绿），
+    // 那是产品给的权威数据。下面这套物理推算只在库里没值时兜底——
+    // 它对蓝色这种与残留底色互补的颜色算不准（互补色插值会穿过灰）。
+    if (s.rgb) return { week: s.week, name: s.name, rgb: s.rgb, within: s.week <= rule.hold_max };
     const t = i / last;
     // 两段合成，缺一不可：
     //   ① 减色混合负责【色相怎么变】——蓝色配黄底会经过绿，这是掉色最有观感的一段
