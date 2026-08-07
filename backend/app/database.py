@@ -331,10 +331,20 @@ class Database:
                 hold_weeks_max INTEGER NOT NULL,
                 source TEXT NOT NULL,
                 updated_at TEXT NOT NULL,
+                r INTEGER,
+                g INTEGER,
+                b INTEGER,
+                hex TEXT,
                 PRIMARY KEY (color_zh, week)
             )
             """
         )
+        # 老库补列：CREATE TABLE IF NOT EXISTS 不会给已存在的表加字段。
+        # main.py 的 /api/color-matrix 会 SELECT 这四列，缺列会直接 500。
+        fade_columns = {row[1] for row in connection.execute("PRAGMA table_info(color_fade)")}
+        for column, column_type in (("r", "INTEGER"), ("g", "INTEGER"), ("b", "INTEGER"), ("hex", "TEXT")):
+            if column not in fade_columns:
+                connection.execute(f"ALTER TABLE color_fade ADD COLUMN {column} {column_type}")
         connection.execute(
             """
             CREATE TABLE IF NOT EXISTS products (
