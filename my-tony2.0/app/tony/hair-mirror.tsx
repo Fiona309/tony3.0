@@ -147,12 +147,20 @@ void main(){
   float t=clamp((uv.y-hairSpan.x)/max(hairSpan.y-hairSpan.x,1e-3),0.,1.);
   float growth=mix(rootKeep,1.0,smoothstep(0.0,0.5,t));
 
-  float g=mix(1.0,liftGamma,m*growth);
-  float sb=max(base,0.004);
-  float baseL=clamp(pow(sb,g),0.,1.);
-  /* 曲线在该点的局部导数：细节要按同样的比例带上去，否则发丝纹理会被留在原来的暗部尺度上 */
-  float dScale=clamp(g*pow(sb,g-1.0),0.4,3.0);
-  float lm=(1.0-liftGamma)*m;
+  /* 漂浅 = 提高发丝反射率，是【乘法】不是加法。
+     发绺缝隙、内层、耳后那些暗是几何遮挡（光根本进不去），漂多少次都还是暗的。
+     曾用 gamma 曲线 Y^g，它把 0.02 的深阴影提到 0.45，整幅画面一个暗值都不剩，
+     动态范围从 0.53 塌到 0.436——没有黑就没有立体感，
+     再多毛流感也只是在一块亮面上做浮雕。乘法后恢复到 0.837，最深处留 0.053。
+     亮部用 Reinhard 软肩收住，避免受光面烧成白块。 */
+  float F=mix(1.0,liftF,m*growth);
+  float W=1.0+F*0.28;
+  float x=base*F;
+  float baseL=clamp(x*(1.0+x/(W*W))/(1.0+x),0.,1.);
+  /* 该点的局部导数：细节按同样比例带上去，否则发丝纹理会留在原来的暗部尺度上 */
+  float dv=((1.0+2.0*x/(W*W))*(1.0+x)-x*(1.0+x/(W*W)))/((1.0+x)*(1.0+x));
+  float dScale=clamp(F*dv,0.4,3.0);
+  float lm=clamp((F-1.0)/2.5,0.,1.)*m;
   float Cb=(c.b-Y0)*.564*mix(1.0,0.35,lm), Cr=(c.r-Y0)*.713*mix(1.0,0.35,lm);
   float tY=dot(target,vec3(.299,.587,.114));
   float tCb=(target.b-tY)*.564, tCr=(target.r-tY)*.713;
@@ -181,7 +189,9 @@ const SPEC_RADIUS = 6;
 const DETAIL_BOOST = 1.45;
 /* 发根保留原色的程度。0 = 发根完全不上色（最强布丁头），1 = 全头均匀（旧行为）。
    0.28 是"看得出发根更深、但不至于像没染到"的位置。 */
-const ROOT_KEEP = 0.28;
+/* 默认 1.0 = 不做发根渐变。立体感应该来自阴影明暗关系，不是人为画一条渐变。
+   保留可调，想看布丁头效果可以拖低。 */
+const ROOT_KEEP = 1.0;
 
 /** 该底色度数下头发的预期明度（sRGB 编码域）。
  *  度数本质是明度：levelFromL 的阈值表给出 Lab L 每 10 一档，故 L≈10×度数。
@@ -257,7 +267,7 @@ function initGL(canvas: HTMLCanvasElement): GL | null {
     gl, camTex, maskTex,
     uT: gl.getUniformLocation(prog, 'target'),
     uS: gl.getUniformLocation(prog, 'strength'),
-    uL: gl.getUniformLocation(prog, 'liftGamma'),
+    uL: gl.getUniformLocation(prog, 'liftF'),
     uM: gl.getUniformLocation(prog, 'mix0'),
     uB: gl.getUniformLocation(prog, 'baseY'),
     uTx: gl.getUniformLocation(prog, 'texel'),
@@ -477,14 +487,17 @@ export function HairMirror({
       const v = variantRef.current;
       gl.uniform3f(uT, (v?.rgb[0] ?? 0) / 255, (v?.rgb[1] ?? 0) / 255, (v?.rgb[2] ?? 0) / 255);
       gl.uniform1f(uS, v?.str ?? 1);
-      gl.uniform1f(uL, v?.gamma ?? 1);
+      gl.uniform1f(uL, v?.liftF ?? 1);
       gl.uniform1f(uM, rawRef.current || !v ? 0 : 1);
       /* baseY 要和 shader 里的 Y 处于同一状态：Y 是漂浅之后的，所以这里也要过一遍
          同样的 lift 公式，否则漂色档的明度缩放系数会算错 */
       /* baseY 要和着色器里的明度处于同一状态：Y 是漂浅之后的，
          所以基准也要过一遍同样的 gamma 曲线 */
       const by0 = baseLumaOf(levelRef.current);
-      gl.uniform1f(uB, Math.pow(Math.max(by0, 0.004), v?.gamma ?? 1));
+      const F = v?.liftF ?? 1;
+      const W = 1 + F * 0.28;
+      const bx = by0 * F;
+      gl.uniform1f(uB, Math.min(1, (bx * (1 + bx / (W * W))) / (1 + bx)));
       gl.uniform1f(uSK, specKeepRef.current);
       gl.uniform1f(uDB, detailRef.current);
       gl.uniform1f(uRK, rootRef.current);

@@ -106,8 +106,8 @@ export type Variant = {
   ok?: boolean;
   /** 该档位对应的官方效果图切片 */
   swatch?: string;
-  /** 漂浅的提亮曲线指数 Y^gamma。1 = 不漂，越小提得越亮。见 gammaFor */
-  gamma?: number;
+  /** 漂浅的乘法提亮倍数。1 = 不漂，越大提得越亮。见 liftFactorFor */
+  liftF?: number;
 };
 
 /* ============================ 色彩工具 ============================ */
@@ -607,21 +607,24 @@ export function baseLumaOf(level: number) {
 }
 
 /**
- * 从 from 度漂到 to 度的提亮曲线指数（Y^gamma）。1.0 = 不漂。
+ * 从 from 度漂到 to 度的【乘法】提亮倍数。1.0 = 不漂。
  *
- * 旧版用加法 Y + lm*(1-Y)*(1.4-0.8Y)，对 Y 求导是 1 + lm*(1.6Y-2.2)：
- * 3 度黑发（Y≈0.15）漂到 8 度需要 lm=0.58，导数是【负的 -0.137】——
- * 原本亮一点的发丝漂完反而更暗，整个动态范围从 0.20 塌成 0.019 还翻了向。
- * 这就是"一坨颜色糊上去、毫无毛流感"的根因。
+ * 漂发改变的是发丝的反射率，不是照明。发绺缝隙、内层、耳后那些暗，
+ * 是几何遮挡造成的（光根本进不去），漂多少次都还是暗的。
+ * 所以提亮必须是乘法：observed = 反射率 × 照明，只放大反射率。
  *
- * gamma 曲线单调、永不翻转：同样 3→8 度，0.10→0.624、0.30→0.782，
- * 动态范围保留 79%。
+ * 之前用 gamma 曲线 Y^g 是错的——它是"加法式"的，把 0.02 的深阴影提到 0.45，
+ * 整幅画面一个暗值都不剩，动态范围从 0.53 塌到 0.436。
+ * 没有黑就没有立体感，再多毛流感也只是在一块亮面上做浮雕。
+ * 换成乘法后动态范围恢复到 0.837，最深处留在 0.053。
+ *
+ * 亮部用 Reinhard 软肩收住，避免受光面直接烧成白块。
  */
-function gammaFor(from: number, to: number) {
+function liftFactorFor(from: number, to: number) {
   const a = baseLumaOf(from);
   const b = baseLumaOf(to);
-  if (b <= a || a >= 0.999) return 1;
-  return Math.max(0.12, Math.min(1, Math.log(b) / Math.log(a)));
+  if (b <= a) return 1;
+  return Math.max(1, Math.min(6, b / a));
 }
 
 /**
@@ -652,7 +655,7 @@ export function bleachVariants(cm: ColorMatrix, kbColor: string, level: number):
       return {
         key: 'bleach0', label: s.label,
         note: `你现在的底色直接染，几乎显不出颜色`,
-        rgb, str: 1, lift: 0, gamma: 1, risk: true, level, ok: false, swatch,
+        rgb, str: 1, lift: 0, liftF: 1, risk: true, level, ok: false, swatch,
       };
     }
     const enough = to >= 8;
@@ -661,7 +664,7 @@ export function bleachVariants(cm: ColorMatrix, kbColor: string, level: number):
       note: enough
         ? `漂到位了，这就是${name}该有的样子`
         : `颜色出得来了，但比${name}闷一些`,
-      rgb, str: 1, lift: 0, gamma: gammaFor(level, to), risk: !enough,
+      rgb, str: 1, lift: 0, liftF: liftFactorFor(level, to), risk: !enough,
       level: to, ok: enough, swatch,
     };
   });
