@@ -2067,9 +2067,14 @@ export function AfterPhotoScreen({
     if (!video || !canvas || !video.videoWidth) return;
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
-    canvas
-      .getContext('2d')
-      ?.drawImage(video, 0, 0, canvas.width, canvas.height);
+    // 与预览一致地镜像存图，理由同 CameraScreen.capture
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      ctx.translate(canvas.width, 0);
+      ctx.scale(-1, 1);
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+    }
     const blob = await new Promise<Blob | null>((resolve) =>
       canvas.toBlob(resolve, 'image/jpeg', 0.88),
     );
@@ -2118,11 +2123,12 @@ export function AfterPhotoScreen({
 
       {stage === 'live' ? (
         <div className="relative min-h-full bg-ink">
+          {/* 与拍照页、试色屏保持一致：原始帧未镜像，翻一次才等于照镜子 */}
           <video
             ref={videoRef}
             muted
             playsInline
-            className="absolute inset-0 size-full object-cover"
+            className="absolute inset-0 size-full scale-x-[-1] object-cover"
           />
           <canvas ref={canvasRef} className="hidden" />
           <div className="absolute inset-0 bg-gradient-to-b from-ink/20 via-transparent to-ink/70" />

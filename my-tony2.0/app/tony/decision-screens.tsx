@@ -636,7 +636,13 @@ export function CameraScreen({
     canvas.height = video.videoHeight;
     const context = canvas.getContext('2d');
     if (!context) return;
+    /* 存下来的照片也要跟预览一样镜像：否则用户按取景框摆好姿势，
+       下一屏"这张照片够清楚吗"却给她一张左右颠倒的图，很突兀。
+       水平翻转不影响任何颜色，底色识别测的是明度与色相，与朝向无关。 */
+    context.translate(canvas.width, 0);
+    context.scale(-1, 1);
     context.drawImage(video, 0, 0, canvas.width, canvas.height);
+    context.setTransform(1, 0, 0, 1, 0, 0);
     const blob = await new Promise<Blob | null>((resolve) =>
       canvas.toBlob(resolve, 'image/jpeg', 0.88),
     );
@@ -761,11 +767,14 @@ export function CameraScreen({
 
       {stage === 'live' ? (
         <div className="relative min-h-full bg-[#211c19]">
+          {/* scale-x-[-1] 把预览翻成镜子。getUserMedia 交出来的是未镜像的原始帧
+              （"别人看你"的视角），直接铺出来会导致人往左移、画面里往右移，
+              自拍取景时会下意识往反方向调整。试色屏在 shader 里做了同样的翻转。 */}
           <video
             ref={videoRef}
             muted
             playsInline
-            className="absolute inset-0 size-full object-cover"
+            className="absolute inset-0 size-full scale-x-[-1] object-cover"
           />
           <canvas ref={canvasRef} className="hidden" />
           <div className="absolute inset-0 bg-gradient-to-b from-[#211c19]/35 via-transparent to-[#211c19]/70" />

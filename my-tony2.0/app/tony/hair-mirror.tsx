@@ -232,9 +232,16 @@ function baseLumaOf(level: number) {
 const MASK_EMA = 0.55;
 
 /* uv.y 翻转：texImage2D 上传视频帧时第 0 行在顶部，而 WebGL 纹理原点在左下，必需。
-   uv.x 翻转：前置摄像头出的是非镜像画面（别人看你的样子），直接显示会导致
-   人往左移、画面里的人往右移，自拍预览必须跟手，所以要翻成镜子。
-   曾经试过去掉这个翻转，实测立刻出现动作反向，已确认必须保留。 */
+
+   uv.x 翻转：把画面翻成【镜子】。照镜子时人往左移、镜中的人也往左移，这是唯一
+   符合直觉的方向；不翻是"别人看你"的视角，人往左移画面里往右移，自拍时会让人
+   下意识往反方向调整姿势。
+
+   前提是 getUserMedia 交出来的是【未镜像】的原始帧 —— 这一点由拍照页反证：
+   decision-screens 的 CameraScreen 直接把 video 铺出来、没有任何 transform，
+   实机表现就是左右相反。既然原始帧未镜像，这里翻一次才等于镜子，所以必须保留。
+
+   验收方法：抬起一只手，画面里抬手的应该是同一侧。 */
 const VERT = `attribute vec2 p;varying vec2 uv;
 void main(){uv=vec2(1.0-(p.x*.5+.5),1.0-(p.y*.5+.5));gl_Position=vec4(p,0.,1.);}`;
 
