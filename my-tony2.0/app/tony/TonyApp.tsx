@@ -39,10 +39,10 @@ import {
   DiscoveryScreen,
   PlanScreen,
   ProductsScreen,
-  ProfileScreen,
 } from './decision-screens';
+import { HairConfirmScreen } from './hair-confirm-screen';
 import { HairMirror } from './hair-mirror';
-import { VerdictScreen, type VerdictIntent } from './verdict-screen';
+import { VerdictScreen } from './verdict-screen';
 import type { PlanVerdict } from './decision-screens';
 import {
   layer1CanDye,
@@ -126,7 +126,6 @@ export default function TonyApp() {
   const [demoError, setDemoError] = useState('');
   const [colorMatrix, setColorMatrix] = useState<ColorMatrix | null>(null);
   const [mirrorLevel, setMirrorLevel] = useState(5);
-  const [mirrorIntent, setMirrorIntent] = useState<VerdictIntent>('preview');
 
   /* 底色是三层判断共同的输入。用户在结论屏改了它，必须同步回后端，
      否则方案页仍用 vision 识别的原值计算，会与试色屏的结论直接矛盾。 */
@@ -147,6 +146,7 @@ export default function TonyApp() {
     },
     [profile],
   );
+
   /* 三层判断结果。与结论屏、试色屏调用同一组函数、同一个底色，
      所以三屏的结论物理上不可能不一致。方案页只展示它，不重算。 */
   const planVerdict: PlanVerdict | undefined = (() => {
@@ -198,6 +198,23 @@ export default function TonyApp() {
   const [archiveSaving, setArchiveSaving] = useState(false);
   const [archiveSaveError, setArchiveSaveError] = useState('');
   const [savedArchiveId, setSavedArchiveId] = useState('');
+
+  /* 在判断屏或试色面板里换了颜色。必须把新的目标色写回后端画像，
+     否则方案页与商品推荐仍按原来那个色算，用户会拿到对不上的商品。 */
+  const changeTargetColor = useCallback(
+    (nextVideoId: string) => {
+      const next = videos.find((v) => v.video_id === nextVideoId);
+      if (!next || next.video_id === selectedVideo?.video_id) return;
+      setSelectedVideo(next);
+      setRecommendation(null);
+      if (!profile || !next.target_color) return;
+      void updateHairProfile(profile.profile_id, {
+        target_color: next.target_color,
+      } as HairProfileUpdate).catch(() => undefined);
+      setProfile({ ...profile, target_color: next.target_color });
+    },
+    [videos, selectedVideo, profile],
+  );
 
   const [archives, setArchives] = useState<ArchiveSummary[]>([]);
   const [archivesLoading, setArchivesLoading] = useState(false);
@@ -856,7 +873,7 @@ export default function TonyApp() {
 
   if (screen === 'profile' && selectedVideo && profile) {
     return (
-      <AgentShell active="analysis" onChange={changeMainTab}><ProfileScreen
+      <AgentShell active="analysis" onChange={changeMainTab}><HairConfirmScreen
         key={`${profile.profile_id}-${profile.status}`}
         initialProfile={profile}
         currentPhotoUrl={currentPhotoUrl}
@@ -876,13 +893,13 @@ export default function TonyApp() {
             matrix={colorMatrix}
             level={mirrorLevel}
             video={entry}
-            photoUrl={currentPhotoUrl}
-            onLevelChange={changeBaseLevel}
+            dyeHistory={profile.dye_history}
+            currentTone={profile.current_hair?.color?.tone}
             onBack={() => setScreen('profile')}
-            onGo={(intent) => {
-              setMirrorIntent(intent);
-              setScreen('mirror');
-            }}
+            // 试色屏自己按"能不能染"决定滑块含义，不需要外部再传意图进去
+            onGo={() => setScreen('mirror')}
+            // 换色是横向重新判断：留在这一屏，换完立刻显示新色的结论
+            onPickColor={changeTargetColor}
           />
         ) : (
           <div className="grid h-full place-items-center bg-cream px-8 text-center text-sm text-ink-3">
@@ -900,14 +917,11 @@ export default function TonyApp() {
           <HairMirror
             matrix={colorMatrix}
             level={mirrorLevel}
-            entryVideoId={
-              mirrorIntent === 'switch'
-                ? colorMatrix.videos.find(
-                    (v) => v.kb_color && v.video_id !== selectedVideo.video_id,
-                  )?.video_id ?? selectedVideo.video_id
-                : selectedVideo.video_id
-            }
+            entryVideoId={selectedVideo.video_id}
+            dyeHistory={profile.dye_history}
+            currentTone={profile.current_hair?.color?.tone}
             onLevelChange={changeBaseLevel}
+            onColorChange={changeTargetColor}
             onBack={() => setScreen('verdict')}
             // 接受风险 -> 此刻才算方案（并触发那唯一一张存档图的生成）
             onAccept={() => void calculatePlan(profile.profile_id)}

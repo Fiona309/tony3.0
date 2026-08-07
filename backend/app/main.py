@@ -332,12 +332,36 @@ def get_color_matrix():
                 "why": row["reason"],
             }
 
+    # 掉色过程：色系 -> 保色期 + 第1~5周的阶段名。
+    # 只给名字和周数，不给色值——色值由前端拿 matrix 的呈色与 undertone 的残留色
+    # 做减色插值算出，与实时试色的偏色档共用同一个函数，两处结果物理上必然一致。
+    fade: dict[str, Any] = {}
+    with database._connect() as connection:
+        connection.row_factory = sqlite3.Row
+        for row in connection.execute(
+            """
+            SELECT color_zh, week, stage_name, hold_weeks_min, hold_weeks_max, source
+            FROM color_fade ORDER BY color_zh, week
+            """
+        ):
+            item = fade.setdefault(
+                row["color_zh"],
+                {
+                    "hold_min": row["hold_weeks_min"],
+                    "hold_max": row["hold_weeks_max"],
+                    "source": row["source"],
+                    "stages": [],
+                },
+            )
+            item["stages"].append({"week": row["week"], "name": row["stage_name"]})
+
     return ok(
         {
             "videos": videos,
             "matrix": matrix,
             "undertone": RESIDUAL_UNDERTONE,
             "transitions": transitions,
+            "fade": fade,
         }
     )
 

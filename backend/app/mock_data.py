@@ -80,15 +80,30 @@ EDITABLE_OPTIONS = {
         {"value": "medium", "label": "适中"},
         {"value": "high", "label": "多"},
     ],
+    # 漂过 1 次和 2 次必须分开：一次漂浅约 +2 度，是"够不够染这个色"的判定粒度，
+    # 旧的 bleached_1_2 把这两档合并，等于把 4 度的差异抹平，判断会失真。
     "dye_history": [
-        {"value": "natural", "label": "无漂染史的自然发"},
-        {"value": "dyed_no_bleach", "label": "染过未漂过"},
-        {"value": "bleached_1_2", "label": "漂过 1-2 次"},
-        {"value": "bleached_3_plus", "label": "漂过 3 次以上"},
-        {"value": "dyed_black", "label": "染过黑色"},
-        {"value": "unknown", "label": "不确定"},
+        {"value": "natural", "label": "从未漂过"},
+        {"value": "bleached_1", "label": "漂过 1 次"},
+        {"value": "bleached_2", "label": "漂过 2 次"},
+        {"value": "bleached_3_plus", "label": "漂过 3 次及以上"},
+        {"value": "dyed_black", "label": "染过黑发"},
     ],
 }
+
+# 旧枚举 -> 现枚举。视觉模型和历史存档里仍可能出现旧值，统一在入口归一化，
+# 避免前端 optionLabel 找不到而把 raw 枚举名直接显示给用户。
+DYE_HISTORY_LEGACY = {
+    "dyed_no_bleach": "natural",  # 染过但没漂过，对"底色够不够浅"的判断等同于从未漂过
+    "bleached_1_2": "bleached_1",  # 合并档拆开时取保守的一侧（少算漂浅次数）
+    "unknown": "natural",
+}
+
+
+def normalize_dye_history(value: str | None) -> str:
+    if not value:
+        return "natural"
+    return DYE_HISTORY_LEGACY.get(value, value)
 
 CURRENT_GOLD = {
     **_color("yellow", 8, "medium", "金色", 0.78),
@@ -564,6 +579,9 @@ class MockStore:
                     "color_name": item["color_name"],
                     "color_alias": item["color_alias"],
                     "accent": item["accent"],
+                    # 用户在试色屏换色时要把新的目标色写回画像，前端必须拿得到
+                    # 完整的 HairColor（含 level/rgb/lab），不能只靠一个色名去猜
+                    "target_color": deepcopy(item["target_color"]),
                     "bound_product_id": item["product_id"],
                     "bound_tutorial_video_id": item["tutorial_video_id"],
                 }
@@ -631,7 +649,7 @@ class MockStore:
         target_color_options = []
         hair_length = "chest"
         hair_volume = "medium"
-        dye_history = "dyed_no_bleach"
+        dye_history = "natural"
         current_color_confidence = 0.78
         target_color_confidence = 0.92
         attribute_confidences = {
@@ -651,7 +669,7 @@ class MockStore:
             target_color_options = deepcopy(vision_analysis.get("target_color_options") or [])
             hair_length = vision_analysis.get("hair_length") or hair_length
             hair_volume = vision_analysis.get("hair_volume") or hair_volume
-            dye_history = vision_analysis.get("dye_history") or dye_history
+            dye_history = normalize_dye_history(vision_analysis.get("dye_history") or dye_history)
             attribute_confidences.update(vision_analysis.get("attribute_confidences") or {})
             vision_debug = {
                 "provider": vision_analysis.get("raw", {}).get("provider"),
@@ -761,7 +779,7 @@ class MockStore:
             "current_hair": current_hair,
             "hair_length": "chest",
             "hair_volume": "medium",
-            "dye_history": "dyed_no_bleach",
+            "dye_history": "natural",
             "attribute_confidences": {
                 "hair_length": 0.85,
                 "hair_volume": 0.72,
@@ -781,7 +799,11 @@ class MockStore:
         profile = self._require_owned(self.profiles, profile_id, "发色画像不存在", "profile", user_key)
         for field in ("current_hair", "hair_length", "hair_volume", "dye_history", "target_color"):
             if field in update:
-                profile[field] = update[field]
+                profile[field] = (
+                    normalize_dye_history(update[field])
+                    if field == "dye_history"
+                    else update[field]
+                )
         profile["status"] = "confirmed"
         self._persist("profile", profile_id, profile, user_key)
         return {"profile_id": profile_id, "status": "confirmed"}
@@ -1611,11 +1633,18 @@ class MockStore:
 
     @staticmethod
     def _public_profile(profile: dict) -> dict:
-        return {
+        public = {
             key: deepcopy(value)
             for key, value in profile.items()
             if key not in {"entry_video_id", "current_image_id", "vision_debug"}
         }
+        # 磁盘上可能存着拆分前写入的旧枚举，出口统一归一化，
+        # 否则前端 optionLabel 找不到会把 bleached_1_2 这种原始值显示给用户
+        if "dye_history" in public:
+            public["dye_history"] = normalize_dye_history(public["dye_history"])
+        if isinstance(public.get("editable_options"), dict):
+            public["editable_options"] = deepcopy(EDITABLE_OPTIONS)
+        return public
 
     def _product_with_plan_risk(self, plan: dict) -> dict:
         product = self._product()

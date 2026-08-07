@@ -31,6 +31,8 @@ export interface MockVideo {
   color_name: string;
   color_alias?: string;
   accent?: string;
+  /** 该视频的目标发色。试色屏换色后要写回画像，所以必须是完整的 HairColor */
+  target_color?: HairColor;
   bound_product_id?: string;
   bound_tutorial_video_id?: string;
 }

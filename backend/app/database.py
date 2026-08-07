@@ -124,6 +124,7 @@ class Database:
             self._seed_color_knowledge_base(connection)
             self._seed_operation_qa(connection)
             self._seed_dark_base_levels(connection)
+            self._seed_color_fade(connection)
             self._seed_product_knowledge_base(connection)
 
     def record_event(
@@ -836,6 +837,53 @@ class Database:
                         updated_at = excluded.updated_at
                     """,
                     (color_id, color_zh, level, quality, reason, source, now),
+                )
+
+    def _seed_color_fade(self, connection: sqlite3.Connection) -> None:
+        """掉色过程与保色期。
+
+        为什么需要这张表：掉色的【色值】不需要新数据——掉色的物理过程就是
+        "染膏色素流失、底色残留逐渐暴露"，起点是 color_effect_matrix 的呈色、
+        终点是 RESIDUAL_UNDERTONE 的残留色，中间用前端已有的 biasedColor() 插值
+        即可，且这样算出来的色和实时试色的偏色档完全一致，不会自相矛盾。
+
+        真正缺的只有两样，都无法从现有数据推导：
+          1. 每一周的【中文阶段名】——按色值反推出的名字很怪（用户说"蓝绿色"，
+             机器会说"深青灰"），必须人工命名
+          2. 【保色期】——取决于色素分子大小、染膏类型、洗发频率，知识库里没有
+             任何字段承载它
+
+        保色期与阶段名来自染发行业通识（冷色分子大、附着差，掉得快；棕色分子小、
+        最持久），标 industry_reference 以区别于官方效果图实测数据。UI 必须显示
+        "参考"字样，后续靠用户回访数据替换为实测值。
+        """
+        # (色系, 保色期周数下限, 上限, 第1~5周的阶段名)
+        FADE = [
+            ("蓝色", 2, 3, ["蓝色", "浅蓝色", "蓝绿色", "绿色", "黄绿色"]),
+            ("紫色", 1, 2, ["紫色", "浅紫色", "灰紫色", "米黄色", "黄色"]),
+            ("粉色", 1, 2, ["粉色", "浅粉色", "藕粉色", "米粉色", "浅黄色"]),
+            ("红色", 4, 6, ["红色", "玫红色", "橘红色", "橘色", "浅橘色"]),
+            ("黑茶色", 6, 8, ["黑茶色", "深茶色", "茶棕色", "浅茶棕", "浅棕色"]),
+            ("奶茶灰棕", 6, 8, ["奶茶灰棕", "浅灰棕", "浅棕色", "米棕色", "浅黄棕"]),
+        ]
+        now = _now()
+        for color_zh, lo, hi, stages in FADE:
+            for index, stage_name in enumerate(stages, start=1):
+                connection.execute(
+                    """
+                    INSERT INTO color_fade (
+                        color_zh, week, stage_name, hold_weeks_min, hold_weeks_max,
+                        source, updated_at
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(color_zh, week) DO UPDATE SET
+                        stage_name = excluded.stage_name,
+                        hold_weeks_min = excluded.hold_weeks_min,
+                        hold_weeks_max = excluded.hold_weeks_max,
+                        source = excluded.source,
+                        updated_at = excluded.updated_at
+                    """,
+                    (color_zh, index, stage_name, lo, hi, "industry_reference", now),
                 )
 
     def _seed_operation_qa(self, connection: sqlite3.Connection) -> None:

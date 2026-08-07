@@ -1,37 +1,39 @@
 'use client';
 
 /**
- * 染发魔镜 · 结论 + 实时试色（屏2）
+ * 屏3 · 实时试色
  *
- * 结论与效果同屏出现：单独一屏文字判断读完就走，叠在自己脸上才有情绪，
- * 这正是用实时渲染替代"百分之多少能染"的意义。
+ * 一件事：看见。所以画面占满剩余空间，文字一律不叠在上面，底部只有一根滑块
+ * 和两个按钮。判断结论收在顶部标题栏——那是用户找"我在看什么"的地方，
+ * 放底部窄条会被当成装饰，实测没人看；完整判断点 ⓘ 从底部推上来。
+ *
+ * 能染和不能染共用这一屏，靠三处区分：标题栏的结论、滑块的语义
+ * （效果范围 vs 漂几次）、以及不能染那条轴上多出来的门槛线。
  *
  * 与施华蔻的差异都来自定位差异（我们是风险顾问，不是品牌货架）：
- *   1. 底部只放 6 个种草视频里的博主色，按"能不能染"分组，不做色系货架
- *   2. 滑块含"可能偏色"一档，且偏色方向随底色度数变化
+ *   1. 换色面板按"能不能染"分组，每张卡自带保色期与判断，不做色系货架
+ *   2. 滑块最右端固定是"可能偏色"，不是一个用户永远不会打开的开关
  *   3. 敢展示翻车效果
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, ArrowsLeftRight, Check, PencilSimple, WarningCircle, X } from '@phosphor-icons/react';
+import { ArrowLeft, ArrowsLeftRight, Check, Info, PencilSimple } from '@phosphor-icons/react';
 
 import {
+  bleachThreshold,
   bleachVariants,
-  decide,
-  GROUP_META,
-  groupVideos,
+  defaultStop,
+  holdLabel,
+  layer1CanDye,
   lookup,
-  riskGroup,
-  SIMPLE_GROUP_LABEL,
+  minDyeableLevel,
   toneVariants,
-  undertoneOf,
   type ColorMatrix,
-  type Decision,
-  type RiskGroup,
-  type SimpleGroup,
   type Variant,
   type VideoColor,
 } from './hair-mirror-core';
+import { FlowProgress } from './flow-progress';
+import { VerdictDetail } from './verdict-screen';
 import { cx } from './ui';
 
 const MP = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.18';
@@ -206,13 +208,22 @@ export type HairMirrorProps = {
   level: number;
   /** 用户种草进来的那个视频，决定默认选中哪个博主色 */
   entryVideoId?: string;
+  /** 屏1 确认的漂染历史，用于风险清单里的"发根发尾不一样" */
+  dyeHistory?: string;
+  /** 当前发色色相，用于中和矩阵 */
+  currentTone?: string;
   onLevelChange?: (level: number) => void;
+  /** 在面板里换了色。必须同步回后端，否则商品页推的还是原来那个色 */
+  onColorChange?: (videoId: string) => void;
   onBack?: () => void;
   /** 用户接受风险，进入方案与商品。此时才会触发生图（B 方案） */
   onAccept?: (choice: { videoId: string; colorName: string; level: number }) => void;
 };
 
-export function HairMirror({ matrix, level, entryVideoId, onLevelChange, onBack, onAccept }: HairMirrorProps) {
+export function HairMirror({
+  matrix, level, entryVideoId, dyeHistory, currentTone,
+  onLevelChange, onColorChange, onBack, onAccept,
+}: HairMirrorProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const glRef = useRef<GL | null>(null);
@@ -233,27 +244,34 @@ export function HairMirror({ matrix, level, entryVideoId, onLevelChange, onBack,
   levelRef.current = level;
 
   const usable = useMemo(() => matrix.videos.filter((v) => v.kb_color), [matrix]);
-  const groups = useMemo(() => groupVideos(matrix, level), [matrix, level]);
   const [videoId, setVideoId] = useState(() => entryVideoId ?? usable[0]?.video_id ?? '');
-  const [stop, setStop] = useState(1);
+  const [stop, setStop] = useState(0);
   const [editLevel, setEditLevel] = useState(false);
+  const [panel, setPanel] = useState(false);
+  const [detail, setDetail] = useState(false);
   const [ready, setReady] = useState(false);
   const [err, setErr] = useState('');
 
   const picked: VideoColor | undefined = usable.find((v) => v.video_id === videoId) ?? usable[0];
   const kb = picked?.kb_color ?? '';
-  const group: RiskGroup | null = kb ? riskGroup(matrix, kb, level) : null;
-  const needBleach = group === 'bleach1' || group === 'bleach2' || group === 'no';
+  const canDye = kb ? layer1CanDye(matrix, kb, level).can : false;
 
-  const { variants, decision } = useMemo(() => {
-    if (!kb) return { variants: [] as Variant[], decision: null as Decision | null };
-    const d = decide(matrix, kb, level);
-    if (needBleach) return { variants: bleachVariants(matrix, kb, level), decision: d };
-    return { variants: toneVariants(matrix, kb, level), decision: d };
-  }, [matrix, kb, level, needBleach]);
+  // 同一根轴，两种含义：能染时是效果范围，不能染时是漂几次。
+  // 滑块形态本身就是最强的模式提示——不能染那条多一根门槛线。
+  const variants = useMemo<Variant[]>(
+    () => (!kb ? [] : canDye ? toneVariants(matrix, kb, level) : bleachVariants(matrix, kb, level)),
+    [matrix, kb, level, canDye],
+  );
 
-  // 切换颜色/度数后把滑块落到有意义的位置：能染时停在"和博主一样"
-  useEffect(() => { setStop(needBleach ? 0 : 1); }, [kb, level, needBleach]);
+  /** 漂色轴上第一个够染的档位。-1 表示漂 2 次也不够 */
+  const threshold = useMemo(() => (canDye ? -1 : bleachThreshold(variants)), [canDye, variants]);
+
+  // 切色/改度数后把滑块落到有意义的位置：能染时停在"和目标色一样"，
+  // 不能染时停在门槛档——让用户一进来就看到"漂到这里才行"的那个结果
+  useEffect(() => {
+    setStop(canDye ? defaultStop(variants) : threshold >= 0 ? threshold : 0);
+    // variants 是按 kb/level/canDye 记忆化的，这里跟着它变即可
+  }, [variants, canDye, threshold]);
 
   const active = variants[Math.min(stop, Math.max(0, variants.length - 1))] ?? null;
   variantRef.current = active;
@@ -372,36 +390,44 @@ export function HairMirror({ matrix, level, entryVideoId, onLevelChange, onBack,
     return () => { runRef.current = false; stream?.getTracks().forEach((t) => t.stop()); };
   }, [ready]);
 
-  const tone = active?.risk ? 'bad' : group === 'ok' ? (decision?.q === 'biased' ? 'warn' : 'ok') : 'warn';
-  const headline = active?.risk
-    ? '这就是翻车的样子'
-    : group === 'ok'
-      ? decision?.q === 'biased' ? '能染，但这个底色容易偏色' : `你现在就能染成${picked?.color_name ?? ''}`
-      : `想染${picked?.color_name ?? ''}，${GROUP_META[group ?? 'no'].label}`;
+  /* 顶部只讲一件事：我现在在看哪个色、它能不能染。
+     放顶部而不是底部窄条——那是用户找"我在看什么"的地方，而且不和滑块抢注意力。
+     底部的窄信息条会被当成装饰，实测没人看。 */
+  const headline = `${picked?.color_name ?? ''} · ${canDye ? '能直接染' : '需要先漂浅'}`;
+  const activeNote = active?.note ?? '';
 
   return (
     <div className="relative flex h-full min-h-0 flex-col bg-[#111014] text-white">
-      <header className="flex shrink-0 items-center gap-2 bg-cream px-3 pb-2.5 pt-[max(12px,env(safe-area-inset-top))] text-ink">
-        <button type="button" onClick={onBack} aria-label="返回"
-          className="sketch-icon-button tap grid size-9 place-items-center bg-white">
-          <ArrowLeft size={18} weight="bold" />
-        </button>
-        <p className="flex-1 truncate text-center text-sm font-black">实时试色</p>
-        <button type="button" onClick={() => setEditLevel((v) => !v)}
-          className="tap flex items-center gap-1 rounded-full border border-ink/20 bg-white px-2.5 py-1 text-[11px] font-bold">
-          底色 <span className="numerals">{level}</span> 度 <PencilSimple size={12} weight="bold" />
-        </button>
+      <header className="shrink-0 bg-[#141317] pt-[max(10px,env(safe-area-inset-top))]">
+        <div className="flex items-center gap-2 px-3">
+          <button type="button" onClick={onBack} aria-label="返回"
+            className="tap grid size-9 shrink-0 place-items-center rounded-full bg-white/10">
+            <ArrowLeft size={17} weight="bold" />
+          </button>
+          <button type="button" onClick={() => setDetail(true)}
+            className="tap flex min-w-0 flex-1 items-center justify-center gap-1.5">
+            <span className={cx('size-2 shrink-0 rounded-full', canDye ? 'bg-[#7fd39a]' : 'bg-[#e5c169]')} />
+            <span className="truncate text-[13px] font-black">{headline}</span>
+            <Info size={14} weight="bold" className="shrink-0 text-white/55" />
+          </button>
+          <button type="button" onClick={() => setEditLevel((v) => !v)}
+            className="tap shrink-0 rounded-full bg-white/10 px-2.5 py-1.5 text-[11px] font-bold">
+            <span className="numerals">{level}</span> 度
+            <PencilSimple size={11} weight="bold" className="ml-0.5 inline" />
+          </button>
+        </div>
+        <FlowProgress stage="mirror" dark />
       </header>
 
       {editLevel && (
-        <div className="shrink-0 bg-cream px-3 pb-3 text-ink">
-          <p className="mb-1.5 text-[11px] text-ink-3">光线会让自动识别偏差 2~3 度，以你实际发根为准</p>
+        <div className="shrink-0 bg-[#141317] px-3 pb-3">
+          <p className="mb-1.5 text-[11px] text-white/50">光线会让自动识别偏 2~3 度，以你实际发根为准</p>
           <div className="flex gap-1.5">
             {[3, 4, 5, 6, 7, 8, 9].map((lv) => (
               <button key={lv} type="button" onClick={() => { onLevelChange?.(lv); setEditLevel(false); }}
                 aria-pressed={lv === level}
                 className={cx('flex-1 rounded-[10px] border py-1.5 text-[13px] font-bold',
-                  lv === level ? 'border-pink bg-pink text-white' : 'border-ink/20 bg-white text-ink-2')}>
+                  lv === level ? 'border-pink bg-pink text-white' : 'border-white/20 text-white/70')}>
                 {lv}
               </button>
             ))}
@@ -409,6 +435,7 @@ export function HairMirror({ matrix, level, entryVideoId, onLevelChange, onBack,
         </div>
       )}
 
+      {/* 画面是这一屏的全部价值，占满剩余空间。文字一律不叠在上面 */}
       <div className="relative min-h-0 flex-1 overflow-hidden bg-black">
         <video ref={videoRef} playsInline muted className="hidden" />
         <canvas ref={canvasRef} className="size-full object-cover" />
@@ -428,10 +455,8 @@ export function HairMirror({ matrix, level, entryVideoId, onLevelChange, onBack,
               <span>高光保护 specKeep</span>
               <span className="tabular-nums">{specKeep.toFixed(2)}</span>
             </div>
-            <input
-              type="range" min={0} max={1} step={0.05} value={specKeep}
-              onChange={(e) => setSpecKeep(Number(e.target.value))}
-              className="mt-1 w-full" />
+            <input type="range" min={0} max={1} step={0.05} value={specKeep}
+              onChange={(e) => setSpecKeep(Number(e.target.value))} className="mt-1 w-full" />
             <p className="mt-1 text-[10px] leading-4 text-white/55">
               0 = 高光也染色（旧行为，颜色像浮在表面）· 1 = 高光保持原样（物理正确）
             </p>
@@ -444,78 +469,162 @@ export function HairMirror({ matrix, level, entryVideoId, onLevelChange, onBack,
           </div>
         )}
 
-        {decision && (
-          <div className={cx('absolute inset-x-3 bottom-3 rounded-2xl px-3.5 py-3 backdrop-blur',
-            tone === 'ok' ? 'bg-[#1d4b2a]/85' : tone === 'bad' ? 'bg-[#5b2320]/88' : 'bg-[#5a4416]/88')}>
-            <div className="flex items-center gap-1.5">
-              {tone === 'ok' ? <Check size={15} weight="bold" />
-                : tone === 'bad' ? <X size={15} weight="bold" />
-                : <WarningCircle size={15} weight="bold" />}
-              <p className="text-[13px] font-black">{headline}</p>
-            </div>
-            <p className="mt-1 text-[11px] leading-[1.55] text-white/80">
-              {active?.risk ? active.note : decision.why}
-            </p>
-          </div>
-        )}
+        {/* 换色面板：半屏浮层，不是一个页面。
+            点色卡时上面的画面立刻变、面板不关，用户可以一个一个点过去边点边看，
+            看到满意的再收起。做成独立页面就会变成 试色→换色→判断→试色 的三跳往返，
+            换三次就晕了；做成浮层则永远没有往返。 */}
+        {panel ? (
+          <ColorPanel
+            matrix={matrix} level={level} pickedId={picked?.video_id ?? ''}
+            onPick={(id) => { setVideoId(id); onColorChange?.(id); }}
+            onClose={() => setPanel(false)}
+          />
+        ) : null}
+
+        {detail && picked ? (
+          <VerdictDetail
+            matrix={matrix} level={level} video={picked}
+            dyeHistory={dyeHistory} currentTone={currentTone}
+            onClose={() => setDetail(false)}
+          />
+        ) : null}
       </div>
 
-      {/* 效果档位：能染时是浅/一样/深/偏色，需要漂时是不漂/漂1次/漂2次 */}
-      <div className="shrink-0 bg-[#1b1a1f] px-4 py-2.5">
-        <input type="range" min={0} max={Math.max(0, variants.length - 1)} step={1} value={stop}
-          onChange={(e) => setStop(Number(e.target.value))}
-          className={cx('w-full', active?.risk ? 'accent-[#e08a84]' : 'accent-white')}
-          aria-label="效果档位" />
+      {/* 效果档位。能染 = 偏浅/一样/偏深/偏色；不能染 = 不漂/漂1次/漂2次 + 门槛线 */}
+      <div className="shrink-0 bg-[#1b1a1f] px-4 pb-2 pt-2.5">
+        <p className={cx('mb-1.5 text-center text-[12px] font-bold',
+          active?.risk && canDye ? 'text-[#e08a84]' : active?.ok ? 'text-[#7fd39a]' : 'text-white/85')}>
+          {activeNote}
+        </p>
+        <div className="relative">
+          <input type="range" min={0} max={Math.max(0, variants.length - 1)} step={1} value={stop}
+            onChange={(e) => setStop(Number(e.target.value))}
+            className={cx('w-full', active?.risk && canDye ? 'accent-[#e08a84]' : 'accent-white')}
+            aria-label={canDye ? '效果档位' : '漂浅次数'} />
+          {/* 门槛线：过了这条线才染得上。用户拖动时自己发现"得漂两次"，
+              比任何一句文案说教都有效——结论是她自己得出来的。 */}
+          {threshold > 0 && threshold < variants.length ? (
+            <span aria-hidden className="pointer-events-none absolute -top-0.5 h-5 w-0.5 bg-[#e5c169]"
+              style={{ left: `calc(${(threshold / (variants.length - 1)) * 100}% - 1px)` }} />
+          ) : null}
+        </div>
         <div className="mt-0.5 flex justify-between text-[11px]">
           {variants.map((v, i) => (
             <span key={v.key} className={cx(
               i === stop ? 'font-black' : 'text-white/45',
-              i === stop && v.risk ? 'text-[#e08a84]' : i === stop ? 'text-white' : '',
+              i === stop && v.risk && canDye ? 'text-[#e08a84]' : i === stop ? 'text-white' : '',
             )}>{v.label}</span>
           ))}
         </div>
       </div>
 
-      {/* 6 个博主色常驻可见，只分两组——分组标题本身就是引导语。
-          隐藏起来用户根本不会主动点开，所以不做折叠。 */}
-      <div className="shrink-0 bg-[#141317] pt-2.5">
-        <div className="flex items-start gap-3 overflow-x-auto px-4 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {(['ok', 'bleach'] as SimpleGroup[]).map((g) =>
-            groups[g].length ? (
-              <div key={g} className="flex shrink-0 items-start gap-3 border-l border-white/12 pl-3 first:border-0 first:pl-0">
-                <p className={cx('w-12 shrink-0 pt-3 text-[11px] font-black leading-tight',
-                  g === 'ok' ? 'text-[#7fd39a]' : 'text-[#e5c169]')}>
-                  {SIMPLE_GROUP_LABEL[g]}
-                </p>
-                {groups[g].map((v) => {
-                  const e = lookup(matrix, v.kb_color!, level);
-                  const on = v.video_id === picked?.video_id;
-                  return (
-                    <button key={v.video_id} type="button" onClick={() => setVideoId(v.video_id)}
-                      aria-pressed={on} className="w-14 shrink-0 text-center">
-                      <span className={cx('mx-auto block size-12 rounded-full border-2 transition',
-                        on ? 'border-pink' : 'border-transparent')}
-                        style={{ background: e?.hex ?? v.accent ?? '#3a3a3a' }} />
-                      <span className={cx('mt-1 block truncate text-[11px]',
-                        on ? 'font-black text-white' : 'text-white/60')}>
-                        {v.color_name}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            ) : null,
-          )}
+      <div className="shrink-0 bg-[#141317] px-4 pb-[max(12px,env(safe-area-inset-bottom))] pt-2">
+        <div className="flex gap-2.5">
+          <button type="button" onClick={() => setPanel(true)}
+            className="tap shrink-0 rounded-full border border-white/25 px-4 py-3 text-[13px] font-bold">
+            换个颜色
+          </button>
+          <button type="button"
+            onClick={() => picked && onAccept?.({ videoId: picked.video_id, colorName: picked.color_name, level })}
+            className="tap flex-1 rounded-full bg-pink py-3 text-[14px] font-black text-white">
+            就要这个 →
+          </button>
         </div>
       </div>
+    </div>
+  );
+}
 
-      <div className="shrink-0 bg-[#141317] px-4 pb-[max(12px,env(safe-area-inset-bottom))] pt-1">
-        <button type="button"
-          onClick={() => picked && onAccept?.({ videoId: picked.video_id, colorName: picked.color_name, level })}
-          className="tap w-full rounded-full bg-pink py-3 text-[14px] font-black text-white">
-          我接受这些风险，看方案与商品 →
-        </button>
+/**
+ * 换色面板。引导住在色卡本身上——每张卡自带保色期与一句判断，
+ * 这就是引导，不需要额外一根信息条，也不会被忽略，因为它就是用户正在读的东西。
+ */
+function ColorPanel({
+  matrix, level, pickedId, onPick, onClose,
+}: {
+  matrix: ColorMatrix; level: number; pickedId: string;
+  onPick: (id: string) => void; onClose: () => void;
+}) {
+  const usable = matrix.videos.filter((v) => v.kb_color);
+  const ok = usable.filter((v) => layer1CanDye(matrix, v.kb_color!, level).can);
+  const need = usable.filter((v) => !layer1CanDye(matrix, v.kb_color!, level).can);
+
+  return (
+    <div className="absolute inset-0 z-20 flex flex-col justify-end" onClick={onClose}>
+      <div className="flex max-h-[64%] flex-col rounded-t-[24px] bg-[#17161b] pb-[max(14px,env(safe-area-inset-bottom))]"
+        onClick={(e) => e.stopPropagation()}>
+        <div className="flex shrink-0 items-center gap-2 px-5 pb-1 pt-4">
+          <div className="min-w-0 flex-1">
+            <p className="text-[15px] font-black">换个颜色</p>
+            <p className="mt-0.5 text-[11px] text-white/50">
+              按你的 <span className="numerals">{level}</span> 度底色 · 点一下上面的画面立刻变
+            </p>
+          </div>
+          <button type="button" onClick={onClose}
+            className="tap shrink-0 rounded-full bg-pink px-4 py-2 text-[12.5px] font-black text-white">
+            用这个色
+          </button>
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 pt-2">
+          {ok.length > 0 ? (
+            <>
+              <p className="mb-2 text-[11.5px] font-black text-[#7fd39a]">现在能直接染</p>
+              <div className="space-y-2">
+                {ok.map((v) => (
+                  <ColorCard key={v.video_id} matrix={matrix} level={level} video={v}
+                    on={v.video_id === pickedId} onPick={onPick} />
+                ))}
+              </div>
+            </>
+          ) : null}
+
+          {need.length > 0 ? (
+            <>
+              <p className="mb-2 mt-4 text-[11.5px] font-black text-[#e5c169]">要先漂才能染</p>
+              <div className="space-y-2">
+                {need.map((v) => (
+                  <ColorCard key={v.video_id} matrix={matrix} level={level} video={v}
+                    on={v.video_id === pickedId} onPick={onPick} />
+                ))}
+              </div>
+            </>
+          ) : null}
+        </div>
       </div>
     </div>
+  );
+}
+
+function ColorCard({
+  matrix, level, video, on, onPick,
+}: {
+  matrix: ColorMatrix; level: number; video: VideoColor; on: boolean; onPick: (id: string) => void;
+}) {
+  const kb = video.kb_color!;
+  const can = layer1CanDye(matrix, kb, level).can;
+  const min = minDyeableLevel(matrix, kb);
+  // 真实呈色，不是色卡色：色卡是印刷/渲染的理想效果，鲜艳色系饱和度普遍是
+  // 真实染后色的两倍，用它当色球会让用户对效果产生错误预期
+  const rgb = lookup(matrix, kb, can ? level : Math.max(level, min ?? level))?.rgb;
+
+  return (
+    <button type="button" onClick={() => onPick(video.video_id)} aria-pressed={on}
+      className={cx('tap flex w-full items-center gap-3 rounded-[16px] border-2 p-2.5 text-left',
+        on ? 'border-pink bg-white/[0.07]' : 'border-white/10')}>
+      <span className={cx('size-11 shrink-0 rounded-full border border-white/20', can ? '' : 'opacity-45')}
+        style={{ background: rgb ? `rgb(${rgb[0]},${rgb[1]},${rgb[2]})` : video.accent ?? '#555' }} />
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-[14px] font-black">{video.color_name}</span>
+        <span className="mt-0.5 block text-[11px] text-white/55">
+          {can
+            ? `保色 ${holdLabel(matrix, kb)}`
+            : min !== null
+              ? `还差 ${min - level} 度，要先漂浅`
+              : '这个底色不建议自己染'}
+        </span>
+      </span>
+      {on ? <Check size={16} weight="bold" className="shrink-0 text-pink" /> : null}
+    </button>
   );
 }

@@ -540,7 +540,7 @@ class ModelService:
   "target_color_options": [最多 3 个候选 target_color，不要包含 confidence],
   "hair_length": "ear|shoulder|chest|waist|below_waist|unknown",
   "hair_volume": "low|medium|high|unknown",
-  "dye_history": "natural|dyed_no_bleach|bleached_1_2|bleached_3_plus|dyed_black|unknown",
+  "dye_history": "natural|bleached_1|bleached_2|bleached_3_plus|dyed_black|unknown",
   "attribute_confidences": {
     "hair_length": 0-1,
     "hair_volume": 0-1,
@@ -618,9 +618,12 @@ class ModelService:
             hair_volume=self._enum_or_none(parsed.get("hair_volume"), {"low", "medium", "high", "unknown"}),
             dye_history=self._enum_or_none(
                 parsed.get("dye_history"),
+                # 旧值 dyed_no_bleach / bleached_1_2 仍接受，由 normalize_dye_history 归一化
                 {
                     "natural",
                     "dyed_no_bleach",
+                    "bleached_1",
+                    "bleached_2",
                     "bleached_1_2",
                     "bleached_3_plus",
                     "dyed_black",

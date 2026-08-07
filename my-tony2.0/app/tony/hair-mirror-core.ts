@@ -40,6 +40,15 @@ export type TransitionRule = {
   why: string;
 };
 
+/** 掉色过程。后端只给周数与中文阶段名，色值由前端算——见 fadeStages */
+export type FadeRule = {
+  hold_min: number;
+  hold_max: number;
+  /** industry_reference = 行业通识参考值，非实测。UI 必须注明 */
+  source: string;
+  stages: { week: number; name: string }[];
+};
+
 export type ColorMatrix = {
   videos: VideoColor[];
   matrix: Record<string, Record<string, MatrixEntry>>;
@@ -47,6 +56,8 @@ export type ColorMatrix = {
   undertone: Record<string, { rgb: [number, number, number]; name: string }>;
   /** 目标色 -> 当前发色色相 -> 中和判定 */
   transitions: Record<string, Record<string, TransitionRule>>;
+  /** 色系 -> 保色期 + 第1~5周的阶段名 */
+  fade: Record<string, FadeRule>;
 };
 
 export type Resolved = MatrixEntry & {
@@ -74,6 +85,10 @@ export type Variant = {
   /** 漂浅提亮量：漂浅的物理本质是把发丝提亮，提亮后才吃得上色 */
   lift: number;
   risk?: boolean;
+  /** 漂色档专用：这一档对应的底色度数 */
+  level?: number;
+  /** 漂色档专用：到这一档是否已经够染目标色。滑块用它画门槛线 */
+  ok?: boolean;
 };
 
 /* ============================ 色彩工具 ============================ */
@@ -267,6 +282,109 @@ export function layer3Vibrancy(cm: ColorMatrix, kbColor: string, level: number):
   return { saturation: here ? satOf(here) : 0, best };
 }
 
+/* ==================== 掉色过程 ====================
+ *
+ * 掉色的物理过程 = 染膏色素流失、底色残留逐渐暴露。所以：
+ *   起点（第1周）= 官方呈色                 —— matrix 已有
+ *   终点（第5周）= 该度数的残留底色          —— undertone 已有
+ *   中间       = 两者按比例做减色混合        —— biasedColor 已有
+ *
+ * 这正是偏色计算做的事，只是把 amount 从 0 连续拉到 1。因此掉色色带与实时试色的
+ * 「可能偏色」档共用同一个函数，两处结果物理上必然一致，不会自相矛盾。
+ * 后端只需要提供无法推导的两样：中文阶段名与保色期。
+ */
+
+export type FadeStage = {
+  week: number;
+  name: string;
+  rgb: [number, number, number];
+  /** 该周是否仍在保色期内 */
+  within: boolean;
+};
+
+export function fadeStages(cm: ColorMatrix, kbColor: string, level: number): FadeStage[] {
+  const rule = cm.fade?.[kbColor];
+  const base = entryAt(cm, kbColor, level)?.rgb ?? lookup(cm, kbColor, level)?.rgb;
+  if (!rule || !base) return [];
+  const residual = undertoneOf(cm, level);
+  const last = Math.max(1, rule.stages.length - 1);
+
+  return rule.stages.map((s, i) => {
+    const t = i / last;
+    // 两段合成，缺一不可：
+    //   ① 减色混合负责【色相怎么变】——蓝色配黄底会经过绿，这是掉色最有观感的一段
+    //   ② 向残留底色收敛负责【最后退成什么】——染膏彻底洗掉后剩的就是底色本身。
+    // 只做 ① 的话末周会停在一个被 desat 压扁的浑浊色，五格看上去几乎一样；
+    // 只做 ② 的话就是一条直线渐变，中间那段绿会消失。
+    const shifted = i === 0 ? base : biasedColor(base, residual, t * bias.amount, 1 - (1 - bias.desat) * t);
+    const w = t * t; // 前期掉色慢、后期加速，与色素流失的实际曲线一致
+    const rgb = shifted.map((v, k) => Math.round(v + (residual[k] - v) * w)) as [number, number, number];
+    return { week: s.week, name: s.name, rgb, within: s.week <= rule.hold_max };
+  });
+}
+
+export function holdLabel(cm: ColorMatrix, kbColor: string): string {
+  const rule = cm.fade?.[kbColor];
+  if (!rule) return '';
+  return rule.hold_min === rule.hold_max
+    ? `${rule.hold_min} 周`
+    : `${rule.hold_min}-${rule.hold_max} 周`;
+}
+
+/* ==================== 风险清单 ====================
+ *
+ * 只收「配得出具体动作」的风险——说不出该做什么的提示对用户没有指导意义，
+ * 「染发会损伤发质」就是典型：所有人都知道，且给不出可执行的下一步。
+ *
+ * 且只放【判断类】风险（影响"我要不要染"）。过敏测试、凡士林这类【操作类】
+ * 注意事项属于决定要染之后的事，放在决策屏是干扰。
+ */
+
+export type JudgeRisk = { key: string; text: string; action: string };
+
+export function judgeRisks(
+  cm: ColorMatrix,
+  kbColor: string,
+  level: number,
+  dyeHistory: string | undefined,
+  currentTone?: string,
+): JudgeRisk[] {
+  const out: JudgeRisk[] = [];
+
+  // 偏色与显色淡同因（底色没处理干净 / 不够浅），对用户是同一件事：
+  // 「染出来跟博主不一样」。拆成两条是拿技术分类去切用户感受。
+  const l2 = layer2BiasRisk(cm, kbColor, level, currentTone);
+  const l3 = layer3Vibrancy(cm, kbColor, level);
+  const min = minDyeableLevel(cm, kbColor);
+  const onEdge = min !== null && level === min;
+
+  if (l2.risky || onEdge || (l3.best && l3.saturation < l3.best.saturation * 0.7)) {
+    const why = l2.risky && l2.undertoneName
+      ? `你的 ${level} 度底色还残留${l2.undertoneName}，颜色盖上去会被带偏`
+      : onEdge
+        ? `你正好卡在这个色的最低门槛上，颜色会比博主淡`
+        : `你的底色偏深，颜色出来会比博主闷一些`;
+    out.push({
+      key: 'color-gap',
+      text: `颜色会和博主有差距 —— ${why}`,
+      action: '试色屏拖到最右边可以看到偏色的样子，先看清楚再决定',
+    });
+  }
+
+  // 布丁头：发根新生发与已漂染的发尾吸色速度不同，是家用染发最常见的翻车
+  if (dyeHistory && dyeHistory !== 'natural') {
+    const times = dyeHistory === 'bleached_3_plus' ? '3 次以上'
+      : dyeHistory === 'bleached_2' ? '2 次' : '1 次';
+    out.push({
+      key: 'uneven',
+      text: `发根和发尾会不一样 —— 你漂过 ${times}，发尾吃色快、发根慢`,
+      action: '先涂发尾停 10 分钟，再涂发根一起冲，两段颜色才接得上',
+    });
+  }
+
+  return out;
+}
+
 /* ============================ 规则查询 ============================ */
 
 /**
@@ -372,24 +490,26 @@ export function toneVariants(
   if (!here?.rgb) return [];
 
   const out: Variant[] = [];
-  const lighter = entryAt(cm, kbColor, level - 1);
-  const deeper = entryAt(cm, kbColor, level + 1);
+  // 底色更浅一度 -> 显色更亮；更深一度 -> 显色更闷。方向与度数一致。
+  const onDeeperBase = entryAt(cm, kbColor, level - 1);
+  const onLighterBase = entryAt(cm, kbColor, level + 1);
 
-  // 底色更深一度 -> 显色更闷；更浅一度 -> 显色更亮。方向与度数一致。
-  if (lighter?.rgb) {
+  // 轴向固定为 浅 → 一样 → 深 → 偏色。偏色不是可选开关而是必然要看到的一档，
+  // 所以放在同一根轴的最右端，而不是做成一个用户永远不会打开的按钮。
+  if (onLighterBase?.rgb) {
     out.push({
-      key: 'deep', label: '比博主深', note: `底色偏深时的呈色（${level - 1} 度实测）`,
-      rgb: lighter.rgb, str: 1, lift: 0,
+      key: 'light', label: '偏浅', note: `底色偏浅时的呈色（${level + 1} 度实测）`,
+      rgb: onLighterBase.rgb, str: 1, lift: 0,
     });
   }
   out.push({
-    key: 'same', label: '和博主一样', note: `你的 ${level} 度底色的官方呈色`,
+    key: 'same', label: '和目标色一样', note: `你的 ${level} 度底色的官方呈色`,
     rgb: here.rgb, str: 1, lift: 0,
   });
-  if (deeper?.rgb) {
+  if (onDeeperBase?.rgb) {
     out.push({
-      key: 'light', label: '比博主浅', note: `底色偏浅时的呈色（${level + 1} 度实测）`,
-      rgb: deeper.rgb, str: 1, lift: 0,
+      key: 'deep', label: '偏深', note: `底色偏深时的呈色（${level - 1} 度实测）`,
+      rgb: onDeeperBase.rgb, str: 1, lift: 0,
     });
   }
 
@@ -404,20 +524,40 @@ export function toneVariants(
   return out;
 }
 
+/** 「和目标色一样」这一档在轴上的位置。切色后滑块要落在这里，不是落在 0 */
+export function defaultStop(variants: Variant[]) {
+  const i = variants.findIndex((v) => v.key === 'same');
+  return i < 0 ? 0 : i;
+}
+
 /** 不能染时的三档：不漂 / 漂1次 / 漂2次 */
 export function bleachVariants(cm: ColorMatrix, kbColor: string, level: number): Variant[] {
+  const min = minDyeableLevel(cm, kbColor);
   return BLEACH_STOPS.map((s, i) => {
     const lv = Math.min(9, level + s.add);
     const e = lookup(cm, kbColor, lv);
-    const d = decide(cm, kbColor, lv);
+    const can = decide(cm, kbColor, lv).can;
     return {
       key: `bleach${i}`,
       label: s.label,
-      note: `底色 ${lv} 度` + (d.can ? '' : '·仍不推荐'),
+      // 每一档都要自己回答"够不够"——用户靠拖动自己得出"要漂几次"，
+      // 比我们直接告诉她更有说服力，也更容易被接受
+      note: can
+        ? `漂完约 ${lv} 度，够染了`
+        : min !== null
+          ? `漂完约 ${lv} 度，还差 ${min - lv} 度`
+          : `漂完约 ${lv} 度，仍不够`,
       rgb: (e?.rgb ?? [60, 60, 60]) as [number, number, number],
       str: 1,
       lift: s.lift,
-      risk: i === 0 && !d.can,
+      risk: !can,
+      level: lv,
+      ok: can,
     };
   });
+}
+
+/** 漂色轴上第一个够染的档位；滑块用它画门槛线，没有则返回 -1 */
+export function bleachThreshold(variants: Variant[]) {
+  return variants.findIndex((v) => v.ok);
 }
