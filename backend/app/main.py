@@ -271,7 +271,7 @@ def get_color_matrix():
         for row in connection.execute(
             """
             SELECT m.color_zh, m.base_level, m.r, m.g, m.b, m.hex, m.recommended,
-                   m.r_real, m.g_real, m.b_real, m.hex_real, m.real_source,
+                   m.r_real, m.g_real, m.b_real, m.hex_real, m.real_source, m.swatch_path,
                    r.result_quality, r.reason
             FROM color_effect_matrix m
             LEFT JOIN color_result_rules r
@@ -285,8 +285,9 @@ def get_color_matrix():
             }
             # 官方效果图对 not_recommended 的组合不给色值，此处保持缺省，由前端外推
             if row["r"] is not None:
-                # rgb 优先给实测真实染后色。色卡值（sampled_from_chart）是印刷/渲染的
-                # 理想效果，鲜艳色系饱和度普遍比真实染后高 2 倍以上，直接拿去渲染会很假。
+                # rgb 优先给官方商品详情页逐格采样的呈色（real_source）。
+                # 总矩阵图那张小格子噪声大，详情页的「使用后」一行格子更大更干净，
+                # 两者在蓝色 7 度、紫色 9 度这些档位差异明显，以详情页为准。
                 # 色卡原值保留在 rgb_chart，商品页展示色号仍可用。
                 if row["r_real"] is not None:
                     entry["rgb"] = [row["r_real"], row["g_real"], row["b_real"]]
@@ -296,6 +297,10 @@ def get_color_matrix():
                     entry["rgb"] = [row["r"], row["g"], row["b"]]
                     entry["hex"] = row["hex"]
                 entry["rgb_chart"] = [row["r"], row["g"], row["b"]]
+            if row["swatch_path"]:
+                # 官方效果图切出来的发丝小图。带光泽和发丝走向，
+                # 比纯色圆点有说服力，前端色卡直接用它
+                entry["swatch"] = row["swatch_path"]
             matrix.setdefault(row["color_zh"], {})[str(row["base_level"])] = entry
 
     # 单点凹陷平滑：不改官方数据，只在判定层修正"4度能染、5度不能、6度又能"这类
@@ -311,6 +316,26 @@ def get_color_matrix():
                     f"官方矩阵在 {level} 度标注为不推荐，但相邻的 {level - 1} 度与 "
                     f"{level + 1} 度都可染，判定为可染（推断，非官方结论）。"
                 )
+
+    # 命名变体（「固色适用发色」六宫格）。粉色在官方矩阵里只有 8、9 两档，
+    # 8 度用户没有"偏深"和"偏色"可看；用同色系的命名变体替补，
+    # 其中玫瑰金是暖橙调，正好对应官方警告的"粉色在偏黄底色上会偏橘"。
+    variants: dict[str, list[dict[str, Any]]] = {}
+    with database._connect() as connection:
+        connection.row_factory = sqlite3.Row
+        for row in connection.execute(
+            "SELECT color_zh, variant_name, r, g, b, hex, swatch_path, fallback_slot "
+            "FROM color_variant ORDER BY color_zh, variant_name"
+        ):
+            variants.setdefault(row["color_zh"], []).append(
+                {
+                    "name": row["variant_name"],
+                    "rgb": [row["r"], row["g"], row["b"]],
+                    "hex": row["hex"],
+                    "swatch": row["swatch_path"],
+                    "slot": row["fallback_slot"],
+                }
+            )
 
     # 第二层的另一半：当前发色色相 × 目标色的中和矩阵。
     # 与 undertone 回答的问题不同——undertone 说"会偏成什么颜色"（用于渲染），
@@ -361,6 +386,7 @@ def get_color_matrix():
             "matrix": matrix,
             "undertone": RESIDUAL_UNDERTONE,
             "transitions": transitions,
+            "variants": variants,
             "fade": fade,
         }
     )

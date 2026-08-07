@@ -15,6 +15,8 @@ export type MatrixEntry = {
   /** 渲染与接近度用的呈色。后端优先给实测标定的真实染后色，缺失时回落到色卡值 */
   rgb?: [number, number, number];
   hex?: string;
+  /** 官方效果图切出来的发丝小图。带光泽和走向，色卡用它而不是纯色块 */
+  swatch?: string;
   /** 色卡原值。真实染后色饱和度普遍只有它的一半，仅供商品页展示色号用，不要拿来渲染 */
   rgb_chart?: [number, number, number];
   /** rgb 的来源标记，存在即说明是实测标定值 */
@@ -49,8 +51,20 @@ export type FadeRule = {
   stages: { week: number; name: string }[];
 };
 
+/** 「固色适用发色」六宫格里的命名变体，用于矩阵缺档时替补 */
+export type ColorVariant = {
+  name: string;
+  rgb: [number, number, number];
+  hex: string;
+  swatch: string | null;
+  /** lighter=替补偏浅 deeper=替补偏深 bias=替补偏色 null=不替补 */
+  slot: 'lighter' | 'deeper' | 'bias' | null;
+};
+
 export type ColorMatrix = {
   videos: VideoColor[];
+  /** 色系 -> 命名变体列表 */
+  variants?: Record<string, ColorVariant[]>;
   matrix: Record<string, Record<string, MatrixEntry>>;
   /** 底色度数 -> 漂浅过程中残留的底色，决定偏色方向 */
   undertone: Record<string, { rgb: [number, number, number]; name: string }>;
@@ -89,6 +103,8 @@ export type Variant = {
   level?: number;
   /** 漂色档专用：到这一档是否已经够染目标色。滑块用它画门槛线 */
   ok?: boolean;
+  /** 该档位对应的官方效果图切片 */
+  swatch?: string;
 };
 
 /* ============================ 色彩工具 ============================ */
@@ -490,36 +506,65 @@ export function toneVariants(
   if (!here?.rgb) return [];
 
   const out: Variant[] = [];
-  // 底色更浅一度 -> 显色更亮；更深一度 -> 显色更闷。方向与度数一致。
-  const onDeeperBase = entryAt(cm, kbColor, level - 1);
-  const onLighterBase = entryAt(cm, kbColor, level + 1);
+  /* 四档全部直接查官方效果矩阵，不再算系数：
+       偏浅 = 高一度   一样 = 本档   偏深 = 低一度   偏色 = 低两度
 
-  // 轴向固定为 浅 → 一样 → 深 → 偏色。偏色不是可选开关而是必然要看到的一档，
-  // 所以放在同一根轴的最右端，而不是做成一个用户永远不会打开的按钮。
-  if (onLighterBase?.rgb) {
-    out.push({
-      key: 'light', label: '偏浅', note: `底色偏浅时的呈色（${level + 1} 度实测）`,
-      rgb: onLighterBase.rgb, str: 1, lift: 0,
-    });
-  }
+     「偏色」改用低两度的官方实拍，而不是减色混合算出来的值。
+     低两度就是"实际底色比你以为的深、没漂匀"的真实结果，有官方照片支撑，
+     比我们算的可信。品牌自己也这么描述——蓝色页写"偏黄底色上色后会偏绿"，
+     而官方矩阵里蓝色 6 度采出来正是 H165 的绿色。
+
+     缺档时用同色系的命名变体替补：粉色在矩阵里只有 8、9 两档，
+     8 度用户没有偏深和偏色可看；玫瑰金是暖橙调，正好对应官方警告的
+     "粉色在偏黄底色上会偏橘"。 */
+  const vs = cm.variants?.[kbColor] ?? [];
+  const bySlot = (slot: ColorVariant['slot']) => vs.find((v) => v.slot === slot);
+
+  const push = (
+    key: string, label: string, lv: number,
+    noteAt: (l: number) => string, slot: ColorVariant['slot'], risk?: boolean,
+  ) => {
+    const e = entryAt(cm, kbColor, lv);
+    if (e?.rgb) {
+      out.push({ key, label, note: noteAt(lv), rgb: e.rgb, str: 1, lift: 0, risk, swatch: e.swatch });
+      return;
+    }
+    const v = bySlot(slot);
+    if (v) {
+      out.push({
+        key, label, note: `${v.name}（同色系，官方矩阵未覆盖这个底色）`,
+        rgb: v.rgb, str: 1, lift: 0, risk, swatch: v.swatch ?? undefined,
+      });
+    }
+  };
+
+  push('light', '偏浅', level + 1, (l) => `底色偏浅时的呈色（${l} 度实测）`, 'lighter');
   out.push({
     key: 'same', label: '和目标色一样', note: `你的 ${level} 度底色的官方呈色`,
-    rgb: here.rgb, str: 1, lift: 0,
+    rgb: here.rgb, str: 1, lift: 0, swatch: here.swatch,
   });
-  if (onDeeperBase?.rgb) {
-    out.push({
-      key: 'deep', label: '偏深', note: `底色偏深时的呈色（${level - 1} 度实测）`,
-      rgb: onDeeperBase.rgb, str: 1, lift: 0,
-    });
-  }
+  push('deep', '偏深', level - 1, (l) => `底色偏深时的呈色（${l} 度实测）`, 'deeper');
 
-  const bias2 = layer2BiasRisk(cm, kbColor, level);
-  if (bias2.biasedRgb) {
-    out.push({
-      key: 'biased', label: '可能偏色',
-      note: bias2.undertoneName ? `${bias2.undertoneName}底残留会把颜色带偏` : '底色残留会影响呈色',
-      rgb: bias2.biasedRgb, str: 1, lift: 0, risk: true,
-    });
+  const un = undertoneNameOf(cm, level);
+  const before = out.length;
+  push('biased', '可能偏色', level - 2,
+    (l) => (un
+      ? `底色没漂匀、还残留${un}时的样子（${l} 度实测）`
+      : `底色比你以为的深时的样子（${l} 度实测）`),
+    'bias', true);
+  if (out.length === before) {
+    /* 低两度官方没给色值、也没有可替补的变体时（如蓝色 7 度，低两度是 5 度），
+       退回减色混合算。偏色是必须让用户看到的一档，宁可用算的也不能整档消失。 */
+    const b2 = layer2BiasRisk(cm, kbColor, level);
+    if (b2.biasedRgb) {
+      out.push({
+        key: 'biased', label: '可能偏色',
+        note: b2.undertoneName
+          ? `${b2.undertoneName}底残留会把颜色带偏（推算，官方无该底色样本）`
+          : '底色残留会影响呈色（推算，官方无该底色样本）',
+        rgb: b2.biasedRgb, str: 1, lift: 0, risk: true,
+      });
+    }
   }
   return out;
 }
