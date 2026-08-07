@@ -101,12 +101,12 @@ function baseLumaOf(level: number) {
 /* mask 时域平滑系数：上一帧占比。越大越稳但越迟滞，0.55 是消抖与跟手的折中 */
 const MASK_EMA = 0.55;
 
-/* uv.y 必须翻转：texImage2D 上传视频帧时第 0 行在顶部，而 WebGL 纹理原点在左下。
-   uv.x 【不】翻转：前置摄像头出的本来就是非镜像画面（别人看你的样子）。
-   之前额外翻了 X 做成照镜子效果，但这里用户是在比对发色，不是在整理仪容——
-   镜像会和流程前面那张自拍存档左右相反，也让偏分、单侧挑染这类不对称发型难以判断。 */
+/* uv.y 翻转：texImage2D 上传视频帧时第 0 行在顶部，而 WebGL 纹理原点在左下，必需。
+   uv.x 翻转：前置摄像头出的是非镜像画面（别人看你的样子），直接显示会导致
+   人往左移、画面里的人往右移，自拍预览必须跟手，所以要翻成镜子。
+   曾经试过去掉这个翻转，实测立刻出现动作反向，已确认必须保留。 */
 const VERT = `attribute vec2 p;varying vec2 uv;
-void main(){uv=vec2(p.x*.5+.5,1.0-(p.y*.5+.5));gl_Position=vec4(p,0.,1.);}`;
+void main(){uv=vec2(1.0-(p.x*.5+.5),1.0-(p.y*.5+.5));gl_Position=vec4(p,0.,1.);}`;
 
 type GL = {
   gl: WebGLRenderingContext;
