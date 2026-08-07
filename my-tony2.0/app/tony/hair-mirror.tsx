@@ -96,7 +96,7 @@ const CH = { hair: 1 } as const;
    mix0=0 时输出原始画面（按住看染前）。 */
 const FRAG = `precision mediump float;varying vec2 uv;
 uniform sampler2D cam,mask;uniform vec3 target;
-uniform float strength,lift,mix0,baseY,specKeep,detailBoost;uniform vec2 texel,ctexel;
+uniform float strength,liftGamma,mix0,baseY,specKeep,detailBoost;uniform vec2 texel,ctexel;
 float maskAt(vec2 p){
   float s=texture2D(mask,p).r*.36;
   s+=texture2D(mask,p+vec2(texel.x,0.)).r*.16;
@@ -135,8 +135,16 @@ void main(){
   float scalp=bright*skinHue;
   float spec=bright*(1.-skinHue)*specKeep;          // 纯高光（亮但不是肤色）
 
-  float lm=lift*m;
-  float baseL=clamp(base+lm*(1.0-base)*mix(1.4,0.6,base),0.,1.);
+  /* 漂浅用 gamma 曲线 Y^g（g<1 提亮），只作用在头发上。
+     旧版加法公式 base+lm*(1-base)*(1.4-0.8*base) 的导数是 1+lm*(1.6*base-2.2)，
+     黑发漂到 8 度时 lm=0.58，导数【负 0.137】——明暗关系被翻转并压成一团，
+     这就是低度数下"一坨颜色糊上去"的根因。gamma 曲线单调，永不翻转。 */
+  float g=mix(1.0,liftGamma,m);
+  float sb=max(base,0.004);
+  float baseL=clamp(pow(sb,g),0.,1.);
+  /* 曲线在该点的局部导数：细节要按同样的比例带上去，否则发丝纹理会被留在原来的暗部尺度上 */
+  float dScale=clamp(g*pow(sb,g-1.0),0.4,3.0);
+  float lm=(1.0-liftGamma)*m;
   float Cb=(c.b-Y0)*.564*mix(1.0,0.35,lm), Cr=(c.r-Y0)*.713*mix(1.0,0.35,lm);
   float tY=dot(target,vec3(.299,.587,.114));
   float tCb=(target.b-tY)*.564, tCr=(target.r-tY)*.713;
@@ -147,7 +155,7 @@ void main(){
   /* 只缩放 base，detail 按 detailBoost 原样加回。
      旧版 nY=Y*mix(1,k,a) 把整体乘以 k<1，发丝的【绝对】对比也跟着被压掉，
      深色目标色（紫/红）压得最狠——这就是"没有毛流感、像一团色块"的来源。 */
-  float nY=clamp(baseL*mix(1.0,k,a)+detail*mix(1.0,detailBoost,a),0.,1.);
+  float nY=clamp(baseL*mix(1.0,k,a)+detail*dScale*mix(1.0,detailBoost,a),0.,1.);
   vec3 o=vec3(nY+1.403*nCr, nY-.714*nCr-.344*nCb, nY+1.773*nCb);
   gl_FragColor=vec4(clamp(mix(c,o,mix0),0.,1.),1.);
 }`;
@@ -233,7 +241,7 @@ function initGL(canvas: HTMLCanvasElement): GL | null {
     gl, camTex, maskTex,
     uT: gl.getUniformLocation(prog, 'target'),
     uS: gl.getUniformLocation(prog, 'strength'),
-    uL: gl.getUniformLocation(prog, 'lift'),
+    uL: gl.getUniformLocation(prog, 'liftGamma'),
     uM: gl.getUniformLocation(prog, 'mix0'),
     uB: gl.getUniformLocation(prog, 'baseY'),
     uTx: gl.getUniformLocation(prog, 'texel'),
@@ -429,13 +437,14 @@ export function HairMirror({
       const v = variantRef.current;
       gl.uniform3f(uT, (v?.rgb[0] ?? 0) / 255, (v?.rgb[1] ?? 0) / 255, (v?.rgb[2] ?? 0) / 255);
       gl.uniform1f(uS, v?.str ?? 1);
-      gl.uniform1f(uL, v?.lift ?? 0);
+      gl.uniform1f(uL, v?.gamma ?? 1);
       gl.uniform1f(uM, rawRef.current || !v ? 0 : 1);
       /* baseY 要和 shader 里的 Y 处于同一状态：Y 是漂浅之后的，所以这里也要过一遍
          同样的 lift 公式，否则漂色档的明度缩放系数会算错 */
+      /* baseY 要和着色器里的明度处于同一状态：Y 是漂浅之后的，
+         所以基准也要过一遍同样的 gamma 曲线 */
       const by0 = baseLumaOf(levelRef.current);
-      const lf = v?.lift ?? 0;
-      gl.uniform1f(uB, Math.min(1, by0 + lf * (1 - by0) * (1.4 + (0.6 - 1.4) * by0)));
+      gl.uniform1f(uB, Math.pow(Math.max(by0, 0.004), v?.gamma ?? 1));
       gl.uniform1f(uSK, specKeepRef.current);
       gl.uniform1f(uDB, detailRef.current);
       // 局部均值采样半径按相机实际分辨率折算成 uv 步长

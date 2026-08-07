@@ -106,6 +106,8 @@ export type Variant = {
   ok?: boolean;
   /** 该档位对应的官方效果图切片 */
   swatch?: string;
+  /** 漂浅的提亮曲线指数 Y^gamma。1 = 不漂，越小提得越亮。见 gammaFor */
+  gamma?: number;
 };
 
 /* ============================ 色彩工具 ============================ */
@@ -604,13 +606,22 @@ export function baseLumaOf(level: number) {
   return Math.pow(Math.max(((L + 16) / 116) ** 3, 0.001), 1 / 2.2);
 }
 
-/** 从 from 度漂到 to 度需要的提亮量。反解着色器里的 lift 公式，不再写死 0/0.2/0.4——
- *  从 2 度漂到 8 度和从 6 度漂到 8 度需要的提亮量差很多。 */
-function liftFor(from: number, to: number) {
+/**
+ * 从 from 度漂到 to 度的提亮曲线指数（Y^gamma）。1.0 = 不漂。
+ *
+ * 旧版用加法 Y + lm*(1-Y)*(1.4-0.8Y)，对 Y 求导是 1 + lm*(1.6Y-2.2)：
+ * 3 度黑发（Y≈0.15）漂到 8 度需要 lm=0.58，导数是【负的 -0.137】——
+ * 原本亮一点的发丝漂完反而更暗，整个动态范围从 0.20 塌成 0.019 还翻了向。
+ * 这就是"一坨颜色糊上去、毫无毛流感"的根因。
+ *
+ * gamma 曲线单调、永不翻转：同样 3→8 度，0.10→0.624、0.30→0.782，
+ * 动态范围保留 79%。
+ */
+function gammaFor(from: number, to: number) {
   const a = baseLumaOf(from);
   const b = baseLumaOf(to);
-  if (b <= a) return 0;
-  return Math.max(0, Math.min(1, (b - a) / ((1 - a) * (1.4 - 0.8 * a))));
+  if (b <= a || a >= 0.999) return 1;
+  return Math.max(0.12, Math.min(1, Math.log(b) / Math.log(a)));
 }
 
 /**
@@ -641,7 +652,7 @@ export function bleachVariants(cm: ColorMatrix, kbColor: string, level: number):
       return {
         key: 'bleach0', label: s.label,
         note: `你现在的底色直接染，几乎显不出颜色`,
-        rgb, str: 1, lift: 0, risk: true, level, ok: false, swatch,
+        rgb, str: 1, lift: 0, gamma: 1, risk: true, level, ok: false, swatch,
       };
     }
     const enough = to >= 8;
@@ -650,7 +661,7 @@ export function bleachVariants(cm: ColorMatrix, kbColor: string, level: number):
       note: enough
         ? `漂到位了，这就是${name}该有的样子`
         : `颜色出得来了，但比${name}闷一些`,
-      rgb, str: 1, lift: liftFor(level, to), risk: !enough,
+      rgb, str: 1, lift: 0, gamma: gammaFor(level, to), risk: !enough,
       level: to, ok: enough, swatch,
     };
   });
