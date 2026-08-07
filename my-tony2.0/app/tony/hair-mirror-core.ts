@@ -57,8 +57,9 @@ export type ColorVariant = {
   rgb: [number, number, number];
   hex: string;
   swatch: string | null;
-  /** lighter=替补偏浅 deeper=替补偏深 bias=替补偏色 null=不替补 */
-  slot: 'lighter' | 'deeper' | 'bias' | null;
+  /** ideal=该色系的理想主色（去黄后的样子）
+   *  lighter/deeper/bias=矩阵缺档时替补对应档位  null=仅作色卡展示 */
+  slot: 'ideal' | 'lighter' | 'deeper' | 'bias' | null;
 };
 
 export type ColorMatrix = {
@@ -482,10 +483,12 @@ export function riskGroup(cm: ColorMatrix, kbColor: string, level: number): Risk
 }
 
 /** 一次漂浅约 +2 度 */
+/** 漂色轴。用户只认「漂几次」，不认度数——度数是我们内部的说法。
+ *  映射按家用漂发的常见结果定：漂 1 次到 6 度，漂 2 次到 8 度。 */
 export const BLEACH_STOPS = [
-  { add: 0, lift: 0, label: '不漂' },
-  { add: 2, lift: 0.2, label: '漂浅 1 次' },
-  { add: 4, lift: 0.4, label: '漂浅 2 次' },
+  { label: '不漂', toLevel: null },
+  { label: '漂浅 1 次', toLevel: 6 },
+  { label: '漂浅 2 次', toLevel: 8 },
 ] as const;
 
 /**
@@ -594,28 +597,61 @@ export function defaultStop(variants: Variant[]) {
 }
 
 /** 不能染时的三档：不漂 / 漂1次 / 漂2次 */
+/** 该底色度数下头发的预期明度（sRGB 编码域）。度数本质是明度：
+ *  levelFromL 的阈值表每 10 一档，故 Lab L≈10×度数。 */
+export function baseLumaOf(level: number) {
+  const L = Math.max(5, Math.min(100, level * 10));
+  return Math.pow(Math.max(((L + 16) / 116) ** 3, 0.001), 1 / 2.2);
+}
+
+/** 从 from 度漂到 to 度需要的提亮量。反解着色器里的 lift 公式，不再写死 0/0.2/0.4——
+ *  从 2 度漂到 8 度和从 6 度漂到 8 度需要的提亮量差很多。 */
+function liftFor(from: number, to: number) {
+  const a = baseLumaOf(from);
+  const b = baseLumaOf(to);
+  if (b <= a) return 0;
+  return Math.max(0, Math.min(1, (b - a) / ((1 - a) * (1.4 - 0.8 * a))));
+}
+
+/**
+ * 不能直染时的漂色轴。三档：不漂 / 漂 1 次 / 漂 2 次。
+ *
+ * 三档【用同一个理想色】，变的只是显色程度：底色越浅吃色越足，
+ * 这一层由着色器的 lift + recept 自然完成，不需要换颜色。
+ *
+ * 理想色取「固色适用发色」六宫格里的主色，而不是「使用后」那一行——
+ * 那一行的「使用前」全是金黄色底，粉+黄=珊瑚红、蓝+黄=绿，
+ * 它描述的是"漂了但没去黄"的结果，不是理想效果。
+ * 官方文案自己写着「务必漂至 8 度及以上并去黄后使用，偏黄底色上色后会偏橘/偏绿」。
+ *
+ * 现场体验的用户基本都是黑发，默认必须落在漂 2 次那一档，
+ * 让她一进来就看到漂完的好效果；想看真相往左拖。
+ */
 export function bleachVariants(cm: ColorMatrix, kbColor: string, level: number): Variant[] {
-  const min = minDyeableLevel(cm, kbColor);
+  const ideal = cm.variants?.[kbColor]?.find((v) => v.slot === 'ideal');
+  const fallback = lookup(cm, kbColor, 8) ?? lookup(cm, kbColor, level);
+  const rgb = (ideal?.rgb ?? fallback?.rgb) as [number, number, number] | undefined;
+  if (!rgb) return [];
+  const swatch = ideal?.swatch ?? fallback?.swatch ?? undefined;
+  const name = ideal?.name ?? '';
+
   return BLEACH_STOPS.map((s, i) => {
-    const lv = Math.min(9, level + s.add);
-    const e = lookup(cm, kbColor, lv);
-    const can = decide(cm, kbColor, lv).can;
+    const to = s.toLevel;
+    if (to === null) {
+      return {
+        key: 'bleach0', label: s.label,
+        note: `你现在的底色直接染，几乎显不出颜色`,
+        rgb, str: 1, lift: 0, risk: true, level, ok: false, swatch,
+      };
+    }
+    const enough = to >= 8;
     return {
-      key: `bleach${i}`,
-      label: s.label,
-      // 每一档都要自己回答"够不够"——用户靠拖动自己得出"要漂几次"，
-      // 比我们直接告诉她更有说服力，也更容易被接受
-      note: can
-        ? `漂完约 ${lv} 度，够染了`
-        : min !== null
-          ? `漂完约 ${lv} 度，还差 ${min - lv} 度`
-          : `漂完约 ${lv} 度，仍不够`,
-      rgb: (e?.rgb ?? [60, 60, 60]) as [number, number, number],
-      str: 1,
-      lift: s.lift,
-      risk: !can,
-      level: lv,
-      ok: can,
+      key: `bleach${i}`, label: s.label,
+      note: enough
+        ? `漂到位了，这就是${name}该有的样子`
+        : `颜色出得来了，但比${name}闷一些`,
+      rgb, str: 1, lift: liftFor(level, to), risk: !enough,
+      level: to, ok: enough, swatch,
     };
   });
 }

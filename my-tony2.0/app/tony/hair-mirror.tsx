@@ -466,6 +466,8 @@ export function HairMirror({
      底部的窄信息条会被当成装饰，实测没人看。 */
   const headline = `${picked?.color_name ?? ''} · ${canDye ? '能直接染' : '需要先漂浅'}`;
   const activeNote = active?.note ?? '';
+  /* 品牌自己写的偏色方向：蓝色偏绿、粉色偏橘。其余色系没写就不编 */
+  const biasWord = kb === '蓝色' ? '绿' : kb === '粉色' ? '橘' : '色';
 
   return (
     <div className="relative flex h-full min-h-0 flex-col bg-[#111014] text-white">
@@ -581,6 +583,16 @@ export function HairMirror({
           active?.risk && canDye ? 'text-[#e08a84]' : active?.ok ? 'text-[#7fd39a]' : 'text-white/85')}>
           {activeNote}
         </p>
+        {/* 两条小字。刻意用最低的视觉权重：实拍屏的主角是脸和颜色，
+            真正的风险警示留给「能不能染」那一屏，这里只做脚注不抢注意力。
+            去黄那句是品牌原话，不是我们的推断。 */}
+        {!canDye && active?.ok ? (
+          <p className="mb-1 text-center text-[10px] leading-4 text-white/40">
+            官方提示：需漂至 8 度及以上并去黄，偏黄底色上色后会偏{biasWord}
+            <span className="mx-1.5 text-white/25">·</span>
+            漂 2 次损伤较大，建议去店里做
+          </p>
+        ) : null}
         <div className="relative">
           <input type="range" min={0} max={Math.max(0, variants.length - 1)} step={1} value={stop}
             onChange={(e) => setStop(Number(e.target.value))}
