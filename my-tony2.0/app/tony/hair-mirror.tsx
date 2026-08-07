@@ -37,7 +37,24 @@ import { VerdictDetail } from './verdict-screen';
 import { cx } from './ui';
 
 const MP = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.18';
-const MODEL = '/hair-mirror/hair_segmenter.tflite';
+/* 两个分割模型，渐进加载。
+   HAIR_MODEL 763KB，只会回答"是不是头发"——它没有"手"这个概念，
+   所以手撩头发时手指会被误染，深色衣服也会被当成头发。
+   实测（用户实拍帧）：旧模型把人像解析模型认定为衣服的区域，9.1% 判成了头发。
+
+   MULTI_MODEL 是 selfie_multiclass_256x256，一次推理输出 6 类：
+   0背景 1头发 2身体皮肤 3面部皮肤 4衣服 5配饰。
+   手 = 身体皮肤，衣服 = 独立类，两个误判从源头消失。
+   代价是 16.4MB（官方只提供 float32，没有量化版），首屏不能等它。
+
+   所以：先用小模型让试色立刻可用，大模型在后台下载完成后静默切换。 */
+const HAIR_MODEL = '/hair-mirror/hair_segmenter.tflite';
+/* 从 Google CDN 拉，不自托管：16MB 放在 3 Mbps 的 ECS 上要传 43 秒，
+   而且 16MB 二进制不该进 git。官方桶带 access-control-allow-origin: *，已实测可跨域取。 */
+const MULTI_MODEL =
+  'https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_multiclass_256x256/float32/latest/selfie_multiclass_256x256.tflite';
+/* multiclass 的通道号：0背景 1头发 2身体皮肤 3面部皮肤 4衣服 5配饰 */
+const CH = { hair: 1 } as const;
 
 /* 换色 shader。四条关键设计，每条都对应一个实际翻车过的问题：
 
@@ -240,6 +257,9 @@ export function HairMirror({
     setTune(new URLSearchParams(window.location.search).get('tune') === '1');
   }, []);
   /* 渲染循环的闭包只在 ready 变化时重建，level 会变旧，用 ref 传当前值 */
+  /* 当前用的是不是多类模型。切换后 mask 的通道语义变了，uploadMask 要走另一条路 */
+  const isMultiRef = useRef(false);
+  const [upgraded, setUpgraded] = useState(false);
   const levelRef = useRef(level);
   levelRef.current = level;
 
@@ -276,22 +296,37 @@ export function HairMirror({
   const active = variants[Math.min(stop, Math.max(0, variants.length - 1))] ?? null;
   variantRef.current = active;
 
-  /* 载入 MediaPipe */
+  /* 载入 MediaPipe：小模型先上，大模型后台补 */
   useEffect(() => {
     let alive = true;
     (async () => {
       try {
         const { ImageSegmenter, FilesetResolver } = await import(/* webpackIgnore: true */ MP as string);
         const vision = await FilesetResolver.forVisionTasks(`${MP}/wasm`);
-        const seg = await ImageSegmenter.createFromOptions(vision, {
-          baseOptions: { modelAssetPath: MODEL, delegate: 'GPU' },
+        const make = (path: string) => ImageSegmenter.createFromOptions(vision, {
+          baseOptions: { modelAssetPath: path, delegate: 'GPU' },
           runningMode: 'VIDEO',
           outputCategoryMask: false,
           outputConfidenceMasks: true,
         });
-        if (!alive) return;
+
+        const seg = await make(HAIR_MODEL);
+        if (!alive) { seg.close?.(); return; }
         segRef.current = seg;
         setReady(true);
+
+        /* 16MB 的多类模型后台加载。失败不影响使用——继续用小模型，
+           只是手指和衣服会被误染，属于降级不是故障，所以不弹错误。 */
+        try {
+          const multi = await make(MULTI_MODEL);
+          if (!alive) { multi.close?.(); return; }
+          const old = segRef.current;
+          segRef.current = multi;
+          isMultiRef.current = true;
+          prevMaskRef.current = null;   // 两个模型的 mask 尺寸/语义不同，EMA 必须重置
+          setUpgraded(true);
+          old?.close?.();
+        } catch { /* 保持小模型 */ }
       } catch (e: any) {
         if (alive) setErr(e?.message || String(e));
       }
@@ -314,8 +349,16 @@ export function HairMirror({
     let lastT = -1;
 
     const uploadMask = (res: any) => {
-      const cm = res.confidenceMasks?.[res.confidenceMasks.length - 1];
+      const masks = res.confidenceMasks;
+      if (!masks?.length) return;
+      const multi = isMultiRef.current && masks.length >= 5;
+      const cm = multi ? masks[CH.hair] : masks[masks.length - 1];
       if (!cm) return;
+      /* 多类模型的 6 个通道实测逐像素和恰为 1.000（softmax 输出），
+         头发通道本身就是概率，直接用即可。
+         曾试过拿头发通道和皮肤/衣服通道再做一次归一化竞争，是错的：
+         漏掉背景通道会让背景像素也算出"可能是头发"，
+         阈值附近模棱两可的像素从 7.4% 涨到 12.8%，反而更闪。 */
       const f = cm.getAsFloat32Array();
       /* 时域平滑：MediaPipe 模型内部本有"上一帧 mask 作为第 4 输入通道"的机制，
          但 Web 版没暴露这个接口，逐帧独立推理会让 mask 抖动、发际线闪烁。
@@ -451,6 +494,9 @@ export function HairMirror({
         {/* 调参面板：?tune=1 才出现。高光保护强度是观感判断，现场拖比来回猜快 */}
         {tune && (
           <div className="absolute left-3 right-3 top-3 rounded-2xl bg-black/70 px-3 py-2 backdrop-blur">
+            <p className="mb-1 text-[10px] text-white/60">
+              分割模型：{upgraded ? '多类（手/衣服已分离）' : '单类头发（多类模型下载中…）'}
+            </p>
             <div className="flex items-center justify-between text-[11px] font-bold text-white/90">
               <span>高光保护 specKeep</span>
               <span className="tabular-nums">{specKeep.toFixed(2)}</span>
