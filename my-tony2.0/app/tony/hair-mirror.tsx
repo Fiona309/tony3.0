@@ -95,9 +95,10 @@ const CH = { hair: 1 } as const;
    lift 模拟漂浅：先提亮再上色；必须乘 mask，否则整幅画面会蒙一层白纱。
    mix0=0 时输出原始画面（按住看染前）。 */
 const FRAG = `precision mediump float;varying vec2 uv;
-uniform sampler2D cam,mask;uniform vec3 target;
-uniform float strength,liftGamma,mix0,baseY,specKeep,detailBoost,rootKeep;
+uniform sampler2D cam,mask;uniform vec3 target,targetDark,targetLite;
+uniform float strength,liftF,mix0,baseY,specKeep,detailBoost,rootKeep,bloom,chromaVar,wisp,denoise;
 uniform vec2 texel,ctexel,hairSpan;
+
 float maskAt(vec2 p){
   float s=texture2D(mask,p).r*.36;
   s+=texture2D(mask,p+vec2(texel.x,0.)).r*.16;
@@ -107,75 +108,84 @@ float maskAt(vec2 p){
   return s;
 }
 float lumAt(vec2 p){ return dot(texture2D(cam,p).rgb,vec3(.299,.587,.114)); }
-float localLum(vec2 p){
+float blurLum(vec2 p,vec2 r){
   float s=lumAt(p)*.2;
-  s+=lumAt(p+vec2(ctexel.x,0.))*.2;
-  s+=lumAt(p-vec2(ctexel.x,0.))*.2;
-  s+=lumAt(p+vec2(0.,ctexel.y))*.2;
-  s+=lumAt(p-vec2(0.,ctexel.y))*.2;
+  s+=lumAt(p+vec2(r.x,0.))*.2; s+=lumAt(p-vec2(r.x,0.))*.2;
+  s+=lumAt(p+vec2(0.,r.y))*.2; s+=lumAt(p-vec2(0.,r.y))*.2;
   return s;
 }
 void main(){
   vec3 c=texture2D(cam,uv).rgb;
-  float m=smoothstep(.35,.80,maskAt(uv));
   float Y0=dot(c,vec3(.299,.587,.114));
+  float base=blurLum(uv,ctexel);
+  float wide=blurLum(uv,ctexel*3.0);
 
-  /* 低频/高频分离。base 是宽半径均值（整体明暗），detail 是发丝级高频。
-     毛流感全部住在 detail 里，所以后面只对 base 做明度缩放，detail 原样加回去。 */
-  float base=localLum(uv);
+  /* ④ 降噪：黑发在照片里只占 0.05~0.25 的明度，8bit 下约 50 个台阶，
+     乘 2.7 倍要撑满 136 个台阶——中间值是插出来的，同时暗部噪声也被同倍放大。
+     提亮【之前】先把低频压平一点，色带和噪点就不会跟着放大。
+     detail 那一路不动，所以发丝纹理不受影响。 */
+  base=mix(base,wide,denoise);
   float detail=Y0-base;
 
-  float bright=smoothstep(.03,.15,detail);          // 亮于邻域
-  float cb0=(c.b-Y0)*.564*255.+128., cr0=(c.r-Y0)*.713*255.+128.;
-  float skinHue=smoothstep(70.,80.,cb0)*(1.-smoothstep(124.,134.,cb0))
-               *smoothstep(128.,138.,cr0)*(1.-smoothstep(168.,178.,cr0));
-  /* 发缝/头皮 = 比邻域亮【且】是肤色。两个条件缺一不可：
-     只看肤色会误伤棕发（棕发本身就落在 YCbCr 肤色域内），
-     只看比邻域亮会误伤发丝高光。实测多类模型在发缝处 hair 置信度 0.907、
-     普通发丝 0.888，模型根本分不出来，只能靠图像信息补。 */
-  float scalp=bright*skinHue;
-  float spec=bright*(1.-skinHue)*specKeep;          // 纯高光（亮但不是肤色）
+  float mRaw=maskAt(uv);
+  float m=smoothstep(.35,.80,mRaw);
 
-  /* 漂浅用 gamma 曲线 Y^g（g<1 提亮），只作用在头发上。
-     旧版加法公式 base+lm*(1-base)*(1.4-0.8*base) 的导数是 1+lm*(1.6*base-2.2)，
-     黑发漂到 8 度时 lm=0.58，导数【负 0.137】——明暗关系被翻转并压成一团，
-     这就是低度数下"一坨颜色糊上去"的根因。gamma 曲线单调，永不翻转。 */
-  /* 沿发丝长度：0=发根 1=发尾。hairSpan 是这一帧头发在画面里的上下边界。
-     真实头发从来不是均匀一个色——发根被头挡着有阴影、新生发没染到、
-     发尾更疏松吃色更多。抖音那类特效的真实感主要就来自这条渐变，
-     我们之前全头一个色，所以像戴了个纯色泳帽。 */
+  /* ⑤ 碎发补偿（近似，不是真 matting）：mask 的过渡区里，
+     比周围暗的细结构大概率是飞散的碎发。真 matting 要换模型，
+     这里先用图像信息把它们捞回来一部分，让轮廓不再是一条硬边。 */
+  float edgeZone=smoothstep(.05,.35,mRaw)*(1.0-smoothstep(.55,.92,mRaw));
+  float darker=smoothstep(0.0,0.12,base-Y0);
+  m=clamp(m+edgeZone*darker*wisp,0.,1.);
+
   float t=clamp((uv.y-hairSpan.x)/max(hairSpan.y-hairSpan.x,1e-3),0.,1.);
   float growth=mix(rootKeep,1.0,smoothstep(0.0,0.5,t));
 
-  /* 漂浅 = 提高发丝反射率，是【乘法】不是加法。
-     发绺缝隙、内层、耳后那些暗是几何遮挡（光根本进不去），漂多少次都还是暗的。
-     曾用 gamma 曲线 Y^g，它把 0.02 的深阴影提到 0.45，整幅画面一个暗值都不剩，
-     动态范围从 0.53 塌到 0.436——没有黑就没有立体感，
-     再多毛流感也只是在一块亮面上做浮雕。乘法后恢复到 0.837，最深处留 0.053。
+  /* 漂浅 = 提高发丝反射率，是乘法不是加法：发绺缝隙的暗是几何遮挡，漂多少次都还是暗的。
      亮部用 Reinhard 软肩收住，避免受光面烧成白块。 */
   float F=mix(1.0,liftF,m*growth);
   float W=1.0+F*0.28;
   float x=base*F;
   float baseL=clamp(x*(1.0+x/(W*W))/(1.0+x),0.,1.);
-  /* 该点的局部导数：细节按同样比例带上去，否则发丝纹理会留在原来的暗部尺度上 */
   float dv=((1.0+2.0*x/(W*W))*(1.0+x)-x*(1.0+x/(W*W)))/((1.0+x)*(1.0+x));
   float dScale=clamp(F*dv,0.4,3.0);
   float lm=clamp((F-1.0)/2.5,0.,1.)*m;
+
+  float bright=smoothstep(.03,.15,detail);
+  float cb0=(c.b-Y0)*.564*255.+128., cr0=(c.r-Y0)*.713*255.+128.;
+  float skinHue=smoothstep(70.,80.,cb0)*(1.-smoothstep(124.,134.,cb0))
+               *smoothstep(128.,138.,cr0)*(1.-smoothstep(168.,178.,cr0));
+  float scalp=bright*skinHue;          // 发缝/头皮：比邻域亮【且】是肤色
+  float spec=bright*(1.-skinHue)*specKeep;
+
   float Cb=(c.b-Y0)*.564*mix(1.0,0.35,lm), Cr=(c.r-Y0)*.713*mix(1.0,0.35,lm);
-  float tY=dot(target,vec3(.299,.587,.114));
-  float tCb=(target.b-tY)*.564, tCr=(target.r-tY)*.713;
-  /* recept 必须用【原始】明度，不能用漂后的：漂完所有像素都超过 0.55，
-     recept 一律饱和成 1.0，全头每个像素吃色完全一样。
-     用原始明度则保留 0.07~0.87 的真实落差，发根深发尾浅自然就出来了。 */
+
+  /* ③ 色度随明度走。整头一个色相 = 塑料，现实中不存在。
+     黑发本身几乎没有色度信息（R≈G≈B），替换后得到的是"完美均匀"的色度场，
+     而真实浅发的色度是有结构的。用我们【有】的明度变化去驱动它：
+     暗处偏深色端、亮处偏浅色端。两个端点取自官方六宫格里同色系最深/最浅的变体，
+     不是我编的插值。 */
+  vec3 tgt=mix(targetDark,targetLite,clamp(baseL*chromaVar+(1.0-chromaVar)*0.5,0.,1.));
+  tgt=mix(target,tgt,chromaVar);
+  float tY=dot(tgt,vec3(.299,.587,.114));
+  float tCb=(tgt.b-tY)*.564, tCr=(tgt.r-tY)*.713;
+
+  /* recept 用【原始】明度：漂后所有像素都超过阈值会一律饱和成 1，全头吃色一样 */
   float recept=clamp((base-.06)/.30,0.,1.);
   float a=m*mix(.05,.90,recept)*strength*growth*(1.0-spec*.85)*(1.0-scalp*.95);
   float nCb=mix(Cb,tCb,a)*(1.0-spec*.60), nCr=mix(Cr,tCr,a)*(1.0-spec*.60);
   float k=clamp(tY/max(baseY,.06),.55,1.5);
-  /* 只缩放 base，detail 按 detailBoost 原样加回。
-     旧版 nY=Y*mix(1,k,a) 把整体乘以 k<1，发丝的【绝对】对比也跟着被压掉，
-     深色目标色（紫/红）压得最狠——这就是"没有毛流感、像一团色块"的来源。 */
   float nY=clamp(baseL*mix(1.0,k,a)+detail*dScale*mix(1.0,detailBoost,a),0.,1.);
+
   vec3 o=vec3(nY+1.403*nCr, nY-.714*nCr-.344*nCb, nY+1.773*nCb);
+
+  /* ② 次表面散射辉光。黑发把光全吸收，只剩又窄又硬的表面镜面反射；
+     漂过的发丝色素没了，光进入内部多次散射再出来，高光【又宽又软、边缘外溢】。
+     这是"浅"这个感觉最强的物理信号——只把黑发的窄高光乘以 2.7，
+     亮度到位了但质感没到位，看着像被打了灯的黑发，不像浅发。
+     用宽半径模糊的亮部往外加光，强度随提亮倍数增长。 */
+  float glowSrc=max(0.0,wide*F-0.42);
+  o+=tgt*glowSrc*bloom*m*clamp((F-1.0)*0.6,0.,1.);
+
   gl_FragColor=vec4(clamp(mix(c,o,mix0),0.,1.),1.);
 }`;
 
@@ -192,6 +202,14 @@ const DETAIL_BOOST = 1.45;
 /* 默认 1.0 = 不做发根渐变。立体感应该来自阴影明暗关系，不是人为画一条渐变。
    保留可调，想看布丁头效果可以拖低。 */
 const ROOT_KEEP = 1.0;
+/* ② 次表面散射辉光强度 */
+const BLOOM = 0.55;
+/* ③ 色度随明度变化的幅度。0 = 整头一个色相（旧行为），1 = 完全按明度在深浅变体间插值 */
+const CHROMA_VAR = 0.6;
+/* ⑤ 碎发补偿强度 */
+const WISP = 0.45;
+/* ④ 提亮前的低频降噪强度 */
+const DENOISE = 0.35;
 
 /** 该底色度数下头发的预期明度（sRGB 编码域）。
  *  度数本质是明度：levelFromL 的阈值表给出 Lab L 每 10 一档，故 L≈10×度数。
@@ -225,6 +243,12 @@ type GL = {
   uDB: WebGLUniformLocation | null;
   uRK: WebGLUniformLocation | null;
   uHS: WebGLUniformLocation | null;
+  uTD: WebGLUniformLocation | null;
+  uTL: WebGLUniformLocation | null;
+  uBl: WebGLUniformLocation | null;
+  uCV: WebGLUniformLocation | null;
+  uWi: WebGLUniformLocation | null;
+  uDn: WebGLUniformLocation | null;
   uCtx: WebGLUniformLocation | null;
 };
 
@@ -275,6 +299,12 @@ function initGL(canvas: HTMLCanvasElement): GL | null {
     uDB: gl.getUniformLocation(prog, 'detailBoost'),
     uRK: gl.getUniformLocation(prog, 'rootKeep'),
     uHS: gl.getUniformLocation(prog, 'hairSpan'),
+    uTD: gl.getUniformLocation(prog, 'targetDark'),
+    uTL: gl.getUniformLocation(prog, 'targetLite'),
+    uBl: gl.getUniformLocation(prog, 'bloom'),
+    uCV: gl.getUniformLocation(prog, 'chromaVar'),
+    uWi: gl.getUniformLocation(prog, 'wisp'),
+    uDn: gl.getUniformLocation(prog, 'denoise'),
     uCtx: gl.getUniformLocation(prog, 'ctexel'),
   };
 }
@@ -316,6 +346,11 @@ export function HairMirror({
   useEffect(() => { rootRef.current = rootKeep; }, [rootKeep]);
   /* 头发在画面里的上下边界（uv.y），每帧从 mask 求，做时域平滑 */
   const spanRef = useRef<[number, number]>([0.1, 0.9]);
+  /* 该色系最深/最浅的官方变体，供色度随明度插值。缺省时退化成当前目标色 */
+  const shadeRef = useRef<[number[], number[]]>([[0, 0, 0], [255, 255, 255]]);
+  const [fx, setFx] = useState({ bloom: BLOOM, chromaVar: CHROMA_VAR, wisp: WISP, denoise: DENOISE });
+  const fxRef = useRef(fx);
+  useEffect(() => { fxRef.current = fx; }, [fx]);
   const [detailBoost, setDetailBoost] = useState(DETAIL_BOOST);
   useEffect(() => { detailRef.current = detailBoost; }, [detailBoost]);
   const [specKeep, setSpecKeep] = useState(SPEC_KEEP);
@@ -363,6 +398,15 @@ export function HairMirror({
 
   const active = variants[Math.min(stop, Math.max(0, variants.length - 1))] ?? null;
   variantRef.current = active;
+
+  /* 色度插值的两个端点：同色系官方六宫格里最深和最浅的那两个变体。
+     没有变体数据时退化成当前档位色本身（等于关掉这个效果）。 */
+  useEffect(() => {
+    const lum = (c: number[]) => c[0] * 0.299 + c[1] * 0.587 + c[2] * 0.114;
+    const vs = (matrix.variants?.[kb] ?? []).slice().sort((x, y) => lum(x.rgb) - lum(y.rgb));
+    const self = active?.rgb ?? [128, 128, 128];
+    shadeRef.current = vs.length >= 2 ? [vs[0].rgb, vs[vs.length - 1].rgb] : [self, self];
+  }, [matrix, kb, active]);
 
   /* 载入 MediaPipe：小模型先上，大模型后台补 */
   useEffect(() => {
@@ -474,7 +518,8 @@ export function HairMirror({
       requestAnimationFrame(loop);
       if (video.readyState < 2 || video.currentTime === lastT) return;
       lastT = video.currentTime;
-      const { gl, camTex, uT, uS, uL, uM, uB, uSK, uCtx, uDB, uRK, uHS: uCtx2 } = G;
+      const { gl, camTex, uT, uS, uL, uM, uB, uSK, uCtx, uDB, uRK, uHS: uCtx2,
+              uTD, uTL, uBl, uCV, uWi, uDn } = G;
       if (canvas.width !== video.videoWidth) {
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
@@ -502,6 +547,13 @@ export function HairMirror({
       gl.uniform1f(uDB, detailRef.current);
       gl.uniform1f(uRK, rootRef.current);
       gl.uniform2f(uCtx2, spanRef.current[0], spanRef.current[1]);
+      const [dk, lt] = shadeRef.current;
+      gl.uniform3f(uTD, dk[0] / 255, dk[1] / 255, dk[2] / 255);
+      gl.uniform3f(uTL, lt[0] / 255, lt[1] / 255, lt[2] / 255);
+      gl.uniform1f(uBl, fxRef.current.bloom);
+      gl.uniform1f(uCV, fxRef.current.chromaVar);
+      gl.uniform1f(uWi, fxRef.current.wisp);
+      gl.uniform1f(uDn, fxRef.current.denoise);
       // 局部均值采样半径按相机实际分辨率折算成 uv 步长
       gl.uniform2f(uCtx, SPEC_RADIUS / (video.videoWidth || 1280), SPEC_RADIUS / (video.videoHeight || 720));
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
@@ -622,6 +674,38 @@ export function HairMirror({
             <p className="mt-1 text-[10px] leading-4 text-white/55">
               0 = 发根完全不上色 · 1 = 全头均匀（旧行为）
             </p>
+            <div className="mt-2 flex items-center justify-between text-[11px] font-bold text-white/90">
+              <span>辉光 bloom</span>
+              <span className="tabular-nums">{fx.bloom.toFixed(2)}</span>
+            </div>
+            <input type="range" min={0} max={1.5} step={0.05} value={fx.bloom}
+              onChange={(e) => setFx((v) => ({ ...v, bloom: Number(e.target.value) }))}
+              className="mt-1 w-full" />
+            <p className="mt-1 text-[10px] leading-4 text-white/55">次表面散射。浅发的高光又宽又软，黑发的又窄又硬 —— 这是「浅」最强的信号</p>
+            <div className="mt-2 flex items-center justify-between text-[11px] font-bold text-white/90">
+              <span>色度随明度 chromaVar</span>
+              <span className="tabular-nums">{fx.chromaVar.toFixed(2)}</span>
+            </div>
+            <input type="range" min={0} max={1} step={0.05} value={fx.chromaVar}
+              onChange={(e) => setFx((v) => ({ ...v, chromaVar: Number(e.target.value) }))}
+              className="mt-1 w-full" />
+            <p className="mt-1 text-[10px] leading-4 text-white/55">0 = 整头一个色相（塑料感）· 1 = 按明度在同色系最深/最浅变体间插值</p>
+            <div className="mt-2 flex items-center justify-between text-[11px] font-bold text-white/90">
+              <span>碎发补偿 wisp</span>
+              <span className="tabular-nums">{fx.wisp.toFixed(2)}</span>
+            </div>
+            <input type="range" min={0} max={1} step={0.05} value={fx.wisp}
+              onChange={(e) => setFx((v) => ({ ...v, wisp: Number(e.target.value) }))}
+              className="mt-1 w-full" />
+            <p className="mt-1 text-[10px] leading-4 text-white/55">把 mask 过渡区里比周围暗的细结构捞回来。近似，不是真 matting</p>
+            <div className="mt-2 flex items-center justify-between text-[11px] font-bold text-white/90">
+              <span>提亮前降噪 denoise</span>
+              <span className="tabular-nums">{fx.denoise.toFixed(2)}</span>
+            </div>
+            <input type="range" min={0} max={1} step={0.05} value={fx.denoise}
+              onChange={(e) => setFx((v) => ({ ...v, denoise: Number(e.target.value) }))}
+              className="mt-1 w-full" />
+            <p className="mt-1 text-[10px] leading-4 text-white/55">黑发只有约 50 个明度台阶，提亮 2.7 倍会同时放大色带和噪点</p>
           </div>
         )}
 
