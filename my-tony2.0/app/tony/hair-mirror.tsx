@@ -96,7 +96,8 @@ const CH = { hair: 1 } as const;
    mix0=0 时输出原始画面（按住看染前）。 */
 const FRAG = `precision mediump float;varying vec2 uv;
 uniform sampler2D cam,mask;uniform vec3 target;
-uniform float strength,liftGamma,mix0,baseY,specKeep,detailBoost;uniform vec2 texel,ctexel;
+uniform float strength,liftGamma,mix0,baseY,specKeep,detailBoost,rootKeep;
+uniform vec2 texel,ctexel,hairSpan;
 float maskAt(vec2 p){
   float s=texture2D(mask,p).r*.36;
   s+=texture2D(mask,p+vec2(texel.x,0.)).r*.16;
@@ -139,7 +140,14 @@ void main(){
      旧版加法公式 base+lm*(1-base)*(1.4-0.8*base) 的导数是 1+lm*(1.6*base-2.2)，
      黑发漂到 8 度时 lm=0.58，导数【负 0.137】——明暗关系被翻转并压成一团，
      这就是低度数下"一坨颜色糊上去"的根因。gamma 曲线单调，永不翻转。 */
-  float g=mix(1.0,liftGamma,m);
+  /* 沿发丝长度：0=发根 1=发尾。hairSpan 是这一帧头发在画面里的上下边界。
+     真实头发从来不是均匀一个色——发根被头挡着有阴影、新生发没染到、
+     发尾更疏松吃色更多。抖音那类特效的真实感主要就来自这条渐变，
+     我们之前全头一个色，所以像戴了个纯色泳帽。 */
+  float t=clamp((uv.y-hairSpan.x)/max(hairSpan.y-hairSpan.x,1e-3),0.,1.);
+  float growth=mix(rootKeep,1.0,smoothstep(0.0,0.5,t));
+
+  float g=mix(1.0,liftGamma,m*growth);
   float sb=max(base,0.004);
   float baseL=clamp(pow(sb,g),0.,1.);
   /* 曲线在该点的局部导数：细节要按同样的比例带上去，否则发丝纹理会被留在原来的暗部尺度上 */
@@ -148,8 +156,11 @@ void main(){
   float Cb=(c.b-Y0)*.564*mix(1.0,0.35,lm), Cr=(c.r-Y0)*.713*mix(1.0,0.35,lm);
   float tY=dot(target,vec3(.299,.587,.114));
   float tCb=(target.b-tY)*.564, tCr=(target.r-tY)*.713;
-  float recept=clamp((baseL-.10)/.45,0.,1.);
-  float a=m*mix(.05,.90,recept)*strength*(1.0-spec*.85)*(1.0-scalp*.95);
+  /* recept 必须用【原始】明度，不能用漂后的：漂完所有像素都超过 0.55，
+     recept 一律饱和成 1.0，全头每个像素吃色完全一样。
+     用原始明度则保留 0.07~0.87 的真实落差，发根深发尾浅自然就出来了。 */
+  float recept=clamp((base-.06)/.30,0.,1.);
+  float a=m*mix(.05,.90,recept)*strength*growth*(1.0-spec*.85)*(1.0-scalp*.95);
   float nCb=mix(Cb,tCb,a)*(1.0-spec*.60), nCr=mix(Cr,tCr,a)*(1.0-spec*.60);
   float k=clamp(tY/max(baseY,.06),.55,1.5);
   /* 只缩放 base，detail 按 detailBoost 原样加回。
@@ -168,6 +179,9 @@ const SPEC_RADIUS = 6;
 /* 发丝高频的保留倍数。1.0 = 原样，>1 = 增强。
    base 被 k<1 压暗后，同样幅度的 detail 在视觉上会变弱，需要补一点回来。 */
 const DETAIL_BOOST = 1.45;
+/* 发根保留原色的程度。0 = 发根完全不上色（最强布丁头），1 = 全头均匀（旧行为）。
+   0.28 是"看得出发根更深、但不至于像没染到"的位置。 */
+const ROOT_KEEP = 0.28;
 
 /** 该底色度数下头发的预期明度（sRGB 编码域）。
  *  度数本质是明度：levelFromL 的阈值表给出 Lab L 每 10 一档，故 L≈10×度数。
@@ -199,6 +213,8 @@ type GL = {
   uTx: WebGLUniformLocation | null;
   uSK: WebGLUniformLocation | null;
   uDB: WebGLUniformLocation | null;
+  uRK: WebGLUniformLocation | null;
+  uHS: WebGLUniformLocation | null;
   uCtx: WebGLUniformLocation | null;
 };
 
@@ -247,6 +263,8 @@ function initGL(canvas: HTMLCanvasElement): GL | null {
     uTx: gl.getUniformLocation(prog, 'texel'),
     uSK: gl.getUniformLocation(prog, 'specKeep'),
     uDB: gl.getUniformLocation(prog, 'detailBoost'),
+    uRK: gl.getUniformLocation(prog, 'rootKeep'),
+    uHS: gl.getUniformLocation(prog, 'hairSpan'),
     uCtx: gl.getUniformLocation(prog, 'ctexel'),
   };
 }
@@ -283,6 +301,11 @@ export function HairMirror({
   const rawRef = useRef(false);
   const specKeepRef = useRef(SPEC_KEEP);
   const detailRef = useRef(DETAIL_BOOST);
+  const rootRef = useRef(ROOT_KEEP);
+  const [rootKeep, setRootKeep] = useState(ROOT_KEEP);
+  useEffect(() => { rootRef.current = rootKeep; }, [rootKeep]);
+  /* 头发在画面里的上下边界（uv.y），每帧从 mask 求，做时域平滑 */
+  const spanRef = useRef<[number, number]>([0.1, 0.9]);
   const [detailBoost, setDetailBoost] = useState(DETAIL_BOOST);
   useEffect(() => { detailRef.current = detailBoost; }, [detailBoost]);
   const [specKeep, setSpecKeep] = useState(SPEC_KEEP);
@@ -404,10 +427,27 @@ export function HairMirror({
         prevMaskRef.current = prev;
       }
       const b = new Uint8Array(f.length);
+      /* 顺带求头发的上下边界，供着色器算"沿发丝长度"的渐变。
+         在已有的 EMA 循环里做，不额外遍历一遍。 */
+      const w = cm.width;
+      let top = cm.height, bot = -1;
       for (let i = 0; i < f.length; i++) {
         const v = prev[i] * MASK_EMA + f[i] * (1 - MASK_EMA);
         prev[i] = v;
         b[i] = v * 255;
+        if (v > 0.5) {
+          const row = (i / w) | 0;
+          if (row < top) top = row;
+          if (row > bot) bot = row;
+        }
+      }
+      if (bot > top) {
+        /* mask 的行序与 uv.y 一致（都是画面从上到下），直接归一化即可。
+           跟着 EMA 一起做时域平滑，否则边界会随 mask 抖动而上下跳。 */
+        const t0 = top / cm.height;
+        const b0 = bot / cm.height;
+        const s0 = spanRef.current;
+        spanRef.current = [s0[0] * 0.8 + t0 * 0.2, s0[1] * 0.8 + b0 * 0.2];
       }
       const { gl, maskTex } = G;
       gl.activeTexture(gl.TEXTURE1);
@@ -424,7 +464,7 @@ export function HairMirror({
       requestAnimationFrame(loop);
       if (video.readyState < 2 || video.currentTime === lastT) return;
       lastT = video.currentTime;
-      const { gl, camTex, uT, uS, uL, uM, uB, uSK, uCtx, uDB } = G;
+      const { gl, camTex, uT, uS, uL, uM, uB, uSK, uCtx, uDB, uRK, uHS: uCtx2 } = G;
       if (canvas.width !== video.videoWidth) {
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
@@ -447,6 +487,8 @@ export function HairMirror({
       gl.uniform1f(uB, Math.pow(Math.max(by0, 0.004), v?.gamma ?? 1));
       gl.uniform1f(uSK, specKeepRef.current);
       gl.uniform1f(uDB, detailRef.current);
+      gl.uniform1f(uRK, rootRef.current);
+      gl.uniform2f(uCtx2, spanRef.current[0], spanRef.current[1]);
       // 局部均值采样半径按相机实际分辨率折算成 uv 步长
       gl.uniform2f(uCtx, SPEC_RADIUS / (video.videoWidth || 1280), SPEC_RADIUS / (video.videoHeight || 720));
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
@@ -555,6 +597,17 @@ export function HairMirror({
               className="mt-1 w-full" />
             <p className="mt-1 text-[10px] leading-4 text-white/55">
               发丝高频的保留倍数。1 = 原样，&gt;1 = 增强发丝对比
+            </p>
+            <div className="mt-2 flex items-center justify-between text-[11px] font-bold text-white/90">
+              <span>发根保留 rootKeep</span>
+              <span className="tabular-nums">{rootKeep.toFixed(2)}</span>
+            </div>
+            <input
+              type="range" min={0} max={1} step={0.04} value={rootKeep}
+              onChange={(e) => setRootKeep(Number(e.target.value))}
+              className="mt-1 w-full" />
+            <p className="mt-1 text-[10px] leading-4 text-white/55">
+              0 = 发根完全不上色 · 1 = 全头均匀（旧行为）
             </p>
           </div>
         )}
