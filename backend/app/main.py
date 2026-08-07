@@ -283,8 +283,11 @@ def get_color_matrix():
                 "why": row["reason"] or "",
                 "rec": bool(row["recommended"]),
             }
-            # 官方效果图对 not_recommended 的组合不给色值，此处保持缺省，由前端外推
-            if row["r"] is not None:
+            # 官方效果图对 not_recommended 的组合不给色值，此处保持缺省，由前端外推。
+            # 守卫必须同时看 r_real：官方详情页覆盖到了一些总矩阵没给色值的档位
+            # （奶茶灰棕 5 度、红色 5 度），只看 r 会把这些新数据丢掉，
+            # 前端就会误以为需要外推，四档塌成一档。
+            if row["r"] is not None or row["r_real"] is not None:
                 # rgb 优先给官方商品详情页逐格采样的呈色（real_source）。
                 # 总矩阵图那张小格子噪声大，详情页的「使用后」一行格子更大更干净，
                 # 两者在蓝色 7 度、紫色 9 度这些档位差异明显，以详情页为准。
@@ -296,7 +299,8 @@ def get_color_matrix():
                 else:
                     entry["rgb"] = [row["r"], row["g"], row["b"]]
                     entry["hex"] = row["hex"]
-                entry["rgb_chart"] = [row["r"], row["g"], row["b"]]
+                if row["r"] is not None:
+                    entry["rgb_chart"] = [row["r"], row["g"], row["b"]]
             if row["swatch_path"]:
                 # 官方效果图切出来的发丝小图。带光泽和发丝走向，
                 # 比纯色圆点有说服力，前端色卡直接用它

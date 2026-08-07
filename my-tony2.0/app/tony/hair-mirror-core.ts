@@ -502,8 +502,26 @@ export function toneVariants(
   kbColor: string,
   level: number,
 ): Variant[] {
-  const here = entryAt(cm, kbColor, level);
-  if (!here?.rgb) return [];
+  /* 必须用 lookup 而不是 entryAt：entryAt 只查精确档位、不外推。
+     冷棕色（奶茶灰棕）官方矩阵只有 5~9 度，但知识库说它 3 度就能直染——
+     3~4 度用户走到这里，entryAt 返回无色值，整个函数返回空数组，
+     滑块只剩一个空档、着色器拿到 null，画面留着上一个颜色的残留。
+     任何度数、任何颜色都必须给得出效果，这是产品底线。 */
+  const resolved = lookup(cm, kbColor, level);
+  if (!resolved) return [];
+  const here = resolved;
+
+  if (resolved.extrapolated) {
+    /* 官方没有这个底色的样本，只能借最近档位当参考。
+       此时"偏浅/偏深/偏色"会全部外推到同一个值，四档变成四个一样的颜色，
+       没有意义——直接只给一档，并如实说明这是参考不是实测。 */
+    return [{
+      key: 'same',
+      label: '参考效果',
+      note: `官方没有 ${level} 度底色的样本，这是按 ${resolved.sourceLevel} 度推的参考`,
+      rgb: resolved.rgb, str: 1, lift: 0, swatch: resolved.swatch,
+    }];
+  }
 
   const out: Variant[] = [];
   /* 四档全部直接查官方效果矩阵，不再算系数：

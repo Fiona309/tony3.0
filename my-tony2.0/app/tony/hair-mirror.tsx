@@ -96,7 +96,7 @@ const CH = { hair: 1 } as const;
    mix0=0 时输出原始画面（按住看染前）。 */
 const FRAG = `precision mediump float;varying vec2 uv;
 uniform sampler2D cam,mask;uniform vec3 target;
-uniform float strength,lift,mix0,baseY,specKeep;uniform vec2 texel,ctexel;
+uniform float strength,lift,mix0,baseY,specKeep,detailBoost;uniform vec2 texel,ctexel;
 float maskAt(vec2 p){
   float s=texture2D(mask,p).r*.36;
   s+=texture2D(mask,p+vec2(texel.x,0.)).r*.16;
@@ -118,17 +118,36 @@ void main(){
   vec3 c=texture2D(cam,uv).rgb;
   float m=smoothstep(.35,.80,maskAt(uv));
   float Y0=dot(c,vec3(.299,.587,.114));
-  float spec=smoothstep(.03,.15,Y0-localLum(uv))*specKeep;
+
+  /* 低频/高频分离。base 是宽半径均值（整体明暗），detail 是发丝级高频。
+     毛流感全部住在 detail 里，所以后面只对 base 做明度缩放，detail 原样加回去。 */
+  float base=localLum(uv);
+  float detail=Y0-base;
+
+  float bright=smoothstep(.03,.15,detail);          // 亮于邻域
+  float cb0=(c.b-Y0)*.564*255.+128., cr0=(c.r-Y0)*.713*255.+128.;
+  float skinHue=smoothstep(70.,80.,cb0)*(1.-smoothstep(124.,134.,cb0))
+               *smoothstep(128.,138.,cr0)*(1.-smoothstep(168.,178.,cr0));
+  /* 发缝/头皮 = 比邻域亮【且】是肤色。两个条件缺一不可：
+     只看肤色会误伤棕发（棕发本身就落在 YCbCr 肤色域内），
+     只看比邻域亮会误伤发丝高光。实测多类模型在发缝处 hair 置信度 0.907、
+     普通发丝 0.888，模型根本分不出来，只能靠图像信息补。 */
+  float scalp=bright*skinHue;
+  float spec=bright*(1.-skinHue)*specKeep;          // 纯高光（亮但不是肤色）
+
   float lm=lift*m;
-  float Y=clamp(Y0+lm*(1.0-Y0)*mix(1.4,0.6,Y0),0.,1.);
+  float baseL=clamp(base+lm*(1.0-base)*mix(1.4,0.6,base),0.,1.);
   float Cb=(c.b-Y0)*.564*mix(1.0,0.35,lm), Cr=(c.r-Y0)*.713*mix(1.0,0.35,lm);
   float tY=dot(target,vec3(.299,.587,.114));
   float tCb=(target.b-tY)*.564, tCr=(target.r-tY)*.713;
-  float recept=clamp((Y-.10)/.45,0.,1.);
-  float a=m*mix(.05,.90,recept)*strength*(1.0-spec*.85);
+  float recept=clamp((baseL-.10)/.45,0.,1.);
+  float a=m*mix(.05,.90,recept)*strength*(1.0-spec*.85)*(1.0-scalp*.95);
   float nCb=mix(Cb,tCb,a)*(1.0-spec*.60), nCr=mix(Cr,tCr,a)*(1.0-spec*.60);
   float k=clamp(tY/max(baseY,.06),.55,1.5);
-  float nY=clamp(Y*mix(1.0,k,a),0.,1.);
+  /* 只缩放 base，detail 按 detailBoost 原样加回。
+     旧版 nY=Y*mix(1,k,a) 把整体乘以 k<1，发丝的【绝对】对比也跟着被压掉，
+     深色目标色（紫/红）压得最狠——这就是"没有毛流感、像一团色块"的来源。 */
+  float nY=clamp(baseL*mix(1.0,k,a)+detail*mix(1.0,detailBoost,a),0.,1.);
   vec3 o=vec3(nY+1.403*nCr, nY-.714*nCr-.344*nCb, nY+1.773*nCb);
   gl_FragColor=vec4(clamp(mix(c,o,mix0),0.,1.),1.);
 }`;
@@ -138,6 +157,9 @@ void main(){
 const SPEC_KEEP = 1.0;
 /* 局部均值的采样半径（相机像素）。太小抓不到成片的高光带，太大会把整绺亮发误判成高光 */
 const SPEC_RADIUS = 6;
+/* 发丝高频的保留倍数。1.0 = 原样，>1 = 增强。
+   base 被 k<1 压暗后，同样幅度的 detail 在视觉上会变弱，需要补一点回来。 */
+const DETAIL_BOOST = 1.45;
 
 /** 该底色度数下头发的预期明度（sRGB 编码域）。
  *  度数本质是明度：levelFromL 的阈值表给出 Lab L 每 10 一档，故 L≈10×度数。
@@ -168,6 +190,7 @@ type GL = {
   uB: WebGLUniformLocation | null;
   uTx: WebGLUniformLocation | null;
   uSK: WebGLUniformLocation | null;
+  uDB: WebGLUniformLocation | null;
   uCtx: WebGLUniformLocation | null;
 };
 
@@ -215,6 +238,7 @@ function initGL(canvas: HTMLCanvasElement): GL | null {
     uB: gl.getUniformLocation(prog, 'baseY'),
     uTx: gl.getUniformLocation(prog, 'texel'),
     uSK: gl.getUniformLocation(prog, 'specKeep'),
+    uDB: gl.getUniformLocation(prog, 'detailBoost'),
     uCtx: gl.getUniformLocation(prog, 'ctexel'),
   };
 }
@@ -250,6 +274,9 @@ export function HairMirror({
   const variantRef = useRef<Variant | null>(null);
   const rawRef = useRef(false);
   const specKeepRef = useRef(SPEC_KEEP);
+  const detailRef = useRef(DETAIL_BOOST);
+  const [detailBoost, setDetailBoost] = useState(DETAIL_BOOST);
+  useEffect(() => { detailRef.current = detailBoost; }, [detailBoost]);
   const [specKeep, setSpecKeep] = useState(SPEC_KEEP);
   const [tune, setTune] = useState(false);
   useEffect(() => { specKeepRef.current = specKeep; }, [specKeep]);
@@ -389,7 +416,7 @@ export function HairMirror({
       requestAnimationFrame(loop);
       if (video.readyState < 2 || video.currentTime === lastT) return;
       lastT = video.currentTime;
-      const { gl, camTex, uT, uS, uL, uM, uB, uSK, uCtx } = G;
+      const { gl, camTex, uT, uS, uL, uM, uB, uSK, uCtx, uDB } = G;
       if (canvas.width !== video.videoWidth) {
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
@@ -410,6 +437,7 @@ export function HairMirror({
       const lf = v?.lift ?? 0;
       gl.uniform1f(uB, Math.min(1, by0 + lf * (1 - by0) * (1.4 + (0.6 - 1.4) * by0)));
       gl.uniform1f(uSK, specKeepRef.current);
+      gl.uniform1f(uDB, detailRef.current);
       // 局部均值采样半径按相机实际分辨率折算成 uv 步长
       gl.uniform2f(uCtx, SPEC_RADIUS / (video.videoWidth || 1280), SPEC_RADIUS / (video.videoHeight || 720));
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
@@ -505,6 +533,17 @@ export function HairMirror({
               onChange={(e) => setSpecKeep(Number(e.target.value))} className="mt-1 w-full" />
             <p className="mt-1 text-[10px] leading-4 text-white/55">
               0 = 高光也染色（旧行为，颜色像浮在表面）· 1 = 高光保持原样（物理正确）
+            </p>
+            <div className="mt-2 flex items-center justify-between text-[11px] font-bold text-white/90">
+              <span>毛流感 detailBoost</span>
+              <span className="tabular-nums">{detailBoost.toFixed(2)}</span>
+            </div>
+            <input
+              type="range" min={0.5} max={2.5} step={0.05} value={detailBoost}
+              onChange={(e) => setDetailBoost(Number(e.target.value))}
+              className="mt-1 w-full" />
+            <p className="mt-1 text-[10px] leading-4 text-white/55">
+              发丝高频的保留倍数。1 = 原样，&gt;1 = 增强发丝对比
             </p>
           </div>
         )}
