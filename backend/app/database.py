@@ -322,6 +322,20 @@ class Database:
         )
         connection.execute(
             """
+            CREATE TABLE IF NOT EXISTS color_fade (
+                color_zh TEXT NOT NULL,
+                week INTEGER NOT NULL CHECK (week BETWEEN 1 AND 5),
+                stage_name TEXT NOT NULL,
+                hold_weeks_min INTEGER NOT NULL,
+                hold_weeks_max INTEGER NOT NULL,
+                source TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                PRIMARY KEY (color_zh, week)
+            )
+            """
+        )
+        connection.execute(
+            """
             CREATE TABLE IF NOT EXISTS products (
                 product_id TEXT PRIMARY KEY,
                 brand TEXT NOT NULL,

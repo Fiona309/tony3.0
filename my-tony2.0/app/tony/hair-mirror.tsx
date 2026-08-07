@@ -59,11 +59,25 @@ const MODEL = '/hair-mirror/hair_segmenter.tflite';
    ④ a 上限 0.90
    留 10% 原始色度，头发本身的色彩细微变化不会被抹平成一块死板的纯色。
 
+   ⑤ 高光保护（spec）—— 治"颜色浮在表面上"
+   真实头发的反光分两种，物理上完全不同：
+     · 漫反射 diffuse：光进入发丝内部被色素吸收后散射出来 —— 这才是头发的颜色，染发改的是它
+     · 镜面高光 specular：光在发丝表面直接弹走，压根没进去 —— 它是【光源的颜色】，通常是白的
+   专业毛发渲染器（Redshift Principled Hair 等）明确要求 tint 保持白色，
+   就是为了不让高光被染色；要改发色应该改 albedo。
+   我们之前对所有像素一视同仁地换色度，把本该是白色的高光也染成了粉/蓝，
+   人眼对此极其敏感，直接读作"这是盖在头发上的一层膜"。
+
+   检测方式：高光 = 该像素明显亮于它的邻域。用相机纹理做一次宽半径十字采样得到
+   局部均值，Y0 减去它就是高光强度。这个判据与头发深浅无关（深色发和漂过的浅色发
+   都适用），比拿绝对亮度阈值鲁棒。
+   高光处双重处理：既降低上色强度 a，又把最终色度往 0 推（0 色度 = 白色高光）。
+
    lift 模拟漂浅：先提亮再上色；必须乘 mask，否则整幅画面会蒙一层白纱。
    mix0=0 时输出原始画面（按住看染前）。 */
 const FRAG = `precision mediump float;varying vec2 uv;
 uniform sampler2D cam,mask;uniform vec3 target;
-uniform float strength,lift,mix0,baseY;uniform vec2 texel;
+uniform float strength,lift,mix0,baseY,specKeep;uniform vec2 texel,ctexel;
 float maskAt(vec2 p){
   float s=texture2D(mask,p).r*.36;
   s+=texture2D(mask,p+vec2(texel.x,0.)).r*.16;
@@ -72,23 +86,39 @@ float maskAt(vec2 p){
   s+=texture2D(mask,p-vec2(0.,texel.y)).r*.16;
   return s;
 }
+float lumAt(vec2 p){ return dot(texture2D(cam,p).rgb,vec3(.299,.587,.114)); }
+float localLum(vec2 p){
+  float s=lumAt(p)*.2;
+  s+=lumAt(p+vec2(ctexel.x,0.))*.2;
+  s+=lumAt(p-vec2(ctexel.x,0.))*.2;
+  s+=lumAt(p+vec2(0.,ctexel.y))*.2;
+  s+=lumAt(p-vec2(0.,ctexel.y))*.2;
+  return s;
+}
 void main(){
   vec3 c=texture2D(cam,uv).rgb;
   float m=smoothstep(.35,.80,maskAt(uv));
   float Y0=dot(c,vec3(.299,.587,.114));
+  float spec=smoothstep(.03,.15,Y0-localLum(uv))*specKeep;
   float lm=lift*m;
   float Y=clamp(Y0+lm*(1.0-Y0)*mix(1.4,0.6,Y0),0.,1.);
   float Cb=(c.b-Y0)*.564*mix(1.0,0.35,lm), Cr=(c.r-Y0)*.713*mix(1.0,0.35,lm);
   float tY=dot(target,vec3(.299,.587,.114));
   float tCb=(target.b-tY)*.564, tCr=(target.r-tY)*.713;
   float recept=clamp((Y-.10)/.45,0.,1.);
-  float a=m*mix(.05,.90,recept)*strength;
-  float nCb=mix(Cb,tCb,a), nCr=mix(Cr,tCr,a);
+  float a=m*mix(.05,.90,recept)*strength*(1.0-spec*.85);
+  float nCb=mix(Cb,tCb,a)*(1.0-spec*.60), nCr=mix(Cr,tCr,a)*(1.0-spec*.60);
   float k=clamp(tY/max(baseY,.06),.55,1.5);
   float nY=clamp(Y*mix(1.0,k,a),0.,1.);
   vec3 o=vec3(nY+1.403*nCr, nY-.714*nCr-.344*nCb, nY+1.773*nCb);
   gl_FragColor=vec4(clamp(mix(c,o,mix0),0.,1.),1.);
 }`;
+
+/* 高光保护强度。1 = 完全按物理（高光几乎不染），0 = 关掉（回到旧行为）。
+   这是观感判断不是数学问题，?tune=1 可以现场拖滑块找手感。 */
+const SPEC_KEEP = 1.0;
+/* 局部均值的采样半径（相机像素）。太小抓不到成片的高光带，太大会把整绺亮发误判成高光 */
+const SPEC_RADIUS = 6;
 
 /** 该底色度数下头发的预期明度（sRGB 编码域）。
  *  度数本质是明度：levelFromL 的阈值表给出 Lab L 每 10 一档，故 L≈10×度数。
@@ -118,6 +148,8 @@ type GL = {
   uM: WebGLUniformLocation | null;
   uB: WebGLUniformLocation | null;
   uTx: WebGLUniformLocation | null;
+  uSK: WebGLUniformLocation | null;
+  uCtx: WebGLUniformLocation | null;
 };
 
 function initGL(canvas: HTMLCanvasElement): GL | null {
@@ -163,6 +195,8 @@ function initGL(canvas: HTMLCanvasElement): GL | null {
     uM: gl.getUniformLocation(prog, 'mix0'),
     uB: gl.getUniformLocation(prog, 'baseY'),
     uTx: gl.getUniformLocation(prog, 'texel'),
+    uSK: gl.getUniformLocation(prog, 'specKeep'),
+    uCtx: gl.getUniformLocation(prog, 'ctexel'),
   };
 }
 
@@ -187,6 +221,13 @@ export function HairMirror({ matrix, level, entryVideoId, onLevelChange, onBack,
   const runRef = useRef(false);
   const variantRef = useRef<Variant | null>(null);
   const rawRef = useRef(false);
+  const specKeepRef = useRef(SPEC_KEEP);
+  const [specKeep, setSpecKeep] = useState(SPEC_KEEP);
+  const [tune, setTune] = useState(false);
+  useEffect(() => { specKeepRef.current = specKeep; }, [specKeep]);
+  useEffect(() => {
+    setTune(new URLSearchParams(window.location.search).get('tune') === '1');
+  }, []);
   /* 渲染循环的闭包只在 ready 变化时重建，level 会变旧，用 ref 传当前值 */
   const levelRef = useRef(level);
   levelRef.current = level;
@@ -287,7 +328,7 @@ export function HairMirror({ matrix, level, entryVideoId, onLevelChange, onBack,
       requestAnimationFrame(loop);
       if (video.readyState < 2 || video.currentTime === lastT) return;
       lastT = video.currentTime;
-      const { gl, camTex, uT, uS, uL, uM, uB } = G;
+      const { gl, camTex, uT, uS, uL, uM, uB, uSK, uCtx } = G;
       if (canvas.width !== video.videoWidth) {
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
@@ -307,6 +348,9 @@ export function HairMirror({ matrix, level, entryVideoId, onLevelChange, onBack,
       const by0 = baseLumaOf(levelRef.current);
       const lf = v?.lift ?? 0;
       gl.uniform1f(uB, Math.min(1, by0 + lf * (1 - by0) * (1.4 + (0.6 - 1.4) * by0)));
+      gl.uniform1f(uSK, specKeepRef.current);
+      // 局部均值采样半径按相机实际分辨率折算成 uv 步长
+      gl.uniform2f(uCtx, SPEC_RADIUS / (video.videoWidth || 1280), SPEC_RADIUS / (video.videoHeight || 720));
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     };
 
@@ -376,6 +420,23 @@ export function HairMirror({ matrix, level, entryVideoId, onLevelChange, onBack,
           className="absolute right-3 top-3 grid size-11 place-items-center rounded-full bg-black/45 backdrop-blur">
           <ArrowsLeftRight size={20} weight="bold" />
         </button>
+
+        {/* 调参面板：?tune=1 才出现。高光保护强度是观感判断，现场拖比来回猜快 */}
+        {tune && (
+          <div className="absolute left-3 right-3 top-3 rounded-2xl bg-black/70 px-3 py-2 backdrop-blur">
+            <div className="flex items-center justify-between text-[11px] font-bold text-white/90">
+              <span>高光保护 specKeep</span>
+              <span className="tabular-nums">{specKeep.toFixed(2)}</span>
+            </div>
+            <input
+              type="range" min={0} max={1} step={0.05} value={specKeep}
+              onChange={(e) => setSpecKeep(Number(e.target.value))}
+              className="mt-1 w-full" />
+            <p className="mt-1 text-[10px] leading-4 text-white/55">
+              0 = 高光也染色（旧行为，颜色像浮在表面）· 1 = 高光保持原样（物理正确）
+            </p>
+          </div>
+        )}
 
         {(!ready || err) && (
           <div className="absolute inset-0 grid place-items-center bg-black/75 px-8 text-center text-sm">
