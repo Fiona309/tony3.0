@@ -1,34 +1,34 @@
 'use client';
 
-/**
- * 屏2 · 判断屏。能染走 A 版，不能染走 B 版，是同一个组件的两个分支。
- *
- * 这一屏只讲【数】——度数、门槛、差距、风险、保色期。效果图一概不放：
- * 屏2 放了效果图，屏3「看看染在我头上」这个 CTA 就没有动机了，而且静态图
- * 和实时渲染必然对不上，用户会问哪个是真的。屏2 讲道理，屏3 看效果。
- *
- * A 版刻意不放色度尺：尺子回答的是"差多少"，那是 B 版用户的障碍；
- * 对能染的用户，"你富余 2 度"没有任何行动意义，为了和 B 版对称而加是错的
- * ——对称本身不是价值。踩线过门槛的风险由风险清单用一句话表达就够了。
- */
-
-import { ArrowRight, Check, Info, X } from '@phosphor-icons/react';
-
+import { ArrowLeft, ArrowRight, Check, Info, WarningCircle, X } from '@phosphor-icons/react';
 import { FlowProgress } from './flow-progress';
 import {
-  fadeStages,
   holdLabel,
   judgeRisks,
   layer1CanDye,
+  layer2BiasRisk,
   minDyeableLevel,
   type ColorMatrix,
   type VideoColor,
 } from './hair-mirror-core';
-import { cx } from './ui';
+import { MediaImage, cx } from './ui';
 
 export type VerdictIntent = 'preview' | 'switch' | 'bleach';
 
-const rgbCss = (c: [number, number, number]) => `rgb(${c[0]},${c[1]},${c[2]})`;
+const LEVEL_SWATCH = [
+  '#15110f', '#241b17', '#38281f', '#503624', '#704a2c',
+  '#936836', '#b38648', '#cda562', '#dfc384', '#efddb1',
+];
+
+const rgbCss = (value: [number, number, number]) =>
+  `rgb(${value[0]},${value[1]},${value[2]})`;
+
+function biasLabel(kb: string, undertone?: string) {
+  if (kb.includes('蓝') && /黄|橙|暖/.test(undertone ?? '')) return '偏绿';
+  if (kb.includes('紫') && /黄|橙|暖/.test(undertone ?? '')) return '偏红';
+  if (kb.includes('粉') && /黄|橙|暖/.test(undertone ?? '')) return '偏橘';
+  return '偏色';
+}
 
 export function VerdictScreen({
   matrix,
@@ -36,6 +36,8 @@ export function VerdictScreen({
   video,
   dyeHistory,
   currentTone,
+  currentPhotoUrl,
+  targetPhotoUrl,
   onBack,
   onGo,
   onPickColor,
@@ -45,220 +47,246 @@ export function VerdictScreen({
   video: VideoColor;
   dyeHistory?: string;
   currentTone?: string;
+  currentPhotoUrl: string;
+  targetPhotoUrl: string;
   onBack: () => void;
   onGo: (intent: VerdictIntent) => void;
-  /** B 版里点一个能染的替代色 —— 换色是横向重新判断，不是前进 */
-  onPickColor: (videoId: string) => void;
+  onPickColor: (videoId: string) => void | Promise<void>;
 }) {
   const kb = video.kb_color ?? '';
   const can = layer1CanDye(matrix, kb, level).can;
-
-  return can ? (
-    <CanDye
-      matrix={matrix} level={level} video={video}
-      dyeHistory={dyeHistory} currentTone={currentTone}
-      onBack={onBack} onGo={onGo}
-    />
-  ) : (
-    <CannotDye
-      matrix={matrix} level={level} video={video}
-      onBack={onBack} onGo={onGo} onPickColor={onPickColor}
-    />
-  );
-}
-
-/* ============================ A 版 · 能染 ============================ */
-
-function CanDye({
-  matrix, level, video, dyeHistory, currentTone, onBack, onGo,
-}: {
-  matrix: ColorMatrix; level: number; video: VideoColor;
-  dyeHistory?: string; currentTone?: string;
-  onBack: () => void; onGo: (i: VerdictIntent) => void;
-}) {
-  const kb = video.kb_color ?? '';
-  const risks = judgeRisks(matrix, kb, level, dyeHistory, currentTone);
-  const stages = fadeStages(matrix, kb, level);
-  const hold = holdLabel(matrix, kb);
-
   return (
-    <Frame stage="verdict" onBack={onBack} title="你的染发方案">
-      <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-4 pt-4">
-        <div className="flex items-center gap-1.5">
-          <Check size={20} weight="bold" className="text-[#3f8a56]" />
-          <h1 className="text-[22px] font-black leading-tight">你可以染{video.color_name}</h1>
-        </div>
-        <p className="mt-1.5 text-[12px] leading-[1.7] text-ink-2">
-          你的 <span className="numerals font-black">{level}</span> 度底色可以直接上色，不用先漂。
-        </p>
-
-        {risks.length > 0 ? (
-          <section className="mt-5">
-            <h2 className="text-[13px] font-black">你要注意的</h2>
-            <div className="mt-2 space-y-2">
-              {risks.map((r) => (
-                <div key={r.key} className="rounded-[16px] border border-[#e8c47a] bg-[#fff8e4] px-3.5 py-3">
-                  <p className="text-[12.5px] font-bold leading-[1.6] text-[#7a5a12]">{r.text}</p>
-                  <p className="mt-1.5 text-[11.5px] leading-[1.6] text-[#8a6b28]">→ {r.action}</p>
-                </div>
-              ))}
-            </div>
-          </section>
-        ) : null}
-
-        {stages.length > 0 ? (
-          <section className="mt-5">
-            <h2 className="text-[13px] font-black">掉色过程概览</h2>
-            {/* 保色期在色带上方：先回答"能撑多久"，再看"掉成什么样" */}
-            <p className="mt-1 text-[12px] text-ink-2">
-              {video.color_name}大概能保持 <span className="font-black">{hold}</span>
-              <span className="ml-1 text-[10.5px] text-ink-3">（行业参考值）</span>
-            </p>
-            <div className="mt-2.5 flex gap-1.5">
-              {stages.map((s) => (
-                <div key={s.week} className="flex-1">
-                  <div className={cx('h-11 rounded-[10px] border', s.within ? 'border-ink/20' : 'border-ink/10')}
-                    style={{ background: rgbCss(s.rgb) }} />
-                  <p className="mt-1.5 text-center text-[10px] text-ink-3">第 {s.week} 周</p>
-                  <p className="text-center text-[10.5px] font-bold leading-tight">{s.name}</p>
-                </div>
-              ))}
-            </div>
-          </section>
-        ) : null}
-      </div>
-
-      <Footer>
-        <button type="button" onClick={() => onGo('preview')}
-          className="tap flex w-full items-center justify-center gap-1.5 rounded-full bg-pink py-3.5 text-[15px] font-black text-white">
-          看看染在我头上 <ArrowRight size={16} weight="bold" />
-        </button>
-      </Footer>
+    <Frame onBack={onBack}>
+      {can ? (
+        <CanDye
+          matrix={matrix}
+          level={level}
+          video={video}
+          dyeHistory={dyeHistory}
+          currentTone={currentTone}
+          currentPhotoUrl={currentPhotoUrl}
+          targetPhotoUrl={targetPhotoUrl}
+          onGo={onGo}
+        />
+      ) : (
+        <CannotDye
+          matrix={matrix}
+          level={level}
+          video={video}
+          currentPhotoUrl={currentPhotoUrl}
+          targetPhotoUrl={targetPhotoUrl}
+          onGo={onGo}
+          onPickColor={onPickColor}
+        />
+      )}
     </Frame>
   );
 }
 
-/* ============================ B 版 · 不能染 ============================ */
-
-function CannotDye({
-  matrix, level, video, onBack, onGo, onPickColor,
-}: {
-  matrix: ColorMatrix; level: number; video: VideoColor;
-  onBack: () => void; onGo: (i: VerdictIntent) => void; onPickColor: (id: string) => void;
+function CanDye({ matrix, level, video, dyeHistory, currentTone, currentPhotoUrl, targetPhotoUrl, onGo }: {
+  matrix: ColorMatrix;
+  level: number;
+  video: VideoColor;
+  dyeHistory?: string;
+  currentTone?: string;
+  currentPhotoUrl: string;
+  targetPhotoUrl: string;
+  onGo: (intent: VerdictIntent) => void;
 }) {
   const kb = video.kb_color ?? '';
   const min = minDyeableLevel(matrix, kb);
-  const gap = min !== null ? min - level : null;
-
-  // 替代色一律用【真实呈色】而不是色卡色：色卡是印刷/渲染的理想效果，
-  // 鲜艳色系饱和度普遍是真实染后色的两倍，拿它当色球会骗到用户。
-  const alts = matrix.videos.filter(
-    (v) => v.kb_color && v.video_id !== video.video_id && layer1CanDye(matrix, v.kb_color, level).can,
-  );
+  const layer2 = layer2BiasRisk(matrix, kb, level, currentTone);
+  const risks = judgeRisks(matrix, kb, level, dyeHistory, currentTone);
+  const bias = biasLabel(kb, layer2.undertoneName);
+  const conclusion = layer2.risky
+    ? `可以染，但可能会${bias}`
+    : `当前可以直接染${video.color_name}`;
+  const degreeReason = `你现在是 ${level} 度，${video.color_name}从 ${min ?? level} 度起可以显色。`;
+  const neutralReason = layer2.transition?.why
+    ?? `${layer2.undertoneName ? `当前底色残留${layer2.undertoneName}` : '当前底色色相'}，会影响染后色的纯净度。`;
 
   return (
-    <Frame stage="verdict" onBack={onBack} title="你的染发方案">
-      <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-4 pt-4">
-        <div className="flex items-center gap-1.5">
-          <X size={20} weight="bold" className="text-[#b4514a]" />
-          <h1 className="text-[22px] font-black leading-tight">现在还不适合染{video.color_name}</h1>
-        </div>
-        <p className="mt-1.5 text-[12px] leading-[1.7] text-ink-2">
-          不是永远不能染，是当前底色还不够浅。
-        </p>
-
-        {/* 色度尺：B 版的核心。"还差 3 度"是一个距离概念，必须可视化 */}
-        <section className="mt-4 rounded-[18px] border border-line bg-white p-3.5">
-          <div className="flex gap-[3px]">
-            {LEVEL_SWATCH.map((c, i) => {
-              const lv = i + 1;
-              return (
-                <div key={lv} className="flex-1">
-                  <div className={cx('h-9 rounded-[6px] border-2',
-                    lv === level ? 'border-ink' : lv === min ? 'border-pink' : 'border-transparent')}
-                    style={{ background: c }} />
-                  <p className={cx('mt-1 text-center text-[9.5px]',
-                    lv === level || lv === min ? 'font-black' : 'text-ink-3')}>{lv}</p>
-                </div>
-              );
-            })}
-          </div>
-          <div className="mt-2 flex items-center justify-between text-[11px]">
-            <span className="font-bold">你现在 <span className="numerals">{level}</span> 度</span>
-            {min !== null ? (
-              <span className="font-bold text-pink-dark">
-                {video.color_name}要 <span className="numerals">{min}</span> 度
-              </span>
-            ) : null}
-          </div>
-          {gap !== null && gap > 0 ? (
-            <p className="mt-2 rounded-[10px] bg-cream py-1.5 text-center text-[13px] font-black">
-              还差 <span className="numerals text-pink-dark">{gap}</span> 度
-            </p>
-          ) : null}
-        </section>
-
-        <section className="mt-4">
-          <h2 className="text-[13px] font-black">为什么现在不建议直接染</h2>
-          <ul className="mt-2 space-y-1.5 text-[12px] leading-[1.7] text-ink-2">
-            <li>· 底色太深，{video.color_name}盖不上去，容易发黑发脏</li>
-            <li>· 居家漂发有断发和刺激头皮的风险，漂到位不容易</li>
-          </ul>
-        </section>
-
-        {/* 换色是【横向重新判断】，所以留在这个区块里，不做成底部的前进按钮 */}
-        {alts.length > 0 ? (
-          <section className="mt-5 rounded-[18px] border border-line bg-white p-3.5">
-            <h2 className="text-[13px] font-black">现在就能直接染的</h2>
-            <div className="mt-3 flex gap-3">
-              {alts.map((v) => {
-                const rgb = matrix.matrix[v.kb_color!]?.[String(level)]?.rgb;
-                return (
-                  <button key={v.video_id} type="button" onClick={() => onPickColor(v.video_id)}
-                    className="tap flex-1 text-center">
-                    <span className="mx-auto block size-14 rounded-full border border-ink/15"
-                      style={{ background: rgb ? rgbCss(rgb) : v.accent ?? '#888' }} />
-                    <span className="mt-1.5 block truncate text-[11.5px] font-bold">{v.color_name}</span>
-                    <span className="block text-[10px] text-ink-3">保色 {holdLabel(matrix, v.kb_color!)}</span>
-                  </button>
-                );
-              })}
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-5 pt-4">
+        <section className="rounded-[22px] border border-[#9bc9a7] bg-[#f4fbf5] px-4 py-4">
+          <div className="flex items-start gap-3">
+            <span className="grid size-10 shrink-0 place-items-center rounded-full bg-[#8bc798] text-white">
+              <Check size={24} weight="bold" />
+            </span>
+            <div>
+              <h1 className="text-[23px] font-black leading-tight">{conclusion}</h1>
+              <p className="mt-1.5 text-[12px] leading-[1.65] text-ink-2">
+                这是基于你确认的底色色度和知识库颜色中和规则得出的判断。
+              </p>
             </div>
-          </section>
-        ) : null}
-      </div>
+          </div>
+        </section>
 
+        <section className="mt-3 grid grid-cols-[1fr_24px_1fr] items-center gap-2 rounded-[20px] border border-line bg-white p-3">
+          <PhotoFact title="你的当前发色" src={currentPhotoUrl} label={`${level} 度`} />
+          <ArrowRight size={20} weight="bold" className="text-pink-dark" />
+          <PhotoFact title="目标发色" src={targetPhotoUrl || video.cover_url || ''} label={video.color_name} />
+        </section>
+
+        <section className="mt-4 rounded-[22px] border border-line bg-white px-4 py-4">
+          <h2 className="flex items-center gap-2 text-[15px] font-black">
+            <span className="text-pink-dark">☆</span> 判断依据
+          </h2>
+          <div className="mt-3 grid gap-2.5">
+            <Evidence index="1" title="度数满足" body={degreeReason} />
+            <Evidence index="2" title="颜色中和" body={neutralReason} />
+          </div>
+        </section>
+
+        <section className="mt-4 rounded-[22px] border border-[#eccf8c] bg-[#fffaf0] px-4 py-4">
+          <h2 className="text-[15px] font-black">直染前需要知道</h2>
+          <div className="mt-2 divide-y divide-dashed divide-[#e6d6b3]">
+            {(risks.length ? risks : [{ key: 'operation', text: '上色结果会受发质和涂抹均匀度影响', action: '严格按商品说明控制分区和停留时间' }]).slice(0, 3).map((risk, index) => (
+              <div key={risk.key} className="grid grid-cols-[28px_1fr] gap-2 py-2.5">
+                <span className="grid size-6 place-items-center rounded-full bg-pink-soft text-[11px] font-black text-pink-dark">{index + 1}</span>
+                <div>
+                  <p className="text-[12px] font-black leading-5">{risk.text}</p>
+                  <p className="mt-0.5 text-[10.5px] leading-4 text-ink-2">→ {risk.action}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      </div>
       <Footer>
-        <button type="button" onClick={() => onGo('bleach')}
-          className="tap flex w-full items-center justify-center gap-1.5 rounded-full bg-pink py-3.5 text-[15px] font-black text-white">
-          仍想要{video.color_name}，看漂浅效果 <ArrowRight size={16} weight="bold" />
+        <button type="button" onClick={() => onGo('preview')} className="tap flex w-full items-center justify-center gap-2 rounded-full bg-pink py-3.5 text-[15px] font-black text-white">
+          查看实拍效果 <ArrowRight size={18} weight="bold" />
         </button>
       </Footer>
-    </Frame>
+    </div>
   );
 }
 
-/* 1~9 度的发色示意。仅用于色度尺的位置感，不参与任何判断计算 */
-const LEVEL_SWATCH = [
-  '#1c1613', '#2b211b', '#3f2e23', '#573c29', '#7a5334',
-  '#a3763f', '#c39a55', '#dcbb7d', '#ecd9ae',
-];
-
-function Frame({ stage, title, onBack, children }: {
-  stage: 'verdict'; title: string; onBack: () => void; children: React.ReactNode;
+function CannotDye({ matrix, level, video, currentPhotoUrl, targetPhotoUrl, onGo, onPickColor }: {
+  matrix: ColorMatrix;
+  level: number;
+  video: VideoColor;
+  currentPhotoUrl: string;
+  targetPhotoUrl: string;
+  onGo: (intent: VerdictIntent) => void;
+  onPickColor: (videoId: string) => void | Promise<void>;
 }) {
+  const kb = video.kb_color ?? '';
+  const min = minDyeableLevel(matrix, kb) ?? Math.min(10, level + 1);
+  const gap = Math.max(1, min - level);
+  const alternatives = matrix.videos.filter((item) =>
+    item.kb_color && item.video_id !== video.video_id && layer1CanDye(matrix, item.kb_color, level).can,
+  );
+  const chooseAlternative = async () => {
+    if (!alternatives[0]) return;
+    await onPickColor(alternatives[0].video_id);
+    onGo('switch');
+  };
+
+  return (
+    <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-5 pt-4">
+      <section className="rounded-[22px] border border-[#efb7a7] bg-[#fff8f5] px-4 py-4">
+        <div className="flex items-start gap-3">
+          <X size={30} weight="bold" className="mt-0.5 shrink-0 text-pink-dark" />
+          <div>
+            <h1 className="text-[21px] font-black leading-tight">当前发色直染不出{video.color_name}，需要先漂</h1>
+            <p className="mt-1.5 text-[12px] leading-5 text-ink-2">你现在是 {level} 度，至少要到 {min} 度才能明显显色。</p>
+          </div>
+        </div>
+      </section>
+
+      <section className="mt-3 grid grid-cols-[1fr_26px_1fr] items-center gap-2 rounded-[22px] border border-line bg-white p-3">
+        <PhotoFact title="当前发色" src={currentPhotoUrl} label={`${level} 度`} />
+        <ArrowRight size={22} weight="bold" className="text-pink-dark" />
+        <PhotoFact title="目标发色" src={targetPhotoUrl || video.cover_url || ''} label={video.color_name} />
+      </section>
+
+      <section className="mt-3 rounded-[22px] border border-line bg-white px-3 py-3.5">
+        <h2 className="text-center text-[14px] font-black">色度差距</h2>
+        <div className="mt-3 flex gap-[3px]">
+          {LEVEL_SWATCH.map((color, index) => {
+            const degree = index + 1;
+            return (
+              <div key={degree} className="min-w-0 flex-1 text-center">
+                <span className={cx('block aspect-square rounded-[6px] border-2', degree === level ? 'border-pink' : degree === min ? 'border-[#e5b94f]' : 'border-transparent')} style={{ background: color }} />
+                <span className="mt-1 block text-[8px] font-bold">{degree}</span>
+              </div>
+            );
+          })}
+        </div>
+        <p className="mt-3 text-center text-[12px] font-black">当前 {level} 度 <span className="mx-2">→</span> {video.color_name}门槛 {min} 度</p>
+        <p className="mt-1 text-center text-[11px] font-bold text-pink-dark">还差 {gap} 度</p>
+      </section>
+
+      <section className="mt-3 rounded-[22px] border border-[#edc879] bg-[#fffaf0] px-4 py-3.5">
+        <h2 className="flex items-center gap-2 text-[14px] font-black"><WarningCircle size={18} weight="fill" className="text-[#d59b25]" /> 为什么现在不能直接染？</h2>
+        <ol className="mt-2 space-y-1.5 text-[11px] leading-[1.55] text-ink-2">
+          <li>1. 当前底色太深，目标色素无法明显显现。</li>
+          <li>2. 直接覆盖容易接近黑色、显脏或不均匀。</li>
+          <li>3. 居家漂发容易断发、斑驳并刺激头皮，建议去理发店。</li>
+        </ol>
+      </section>
+
+      <h2 className="mb-2 mt-5 text-center text-[14px] font-black">选择一种方案继续</h2>
+      <div className="grid gap-2.5">
+        <button type="button" disabled={!alternatives.length} onClick={() => void chooseAlternative()} className="tap flex items-center gap-3 rounded-[20px] border border-[#9aca9f] bg-[#f5fbf5] px-3.5 py-3 text-left disabled:opacity-45">
+          <span className="grid size-8 shrink-0 place-items-center rounded-full bg-[#7dbb87] font-black text-white">A</span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-[13px] font-black">试试看现在能染的颜色</span>
+            <span className="mt-0.5 block text-[10.5px] text-ink-2">不需要漂，直接进入实拍试色。</span>
+            <span className="mt-2 flex gap-1.5">
+              {alternatives.slice(0, 5).map((item) => {
+                const rgb = matrix.matrix[item.kb_color!]?.[String(level)]?.rgb;
+                return <span key={item.video_id} className="size-5 rounded-full border border-ink/10" style={{ background: rgb ? rgbCss(rgb) : item.accent ?? '#777' }} />;
+              })}
+            </span>
+          </span>
+          <ArrowRight size={19} weight="bold" />
+        </button>
+        <button type="button" onClick={() => onGo('bleach')} className="tap flex items-center gap-3 rounded-[20px] border border-[#e8bd62] bg-[#fffaf0] px-3.5 py-3 text-left">
+          <span className="grid size-8 shrink-0 place-items-center rounded-full bg-[#e8ad3f] font-black text-white">B</span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-[13px] font-black">还是想染{video.color_name}</span>
+            <span className="mt-0.5 block text-[10.5px] leading-4 text-ink-2">跳过实拍，直接查看漂到 {min} 度后的理想方案。</span>
+          </span>
+          <ArrowRight size={19} weight="bold" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function Evidence({ index, title, body }: { index: string; title: string; body: string }) {
+  return (
+    <div className="grid grid-cols-[28px_1fr] gap-2.5 rounded-[15px] bg-cream px-3 py-2.5">
+      <span className="grid size-7 place-items-center rounded-full border border-pink text-[11px] font-black text-pink-dark">{index}</span>
+      <div><p className="text-[12px] font-black">{title}</p><p className="mt-0.5 text-[10.5px] leading-4 text-ink-2">{body}</p></div>
+    </div>
+  );
+}
+
+function PhotoFact({ title, src, label }: { title: string; src: string; label: string }) {
+  return (
+    <div className="text-center">
+      <p className="mb-2 text-[11px] font-black">{title}</p>
+      <div className="mx-auto aspect-square w-full max-w-[118px] overflow-hidden rounded-[16px] bg-cream">
+        {src ? <MediaImage src={src} alt={title} className="object-cover" /> : null}
+      </div>
+      <p className="mt-1.5 text-[10px] font-bold">{label}</p>
+    </div>
+  );
+}
+
+function Frame({ onBack, children }: { onBack: () => void; children: React.ReactNode }) {
   return (
     <main className="tony-app relative mx-auto flex min-h-0 flex-col overflow-hidden bg-cream text-ink md:my-5 md:rounded-[34px] md:border-2 md:border-ink">
       <header className="shrink-0 border-b border-ink/15 pt-[max(10px,env(safe-area-inset-top))]">
         <div className="flex items-center px-3">
-          <button type="button" onClick={onBack} aria-label="返回"
-            className="sketch-icon-button tap grid size-9 place-items-center bg-white">
-            <ArrowRight size={17} weight="bold" className="rotate-180" />
-          </button>
-          <p className="flex-1 text-center text-[13px] font-black">{title}</p>
+          <button type="button" onClick={onBack} aria-label="返回" className="sketch-icon-button tap grid size-9 place-items-center bg-white"><ArrowLeft size={17} weight="bold" /></button>
+          <div className="flex-1 text-center"><p className="text-[15px] font-black">能不能染这个颜色？</p><p className="mt-0.5 text-[9.5px] text-ink-3">根据你的发色和目标色进行判断</p></div>
           <span className="w-9" />
         </div>
-        <FlowProgress stage={stage} />
+        <FlowProgress stage="verdict" />
       </header>
       {children}
     </main>
@@ -266,65 +294,21 @@ function Frame({ stage, title, onBack, children }: {
 }
 
 function Footer({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="shrink-0 border-t border-ink/12 px-5 pb-[max(14px,env(safe-area-inset-bottom))] pt-3">
-      {children}
-    </div>
-  );
+  return <div className="shrink-0 border-t border-ink/12 px-4 pb-[max(12px,env(safe-area-inset-bottom))] pt-3">{children}</div>;
 }
 
-/** 试色屏顶部 ⓘ 展开的完整判断，内容与屏2A 一致，避免两处各说各话 */
-export function VerdictDetail({
-  matrix, level, video, dyeHistory, currentTone, onClose,
-}: {
-  matrix: ColorMatrix; level: number; video: VideoColor;
-  dyeHistory?: string; currentTone?: string; onClose: () => void;
+export function VerdictDetail({ matrix, level, video, dyeHistory, currentTone, onClose }: {
+  matrix: ColorMatrix; level: number; video: VideoColor; dyeHistory?: string; currentTone?: string; onClose: () => void;
 }) {
   const kb = video.kb_color ?? '';
   const risks = judgeRisks(matrix, kb, level, dyeHistory, currentTone);
-  const stages = fadeStages(matrix, kb, level);
   const can = layer1CanDye(matrix, kb, level).can;
-
   return (
-    <div className="absolute inset-0 z-30 flex flex-col justify-end bg-black/45" onClick={onClose}>
-      <div className="max-h-[80%] overflow-y-auto rounded-t-[24px] bg-cream px-5 pb-[max(18px,env(safe-area-inset-bottom))] pt-4 text-ink"
-        onClick={(e) => e.stopPropagation()}>
-        <div className="mb-3 flex items-center gap-1.5">
-          {can ? <Check size={17} weight="bold" className="text-[#3f8a56]" />
-            : <Info size={17} weight="bold" className="text-[#b4801f]" />}
-          <p className="flex-1 text-[15px] font-black">
-            {video.color_name} · {can ? '能直接染' : '需要先漂浅'}
-          </p>
-          <button type="button" onClick={onClose} aria-label="关闭"
-            className="tap grid size-8 place-items-center rounded-full border border-ink/20 bg-white">
-            <X size={14} weight="bold" />
-          </button>
-        </div>
-
-        {risks.map((r) => (
-          <div key={r.key} className="mb-2 rounded-[14px] border border-[#e8c47a] bg-[#fff8e4] px-3 py-2.5">
-            <p className="text-[12px] font-bold leading-[1.6] text-[#7a5a12]">{r.text}</p>
-            <p className="mt-1 text-[11px] leading-[1.6] text-[#8a6b28]">→ {r.action}</p>
-          </div>
-        ))}
-
-        {stages.length > 0 ? (
-          <>
-            <p className="mt-3 text-[12px] font-bold">
-              大概能保持 {holdLabel(matrix, kb)}
-              <span className="ml-1 text-[10px] font-normal text-ink-3">（行业参考值）</span>
-            </p>
-            <div className="mt-2 flex gap-1.5">
-              {stages.map((s) => (
-                <div key={s.week} className="flex-1">
-                  <div className="h-9 rounded-[8px] border border-ink/15" style={{ background: rgbCss(s.rgb) }} />
-                  <p className="mt-1 text-center text-[9.5px] text-ink-3">第 {s.week} 周</p>
-                  <p className="text-center text-[10px] font-bold leading-tight">{s.name}</p>
-                </div>
-              ))}
-            </div>
-          </>
-        ) : null}
+    <div className="absolute inset-0 z-30 flex flex-col justify-end bg-black/35" onClick={onClose}>
+      <div className="max-h-[72%] overflow-y-auto rounded-t-[24px] bg-cream px-5 pb-[max(18px,env(safe-area-inset-bottom))] pt-4 text-ink" onClick={(event) => event.stopPropagation()}>
+        <div className="flex items-center gap-2"><Info size={18} weight="bold" className="text-pink-dark" /><p className="flex-1 text-[15px] font-black">{video.color_name} · {can ? '当前可直接染' : '需要先漂浅'}</p><button type="button" onClick={onClose} className="grid size-8 place-items-center rounded-full border border-line"><X size={15} /></button></div>
+        <p className="mt-3 text-[12px] leading-5 text-ink-2">你当前确认的底色为 {level} 度。保色期参考：{holdLabel(matrix, kb)}。</p>
+        <div className="mt-3 space-y-2">{risks.map((risk) => <div key={risk.key} className="rounded-[14px] border border-[#e8c47a] bg-[#fff8e4] px-3 py-2.5"><p className="text-[12px] font-bold">{risk.text}</p><p className="mt-1 text-[11px] text-ink-2">→ {risk.action}</p></div>)}</div>
       </div>
     </div>
   );

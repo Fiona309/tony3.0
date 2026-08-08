@@ -487,7 +487,9 @@ def get_plan_result(payload: dict[str, Any], request: Request):
     profile = store.profile_for_rules(payload["profile_id"], user_key=current_user_key)
     rule_decision = color_rule_kb.evaluate_profile(profile)
     result = store.plan_result(payload["profile_id"], rule_decision, user_key=current_user_key)
-    if result.get("preview_status") in {"queued", "generating"} and result.get("can_recommend_product"):
+    # 不可直染但坚持查看目标色时，也要提前生成“漂后理想方案”。
+    # 是否推荐居家染发只影响风险提示，不再阻断效果图任务。
+    if result.get("preview_status") in {"queued", "generating"}:
         enqueue_preview_generation(result["preview_task_id"], current_user_key)
     return ok(result)
 
@@ -515,6 +517,7 @@ def run_preview_generation(preview_task_id: str, owner_user_key: str) -> None:
             task["profile"],
             task["labels"],
             task["rule_decision"],
+            task.get("generation_mode", "current_base"),
         )
         store.complete_preview_generation(preview_task_id, images, user_key=owner_user_key)
     except Exception as error:
@@ -565,8 +568,8 @@ def generate_preview_images(
     profile: dict,
     labels: list[str],
     rule_decision: dict | None = None,
+    generation_mode: str = "current_base",
 ) -> list[dict]:
-    _ = labels
     generated_dir = settings.media_dir / "generated" / "previews" / preview_task_id
     generated_dir.mkdir(parents=True, exist_ok=True)
     current_hair = profile.get("current_hair", {})
@@ -585,8 +588,10 @@ def generate_preview_images(
     target_family = color_rule.get("matched_color_name") or target_color.get("display_name") or "目标色"
     target_level = _int_or_default(target_color.get("level"), 8)
     current_level = _int_or_default((current_color or {}).get("level"), _int_or_default(color_rule.get("current_level"), 8))
+    is_bleach_ideal = generation_mode == "post_bleach_ideal"
+    generation_level = target_level if is_bleach_ideal else current_level
     pipeline_plan = _hair_full_generation_plan(
-        user_level=current_level,
+        user_level=generation_level,
         target_family=target_family,
         target_level=target_level,
         target_name=f"{target_family}{target_level}度",
@@ -607,15 +612,19 @@ def generate_preview_images(
             "risk_variant": None,
         }
     base_color = pipeline_plan.get("base_color") or {}
-    target_rgb = _rgb_tuple(base_color.get("rgb")) or _rgb_tuple(target_color.get("rgb"))
+    official_result = color_rule.get("official_result_color") or {}
+    target_rgb = (
+        (_rgb_tuple(base_color.get("rgb")) if is_bleach_ideal else _rgb_tuple(official_result.get("rgb")))
+        or _rgb_tuple(base_color.get("rgb"))
+        or _rgb_tuple(target_color.get("rgb"))
+    )
     if target_rgb is None:
         raise RuntimeError("hair_full_pipeline_target_rgb_unavailable")
-    target_hex = str(base_color.get("hex") or _hex_from_rgb(target_rgb))
-    # 只生一张标准效果图作为存档。偏色/深浅的差异已由实时试色免费呈现，
-    # 生图的唯一职责是给"确定要染"的用户留一张高保真存档，因此不再生成
-    # risk 变体（省掉一次生图调用），也不再本地衍生 4 张 HSV 变体。
-    has_risk = False
-    _ = result_quality
+    target_hex = _hex_from_rgb(target_rgb)
+    # 直染方案保留偏深/标准/偏浅/偏色四档；漂后理想方案只有前三档。
+    # 偏色仅在知识库判定为 biased 时请求独立风险图，否则使用同一标准图的
+    # 物理色温衍生档，避免伪造一条知识库没有给出的风险结论。
+    has_risk = not is_bleach_ideal and result_quality == "biased"
 
     generator = _hair_full_generator()
     with Image.open(current_image_path).convert("RGB") as before_image:
@@ -625,29 +634,40 @@ def generate_preview_images(
             target_level=target_level,
             target_rgb=target_rgb,
             target_hex=target_hex,
-            user_level=current_level,
+            user_level=generation_level,
             has_risk=has_risk,
             output_dir=str(generated_dir),
         )
 
     variants = pipeline_result.get("variants") or []
-    standard = next((v for v in variants if str(v.get("key")) == "standard" and v.get("path")), None)
+    by_key = {str(item.get("key")): item for item in variants if item.get("path")}
+    standard = by_key.get("standard")
     if standard is None:
         raise RuntimeError("hair_full_pipeline_standard_variant_missing")
 
-    output_path = Path(standard["path"])
-    if not output_path.exists():
-        raise RuntimeError("hair_full_pipeline_missing_variant:standard")
-    url = f"/media/generated/previews/{preview_task_id}/{output_path.name}"
-    return [
-        {
-            "preview_level": 1,
-            "label": "标准效果",
+    requested = [
+        ("low", "偏深"),
+        ("standard", "标准"),
+        ("high", "偏浅"),
+    ]
+    if not is_bleach_ideal:
+        requested.append(("risk" if has_risk and by_key.get("risk") else "warm", "偏色"))
+
+    output: list[dict] = []
+    for index, (key, default_label) in enumerate(requested, start=1):
+        item = by_key.get(key) or standard
+        output_path = Path(item["path"])
+        if not output_path.exists():
+            raise RuntimeError(f"hair_full_pipeline_missing_variant:{key}")
+        url = f"/media/generated/previews/{preview_task_id}/{output_path.name}"
+        output.append({
+            "preview_level": index,
+            "label": labels[index - 1] if index <= len(labels) else default_label,
             "url": url,
             "storage_key": url.removeprefix("/media/"),
             "enabled": True,
-        }
-    ]
+        })
+    return output
 
 
 def _hair_full_generator() -> Any:
