@@ -18,6 +18,22 @@ __pycache__/
 *.svg
 *.webm
 
+# App-owned media required by the checked-in UI and API responses.
+# Keep the broad binary ignore above for generated/user uploads, but explicitly
+# version the curated demo/tutorial assets used by the product flow.
+!backend/data/media/mock-assets/
+!backend/data/media/mock-assets/**/*.jpg
+!backend/data/media/mock-assets/**/*.mp4
+!backend/data/media/video-mock/frames/
+!backend/data/media/video-mock/frames/*.jpg
+!my-tony2.0/public/loading/
+!my-tony2.0/public/loading/*.png
+!my-tony2.0/public/product-assets/
+!my-tony2.0/public/product-assets/**/*.jpg
+!my-tony2.0/public/product-assets/**/*.png
+!my-tony2.0/public/video-mock/frames/
+!my-tony2.0/public/video-mock/frames/*.jpg
+
 # Runtime data and user-generated content
 # 本地跑服务时用的数据库副本，避免弄脏被 git 跟踪的 backend/data/meifa.db
 backend/data-local/
