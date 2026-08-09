@@ -157,6 +157,8 @@ TUTORIAL_STEPS = [
         "end_time_ms": 35000,
         "title": "准备与分区",
         "description": "将头发按区域分开，准备开始上色。",
+        "points": ["戴好手套和围布", "发际线周围薄涂隔离霜", "用发夹固定分区"],
+        "caution": "开始后不要临时离开，先确认全部用具齐全。",
     },
     {
         "step_id": "step_02",
@@ -166,6 +168,7 @@ TUTORIAL_STEPS = [
         "end_time_ms": 80000,
         "title": "第一轮上色",
         "description": "从指定区域开始均匀涂抹。",
+        "points": ["每次取一小缕头发", "先覆盖发根和内层", "不要漏掉耳后和后脑勺"],
     },
     {
         "step_id": "step_03",
@@ -175,6 +178,7 @@ TUTORIAL_STEPS = [
         "end_time_ms": 130000,
         "title": "第二轮上色",
         "description": "继续覆盖剩余区域，确保发根和发尾均匀。",
+        "points": ["补齐剩余分区", "翻开检查内层", "请同伴检查后脑勺"],
     },
     {
         "step_id": "step_04",
@@ -184,6 +188,9 @@ TUTORIAL_STEPS = [
         "end_time_ms": 150000,
         "title": "等待显色",
         "description": "按产品说明等待显色，不要额外加热。",
+        "points": ["不要额外加热", "避免产品接触眼睛", "明显刺痛时立即冲洗"],
+        "caution": "演示倒计时缩短为 15 秒，实际请以商品说明为准。",
+        "wait_seconds": 15,
     },
     {
         "step_id": "step_05",
@@ -193,6 +200,8 @@ TUTORIAL_STEPS = [
         "end_time_ms": 180000,
         "title": "冲洗与护理",
         "description": "冲洗至水基本清澈，再使用配套护理。",
+        "points": ["使用偏凉的水冲洗", "第一次不要使用强清洁洗发水", "吹干后检查根尾颜色"],
+        "caution": "前 48 小时尽量减少洗头。",
     },
 ]
 
@@ -309,9 +318,163 @@ def _load_tutorial_steps_by_video_id() -> dict[str, list[dict]]:
 TUTORIAL_STEPS_BY_VIDEO_ID = _load_tutorial_steps_by_video_id()
 
 
+def _format_time_range(start_time_ms: int, end_time_ms: int) -> str:
+    def format_time(value: int) -> str:
+        seconds = max(0, value // 1000)
+        return f"{seconds // 60}:{seconds % 60:02d}"
+
+    return f"{format_time(start_time_ms)}-{format_time(end_time_ms)}"
+
+
+def _manual_tutorial_step(
+    tutorial_id: str,
+    step_no: int,
+    total_steps: int,
+    start_time_ms: int,
+    end_time_ms: int,
+    title: str,
+    description: str,
+    points: list[str],
+    caution: str | None = None,
+) -> dict:
+    step = {
+        "step_id": f"{tutorial_id}_step_{step_no:02d}",
+        "step_no": step_no,
+        "total_steps": total_steps,
+        "start_time_ms": start_time_ms,
+        "end_time_ms": end_time_ms,
+        "title": title,
+        "description": description,
+        "points": points,
+        "display_time_range": _format_time_range(start_time_ms, end_time_ms),
+        "source": "sensevoice_auto_segment",
+    }
+    if caution:
+        step["caution"] = caution
+    return step
+
+
+MANUAL_TUTORIAL_STEPS_BY_VIDEO_ID = {
+    "tutorial_blue": [
+        _manual_tutorial_step("tutorial_blue", 1, 4, 0, 24078, "介绍与准备", "介绍蓝色固色效果，准备固色发膜、洗发水和护发素。", ["确认目标是蓝色固色。", "准备固色发膜、固色洗发水和护发素。"], "产品说明优先于视频口播。"),
+        _manual_tutorial_step("tutorial_blue", 2, 4, 24078, 46370, "分区与涂抹", "按比例调配后从分区开始涂抹，让颜色覆盖更均匀。", ["头发多时先分区。", "干发直接涂抹并轻轻揉开。"]),
+        _manual_tutorial_step("tutorial_blue", 3, 4, 46370, 70112, "等待与冲洗", "揉开后等待几分钟，再用偏凉水冲洗并使用同色洗发水。", ["不要用过高水温冲洗。", "冲洗时继续轻揉让颜色更均匀。"], "明显不适时提前冲洗。"),
+        _manual_tutorial_step("tutorial_blue", 4, 4, 70112, 101266, "护理与效果展示", "完成冲洗和吹干，观察蓝色维持和掉色情况。", ["吹风温度不要太高。", "染后减少频繁洗头。"], "前 48 小时尽量减少洗头。"),
+    ],
+    "tutorial_red": [
+        _manual_tutorial_step("tutorial_red", 1, 4, 0, 20138, "介绍与准备", "介绍红色染发目标，准备旧衣服和皮肤隔离。", ["穿不怕弄脏的衣服。", "额头、脸颊和脖子后面先涂隔离。"]),
+        _manual_tutorial_step("tutorial_red", 2, 4, 20138, 43454, "介绍与准备", "打开染发膏并准备工具，把需要混合的产品放到一起。", ["确认说明书和工具。", "按包装要求混合产品。"], "不要随意改变官方比例。"),
+        _manual_tutorial_step("tutorial_red", 3, 4, 43454, 81567, "等待与冲洗", "完成调配和上色后等待显色，再准备冲洗。", ["观察头顶上色情况。", "时间差不多后及时冲洗。"], "等待时间以商品说明为准。"),
+        _manual_tutorial_step("tutorial_red", 4, 4, 81567, 128637, "护理与效果展示", "查看洗后红色效果、均匀度和光泽感。", ["洗后检查发色是否均匀。", "观察不同光线下的颜色。"]),
+    ],
+    "tutorial_purple": [
+        _manual_tutorial_step("tutorial_purple", 1, 3, 0, 25271, "产品调配", "介绍紫色固色发膜，按干发状态准备上头。", ["干发状态下操作。", "根据想要的浓淡决定是否混护发素。"]),
+        _manual_tutorial_step("tutorial_purple", 2, 3, 25271, 53888, "产品调配", "将发膜揉开到每一根头发，想要浅一点可泡水再淋。", ["尽量不要漏掉头发。", "后脑勺也要检查覆盖。"]),
+        _manual_tutorial_step("tutorial_purple", 3, 3, 53888, 98833, "护理与效果展示", "全头涂好后检查后脑勺，等待十几到二十分钟后冲洗。", ["用镜子检查后脑勺。", "等待后再冲洗。"], "敏感头皮按产品说明保守控制时间。"),
+    ],
+    "tutorial_pink": [
+        _manual_tutorial_step("tutorial_pink", 1, 3, 0, 32888, "介绍与准备", "介绍粉色固色目标，准备旧衣服和 NV 发膜。", ["准备一件不要的衣服。", "确认头皮状态再操作。"]),
+        _manual_tutorial_step("tutorial_pink", 2, 3, 32888, 56190, "产品调配", "用少量发膜加白色护发素调配粉色，也可以准备泡水法。", ["少量多次调配。", "加水搅拌均匀后再泡。"]),
+        _manual_tutorial_step("tutorial_pink", 3, 3, 56190, 98682, "护理与效果展示", "泡十来分钟，后脑勺和耳后多淋几遍，再固色洗一次。", ["后脑勺和耳后要覆盖。", "泡完后用固色产品清洗。"]),
+    ],
+    "tutorial_cold_tea": [
+        _manual_tutorial_step("tutorial_cold_tea", 1, 5, 0, 46173, "介绍与准备", "男生居家染发前先做防护，准备衣服、隔离和工具。", ["穿深色或不要的衣服。", "额头、耳后、脖子后面涂隔离。", "按说明书混合染膏。"]),
+        _manual_tutorial_step("tutorial_cold_tea", 2, 5, 46173, 95532, "分区与涂抹", "从鬓角附近开始刷发中发尾，再用梳子梳开。", ["避开发根 1 到 2 厘米。", "先涂再梳，保证每一面粘到染膏。"]),
+        _manual_tutorial_step("tutorial_cold_tea", 3, 5, 95532, 143007, "分区与涂抹", "补上鬓角、后脑勺和发根，控制整体停留时间后冲洗。", ["后脑勺要一层一层刷匀。", "发根最后补涂。"], "细软发和粗硬发等待时间不同，以说明为准。"),
+        _manual_tutorial_step("tutorial_cold_tea", 4, 5, 143007, 189049, "护理与效果展示", "冲洗后半干状态做护发，观察冷茶色显白效果。", ["先冲掉染膏再洗发。", "半干后护理发中发尾。"]),
+        _manual_tutorial_step("tutorial_cold_tea", 5, 5, 189049, 238630, "护理与效果展示", "后续用护发素和护发精油护理，减少干涩和打结。", ["洗后护发素敷几分钟。", "吹干前使用护发精油。"], "染后前三天尽量不要频繁洗头。"),
+    ],
+    "tutorial_cold_brown": [
+        _manual_tutorial_step("tutorial_cold_brown", 1, 4, 0, 32125, "介绍与准备", "第一次居家染发前清空周围环境，穿旧衣服并保护头皮。", ["三天不洗头可帮助保护头皮。", "清空周围日用品。", "发际线和脖子后面涂隔离。"]),
+        _manual_tutorial_step("tutorial_cold_brown", 2, 4, 32125, 64049, "产品调配", "戴好耳套、手套和披肩，按 1 比 1 调配并加入精油。", ["染发剂和显发剂按比例混合。", "精油不要忘记加入。", "认真搅拌均匀。"]),
+        _manual_tutorial_step("tutorial_cold_brown", 3, 4, 64049, 97971, "分区与涂抹", "把头发分成上下左右区域，从下层开始距离发根两指涂抹。", ["头发多可分成 6 个区。", "发中到发尾多涂。", "反复揉搓确保每根发丝覆盖。"]),
+        _manual_tutorial_step("tutorial_cold_brown", 4, 4, 97971, 144193, "护理与效果展示", "补涂发根并检查均匀度，清洗后查看冷棕色光泽效果。", ["等待后再染发根。", "对镜检查是否涂抹均匀。", "清洗后观察不同光线效果。"]),
+    ],
+}
+
+
+def _mp4_duration_ms(path: Path) -> int | None:
+    try:
+        data = path.read_bytes()
+    except OSError:
+        return None
+
+    def iter_boxes(start: int, end: int):
+        pos = start
+        while pos + 8 <= end:
+            size = int.from_bytes(data[pos : pos + 4], "big")
+            box_type = data[pos + 4 : pos + 8].decode("latin1")
+            header_size = 8
+            if size == 1 and pos + 16 <= end:
+                size = int.from_bytes(data[pos + 8 : pos + 16], "big")
+                header_size = 16
+            elif size == 0:
+                size = end - pos
+            if size < header_size:
+                break
+            yield pos, size, box_type, header_size
+            pos += size
+
+    for moov_pos, moov_size, box_type, moov_header in iter_boxes(0, len(data)):
+        if box_type != "moov":
+            continue
+        for mvhd_pos, mvhd_size, mvhd_type, mvhd_header in iter_boxes(
+            moov_pos + moov_header,
+            moov_pos + moov_size,
+        ):
+            if mvhd_type != "mvhd":
+                continue
+            offset = mvhd_pos + mvhd_header
+            version = data[offset]
+            try:
+                if version == 0:
+                    timescale = int.from_bytes(data[offset + 12 : offset + 16], "big")
+                    duration = int.from_bytes(data[offset + 16 : offset + 20], "big")
+                else:
+                    timescale = int.from_bytes(data[offset + 20 : offset + 24], "big")
+                    duration = int.from_bytes(data[offset + 24 : offset + 32], "big")
+            except IndexError:
+                return None
+            if timescale <= 0:
+                return None
+            return int(duration / timescale * 1000)
+    return None
+
+
+def _tutorial_duration_ms(tutorial_video_id: str | None) -> int | None:
+    media_item = MOCK_MEDIA_BY_TUTORIAL_ID.get(str(tutorial_video_id or ""))
+    tutorial_url = str((media_item or {}).get("tutorial_url") or "")
+    if not tutorial_url.startswith("/media/"):
+        return None
+    return _mp4_duration_ms(PROJECT_ROOT / "backend" / "data" / "media" / tutorial_url.removeprefix("/media/"))
+
+
+def _scaled_default_tutorial_steps(tutorial_video_id: str | None) -> list[dict]:
+    duration_ms = _tutorial_duration_ms(tutorial_video_id)
+    if not duration_ms:
+        return deepcopy(TUTORIAL_STEPS)
+    base_duration_ms = TUTORIAL_STEPS[-1]["end_time_ms"]
+    steps = deepcopy(TUTORIAL_STEPS)
+    previous_end = 0
+    for index, step in enumerate(steps):
+        start = 0 if index == 0 else previous_end
+        if index == len(steps) - 1:
+            end = duration_ms
+        else:
+            ratio = step["end_time_ms"] / base_duration_ms
+            end = max(start + 1000, min(duration_ms, round(duration_ms * ratio)))
+        step["start_time_ms"] = start
+        step["end_time_ms"] = end
+        previous_end = end
+    return steps
+
+
 def _tutorial_steps_for_video_id(tutorial_video_id: str | None) -> list[dict]:
+    manual_steps = MANUAL_TUTORIAL_STEPS_BY_VIDEO_ID.get(str(tutorial_video_id or ""))
+    if manual_steps:
+        return deepcopy(manual_steps)
     steps = TUTORIAL_STEPS_BY_VIDEO_ID.get(str(tutorial_video_id or ""))
-    return deepcopy(steps if steps else TUTORIAL_STEPS)
+    return deepcopy(steps) if steps else _scaled_default_tutorial_steps(tutorial_video_id)
 
 
 def _tutorial_display_title(media_item: dict | None) -> str:
@@ -1209,7 +1372,7 @@ class MockStore:
             "tutorial_steps": deepcopy(tutorial_steps),
             "current_step": deepcopy(tutorial_steps[0]),
             "step_end_tts": {
-                "text": "你在这一步的操作过程中有什么问题，随时可以问我。",
+                "text": "你在这一步有什么问题，可以随时问我～",
                 "audio_url": None,
             },
             "awaiting_voice_input": False,
@@ -1221,12 +1384,35 @@ class MockStore:
         return deepcopy(session)
 
     def session(self, session_id: str, user_key: str | None = None) -> dict:
-        return deepcopy(self._require_owned(self.sessions, session_id, "教程会话不存在", "session", user_key))
+        session = self._require_owned(self.sessions, session_id, "教程会话不存在", "session", user_key)
+        self._sync_session_steps(session, user_key=user_key)
+        return deepcopy(session)
 
     def voice_event(self, session_id: str, event_id: str, user_key: str | None = None) -> dict | None:
         self._require_owned(self.sessions, session_id, "教程会话不存在", "session", user_key)
         event = self.voice_events.get((session_id, event_id))
         return deepcopy(event) if event is not None else None
+
+    def _sync_session_steps(self, session: dict, user_key: str | None = None) -> None:
+        tutorial_video_id = session.get("tutorial_video", {}).get("video_id")
+        tutorial_steps = _tutorial_steps_for_video_id(tutorial_video_id)
+        if not tutorial_steps:
+            return
+        current_step_no = int(session.get("current_step", {}).get("step_no") or 1)
+        current_index = min(max(current_step_no - 1, 0), len(tutorial_steps) - 1)
+        session["tutorial_steps"] = deepcopy(tutorial_steps)
+        session["current_step"] = deepcopy(tutorial_steps[current_index])
+        session["step_end_tts"] = {
+            "text": "你在这一步有什么问题，可以随时问我～",
+            "audio_url": None,
+        }
+        session["completed_step_count"] = min(
+            int(session.get("completed_step_count") or current_index),
+            max(0, len(tutorial_steps) - 1),
+        )
+        session_id = session.get("tutorial_session_id")
+        if session_id:
+            self._persist("session", session_id, session, user_key)
 
     def voice_input(self, session_id: str, current_step_id: str, event_id: str, filename: str) -> dict:
         command = "finish" if "finish" in filename else "next" if "next" in filename else "question"
@@ -1238,6 +1424,21 @@ class MockStore:
             transcript=transcript,
             intent=command,
             tts_audio_url=None,
+        )
+
+    def next_tutorial_step(self, session_id: str, user_key: str | None = None) -> dict:
+        event_id = _id("manual_next")
+        session = self._require_owned(self.sessions, session_id, "教程会话不存在", "session", user_key)
+        self._sync_session_steps(session, user_key=user_key)
+        current_step_id = str(session.get("current_step", {}).get("step_id") or "")
+        return self.voice_input_from_transcript(
+            session_id,
+            current_step_id,
+            event_id,
+            transcript="下一步",
+            intent="next",
+            tts_audio_url=None,
+            user_key=user_key,
         )
 
     def voice_input_from_transcript(
@@ -1260,8 +1461,10 @@ class MockStore:
         tutorial_steps = session.get("tutorial_steps") or _tutorial_steps_for_video_id(
             session.get("tutorial_video", {}).get("video_id")
         )
+        session_step_id = str(session.get("current_step", {}).get("step_id") or "")
+        effective_step_id = session_step_id or current_step_id
         current_index = next(
-            (item["step_no"] - 1 for item in tutorial_steps if item["step_id"] == current_step_id),
+            (item["step_no"] - 1 for item in tutorial_steps if item["step_id"] == effective_step_id),
             0,
         )
         if intent == "finish" and current_index < len(tutorial_steps) - 1:
@@ -1270,7 +1473,7 @@ class MockStore:
             session["awaiting_voice_input"] = True
             result = {
                 "action": "silence",
-                "tts_text": "我没有听清，请再说一次。",
+                "tts_text": "我没有听清，你再说一次。",
                 "tts_audio_url": tts_audio_url,
             }
         elif intent == "finish":
@@ -1307,8 +1510,9 @@ class MockStore:
                     "action": "play_next_step",
                     "asr_transcript": transcript,
                     "current_step": deepcopy(session["current_step"]),
+                    "tts_text": "你在这一步有什么问题，可以随时问我～",
                     "step_end_tts": {
-                        "text": "这一步有什么问题，随时可以问我。",
+                        "text": "你在这一步有什么问题，可以随时问我～",
                         "audio_url": tts_audio_url,
                     },
                 }

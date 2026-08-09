@@ -445,6 +445,7 @@ export type TutorialAction =
       action: 'play_next_step';
       asr_transcript?: string;
       current_step: TutorialStep;
+      tts_text?: string;
       step_end_tts?: StepEndTTS;
     }
   | {

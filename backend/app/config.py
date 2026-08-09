@@ -72,6 +72,10 @@ class Settings:
     sensevoice_vad_model: str
     asr_timeout_seconds: int
     tts_provider: str
+    tts_base_url: str
+    tts_api_key: str | None
+    tts_model: str
+    tts_voice: str
     tts_timeout_seconds: int
     request_worker_threads: int
     preview_worker_count: int
@@ -163,7 +167,14 @@ def get_settings() -> Settings:
         sensevoice_device=os.getenv("SENSEVOICE_DEVICE", "cpu"),
         sensevoice_vad_model=os.getenv("SENSEVOICE_VAD_MODEL", "fsmn-vad"),
         asr_timeout_seconds=int(os.getenv("ASR_TIMEOUT_SECONDS", "8")),
-        tts_provider=os.getenv("TTS_PROVIDER", "browser_fallback"),
+        tts_provider=os.getenv("TTS_PROVIDER", "browser_fallback").lower(),
+        tts_base_url=os.getenv(
+            "TTS_BASE_URL",
+            os.getenv("OPENAI_NEXT_BASE_URL", "https://api.openai-next.com"),
+        ),
+        tts_api_key=os.getenv("TTS_API_KEY") or os.getenv("OPENAI_NEXT_API_KEY"),
+        tts_model=os.getenv("TTS_MODEL", "qwen3-tts-flash"),
+        tts_voice=os.getenv("TTS_VOICE", "Cherry"),
         tts_timeout_seconds=int(os.getenv("TTS_TIMEOUT_SECONDS", "10")),
         # Sync endpoints and run_in_threadpool calls share this pool. Slow
         # upstreams (vision ~10s, ASR ~1s) hold a thread for their whole

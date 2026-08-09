@@ -271,7 +271,7 @@ def suggest_segments(video: TutorialVideo, duration_ms: int, chunks: list[dict[s
                 "start_time_ms": start_ms,
                 "end_time_ms": end_ms,
                 "description": summarize_text(text, title),
-                "step_end_tts": "这一步有什么问题，随时可以问我。",
+                "step_end_tts": "你在这一步有什么问题，可以随时问我～",
                 "notes": text,
             }
         )

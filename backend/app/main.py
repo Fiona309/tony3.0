@@ -880,12 +880,45 @@ def get_archive(archive_id: str, request: Request):
 
 @app.post("/api/tutorial-sessions")
 def create_tutorial_session(payload: dict[str, Any], request: Request):
-    return ok(store.create_session(payload["archive_id"], user_key=user_key(request)))
+    session = store.create_session(payload["archive_id"], user_key=user_key(request))
+    _hydrate_step_end_tts(session)
+    return ok(session)
 
 
 @app.get("/api/tutorial-sessions/{tutorial_session_id}")
 def get_tutorial_session(tutorial_session_id: str, request: Request):
-    return ok(store.session(tutorial_session_id, user_key=user_key(request)))
+    session = store.session(tutorial_session_id, user_key=user_key(request))
+    _hydrate_step_end_tts(session)
+    return ok(session)
+
+
+@app.post("/api/tutorial-sessions/{tutorial_session_id}/next-step")
+def next_tutorial_step(tutorial_session_id: str, request: Request):
+    action = store.next_tutorial_step(tutorial_session_id, user_key=user_key(request))
+    _hydrate_action_step_end_tts(action)
+    return ok(action)
+
+
+def _hydrate_step_end_tts(session: dict[str, Any]) -> None:
+    step_end_tts = session.get("step_end_tts")
+    if not isinstance(step_end_tts, dict) or step_end_tts.get("audio_url"):
+        return
+    text = str(step_end_tts.get("text") or "").strip()
+    if not text:
+        return
+    tts = model_service.synthesize_speech(text)
+    step_end_tts["audio_url"] = tts.audio_url
+
+
+def _hydrate_action_step_end_tts(action: dict[str, Any]) -> None:
+    step_end_tts = action.get("step_end_tts")
+    if not isinstance(step_end_tts, dict) or step_end_tts.get("audio_url"):
+        return
+    text = str(step_end_tts.get("text") or "").strip()
+    if not text:
+        return
+    tts = model_service.synthesize_speech(text)
+    step_end_tts["audio_url"] = tts.audio_url
 
 
 @app.post("/api/tutorial-sessions/{tutorial_session_id}/completion-record")

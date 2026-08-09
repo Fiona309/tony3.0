@@ -33,7 +33,7 @@ class TutorialService:
         user_key: str | None = None,
     ) -> dict:
         if not transcribe_result.has_voice:
-            tts = self.model_service.synthesize_speech("我没有听清，请再说一次。")
+            tts = self.model_service.synthesize_speech("我没有听清，你再说一次。")
             return self.store.voice_input_from_transcript(
                 tutorial_session_id,
                 current_step_id,
@@ -44,16 +44,29 @@ class TutorialService:
                 user_key=user_key,
             )
 
+        if _looks_like_asr_hallucination(transcribe_result.transcript):
+            tts = self.model_service.synthesize_speech("我没有听清，你再说一次。")
+            return self.store.voice_input_from_transcript(
+                tutorial_session_id,
+                current_step_id,
+                client_event_id,
+                transcript=transcribe_result.transcript,
+                intent="silence",
+                tts_audio_url=tts.audio_url,
+                user_key=user_key,
+            )
+
         intent = self.model_service.classify_tutorial_intent(transcribe_result.transcript)
+        session = self.store.session(tutorial_session_id, user_key=user_key)
+        current_step = session.get("current_step", {})
+        authoritative_step_id = str(current_step.get("step_id") or current_step_id)
         answer_text = None
         answer_meta = None
         hit = None
         if intent == "question":
-            session = self.store.session(tutorial_session_id, user_key=user_key)
             archive = self.store.archive(session["archive_id"], user_key=user_key)
-            current_step = session["current_step"]
             context = {
-                "step_id": current_step.get("step_id"),
+                "step_id": authoritative_step_id,
                 "step_title": current_step.get("title"),
                 "sku_id": archive.get("product_snapshot", {}).get("sku_id"),
                 "product_name": archive.get("product_snapshot", {}).get("product_name"),
@@ -103,13 +116,19 @@ class TutorialService:
                     "score": float(hit.get("score") or 0.0) if hit is not None else 0.0,
                     "source": "step_context_llm",
                 }
+        effective_intent = intent
+        if intent == "finish":
+            if int(current_step.get("step_no") or 0) < int(current_step.get("total_steps") or 0):
+                effective_intent = "next"
+        tts_text = _tts_text_for_intent(effective_intent, answer_text)
+        tts = self.model_service.synthesize_speech(tts_text) if tts_text else None
         return self.store.voice_input_from_transcript(
             tutorial_session_id,
-            current_step_id,
+            authoritative_step_id,
             client_event_id,
             transcript=transcribe_result.transcript,
             intent=intent,
-            tts_audio_url=None,
+            tts_audio_url=tts.audio_url if tts else None,
             answer_text=answer_text,
             answer_meta=answer_meta,
             user_key=user_key,
@@ -158,3 +177,37 @@ def _looks_like_question(text: str) -> bool:
         "行不行",
     )
     return any(marker in normalized for marker in question_markers) or len(normalized) >= 9
+
+
+def _looks_like_asr_hallucination(text: str) -> bool:
+    normalized = re.sub(r"\s+", " ", text.strip()).lower()
+    if not normalized:
+        return True
+    has_chinese = re.search(r"[\u4e00-\u9fff]", normalized) is not None
+    if has_chinese:
+        return False
+    ascii_letters = re.findall(r"[a-z]", normalized)
+    if len(ascii_letters) >= 8:
+        return True
+    hallucination_markers = (
+        "i'm going to",
+        "go ahead",
+        "next video",
+        "next one",
+        "more questions",
+        "rest of the room",
+        "so let's go",
+    )
+    return any(marker in normalized for marker in hallucination_markers)
+
+
+def _tts_text_for_intent(intent: str, answer_text: str | None) -> str | None:
+    if intent == "question":
+        return answer_text
+    if intent == "next":
+        return "你在这一步有什么问题，可以随时问我～"
+    if intent == "replay":
+        return "好的，我再播放一遍当前步骤。"
+    if intent == "finish":
+        return "好的，本次染发教程已结束。现在拍摄你的染后照片，生成专属短视频吧。"
+    return None

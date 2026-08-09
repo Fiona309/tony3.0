@@ -17,7 +17,7 @@ from typing import Any, Literal
 from PIL import Image
 
 from ..config import Settings
-from .http_client import UpstreamError, post_json
+from .http_client import UpstreamError, get_client, post_json
 
 
 logger = logging.getLogger(__name__)
@@ -379,17 +379,71 @@ class ModelService:
         return [None for _ in texts]
 
     def synthesize_speech(self, text: str) -> TTSResult:
+        text = text.strip()
+        if not text:
+            return TTSResult(
+                audio_url=None,
+                provider=self.settings.tts_provider,
+                fallback_reason="empty_tts_text",
+            )
         if self.settings.tts_provider == "browser_fallback":
             return TTSResult(
                 audio_url=None,
                 provider="browser_fallback",
                 fallback_reason="server_tts_disabled",
             )
-        # Cloud TTS integration is intentionally left behind the interface.
+        if self.settings.tts_provider not in {"openai_next", "openai_compatible"}:
+            return TTSResult(
+                audio_url=None,
+                provider=self.settings.tts_provider,
+                fallback_reason="tts_provider_not_supported",
+            )
+        if not self.settings.tts_api_key:
+            return TTSResult(
+                audio_url=None,
+                provider=self.settings.tts_provider,
+                fallback_reason="tts_api_key_not_configured",
+            )
+
+        endpoint = f"{self.settings.tts_base_url.rstrip('/')}/v1/audio/speech"
+        payload = {
+            "model": self.settings.tts_model,
+            "input": text[:600],
+            "voice": self.settings.tts_voice,
+        }
+        try:
+            response = get_client().post(
+                endpoint,
+                json=payload,
+                headers={
+                    "Authorization": f"Bearer {self.settings.tts_api_key}",
+                    "Content-Type": "application/json",
+                },
+                timeout=self.settings.tts_timeout_seconds,
+            )
+        except Exception as error:
+            logger.warning("TTS request failed: %s", error)
+            return TTSResult(
+                audio_url=None,
+                provider=self.settings.tts_provider,
+                fallback_reason=f"tts_network_error:{error}",
+            )
+
+        if response.status_code >= 400:
+            logger.warning("TTS upstream failed: %s %s", response.status_code, response.text[:200])
+            return TTSResult(
+                audio_url=None,
+                provider=self.settings.tts_provider,
+                fallback_reason=f"tts_http_{response.status_code}:{response.text[:160]}",
+            )
+
+        content_type = response.headers.get("Content-Type") or "audio/mpeg"
+        if response.content.startswith(b"RIFF") and response.content[8:12] == b"WAVE":
+            content_type = "audio/wav"
+        audio_base64 = base64.b64encode(response.content).decode("ascii")
         return TTSResult(
-            audio_url=None,
+            audio_url=f"data:{content_type};base64,{audio_base64}",
             provider=self.settings.tts_provider,
-            fallback_reason="tts_provider_not_implemented",
         )
 
     def _openai_next_classify_intent(self, transcript: str) -> TutorialIntent | None:

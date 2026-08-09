@@ -5,6 +5,7 @@ import {
   MOCK_VIDEOS,
   TARGET_META,
   TUTORIAL_STEPS,
+  TUTORIAL_STEPS_BY_VIDEO_ID,
   productsForRoute,
   toArchiveSummary,
 } from './mock-data';
@@ -286,6 +287,38 @@ const planSelections = new Map<
 >();
 const afterTaskPolls = new Map<string, number>();
 const afterTaskByImage = new Map<string, string>();
+
+const MOCK_TUTORIAL_URL_BY_ID: Record<string, string> = {
+  tutorial_blue: '/mock-assets/blue/tutorial.mp4',
+  tutorial_red: '/mock-assets/red/tutorial.mp4',
+  tutorial_purple: '/mock-assets/purple/tutorial.mp4',
+  tutorial_pink: '/mock-assets/pink/tutorial.mp4',
+  tutorial_cold_tea: '/mock-assets/cold_tea/tutorial.mp4',
+  tutorial_cold_brown: '/mock-assets/cold_brown/tutorial.mp4',
+};
+
+function normalizeTutorialVideoId(videoId?: string | null) {
+  const map: Record<string, string> = {
+    blue_tutorial: 'tutorial_blue',
+    red_tutorial: 'tutorial_red',
+    purple_tutorial: 'tutorial_purple',
+    pink_tutorial: 'tutorial_pink',
+    tea_tutorial: 'tutorial_cold_tea',
+    brown_tutorial: 'tutorial_cold_brown',
+  };
+  return map[videoId ?? ''] ?? videoId ?? 'tutorial_blue';
+}
+
+function tutorialVideoIdForMockArchive(product: { sku_id?: string; shade_name?: string }) {
+  const value = `${product.sku_id ?? ''} ${product.shade_name ?? ''}`;
+  if (/red|红/i.test(value)) return 'tutorial_red';
+  if (/purple|violet|紫/i.test(value)) return 'tutorial_purple';
+  if (/pink|粉/i.test(value)) return 'tutorial_pink';
+  if (/tea|茶/i.test(value)) return 'tutorial_cold_tea';
+  if (/blue|蓝/i.test(value)) return 'tutorial_blue';
+  if (/brown|棕|hazel|mist|cool/i.test(value)) return 'tutorial_cold_brown';
+  return 'tutorial_blue';
+}
 
 function loadArchives() {
   return readJson<ArchiveDetailData[]>(ARCHIVE_STORAGE, []);
@@ -798,6 +831,7 @@ export async function createArchive(input: {
     route: plan.default_route,
     intensity: plan.default_preview_level,
   };
+  const tutorialVideoId = tutorialVideoIdForMockArchive(product);
   const detail: ArchiveDetailData = {
     archive_id: archiveId,
     created_at: createdAt,
@@ -825,7 +859,7 @@ export async function createArchive(input: {
       ...product,
       recommendation_id: input.recommendation_id,
     },
-    tutorial_video_id: 'tutorial_001',
+    tutorial_video_id: tutorialVideoId,
     tutorial_available: true,
     after_video_url: null,
   };
@@ -907,18 +941,22 @@ export async function createTutorialSession(archiveId: string) {
     });
   }
   await sleep(540);
+  const archive = loadArchives().find((item) => item.archive_id === archiveId);
+  const tutorialVideoId = normalizeTutorialVideoId(archive?.tutorial_video_id);
+  const tutorialSteps = TUTORIAL_STEPS_BY_VIDEO_ID[tutorialVideoId] ?? TUTORIAL_STEPS;
   const sessionId = uid('tutorial_session');
   const session: TutorialSessionData = {
     tutorial_session_id: sessionId,
     archive_id: archiveId,
     status: 'active',
     tutorial_video: {
-      video_id: 'tutorial_001',
-      url: '/video-uploads/a2431c5c23e6/video.mp4',
+      video_id: tutorialVideoId,
+      url: MOCK_TUTORIAL_URL_BY_ID[tutorialVideoId] ?? '/mock-assets/blue/tutorial.mp4',
     },
-    current_step: TUTORIAL_STEPS[0],
+    tutorial_steps: tutorialSteps,
+    current_step: tutorialSteps[0],
     step_end_tts: {
-      text: '你在这一步的操作过程中有什么问题，随时可以问我。',
+      text: '你在这一步有什么问题，可以随时问我～',
       audio_url: null,
     },
     completed_step_count: 0,
@@ -961,11 +999,15 @@ export async function sendTutorialVoiceInput(
   const sessions = loadSessions();
   const session = sessions[sessionId];
   if (!session) throw new ApiError('教程会话已失效');
+  const tutorialSteps = session.tutorial_steps?.length
+    ? session.tutorial_steps
+    : TUTORIAL_STEPS;
   const isNext = input.audio.name.includes('command-next');
   const isFinish = input.audio.name.includes('command-finish');
   const text = isNext ? '下一步' : isFinish ? '结束了' : '这一步需要注意什么？';
-  const currentIndex = TUTORIAL_STEPS.findIndex(
-    (step) => step.step_id === input.current_step_id,
+  const currentStepId = session.current_step?.step_id || input.current_step_id;
+  const currentIndex = tutorialSteps.findIndex(
+    (step) => step.step_id === currentStepId,
   );
 
   if (isFinish) {
@@ -981,7 +1023,7 @@ export async function sendTutorialVoiceInput(
   }
 
   if (isNext) {
-    if (currentIndex >= TUTORIAL_STEPS.length - 1) {
+    if (currentIndex >= tutorialSteps.length - 1) {
       session.status = 'completed';
       sessions[sessionId] = session;
       saveSessions(sessions);
@@ -992,10 +1034,11 @@ export async function sendTutorialVoiceInput(
         tts_audio_url: null,
       } satisfies TutorialAction;
     }
-    const nextStep = TUTORIAL_STEPS[currentIndex + 1];
+    const nextStep = tutorialSteps[Math.max(0, currentIndex) + 1];
     session.current_step = nextStep;
+    session.tutorial_steps = tutorialSteps;
     session.step_end_tts = {
-      text: '这一步有什么问题，随时可以问我。',
+      text: '你在这一步有什么问题，可以随时问我～',
       audio_url: null,
     };
     session.completed_step_count = currentIndex + 1;
@@ -1006,8 +1049,9 @@ export async function sendTutorialVoiceInput(
       action: 'play_next_step',
       asr_transcript: '下一步',
       current_step: nextStep,
+      tts_text: '你在这一步有什么问题，可以随时问我～',
       step_end_tts: {
-        text: '这一步有什么问题，随时可以问我。',
+        text: '你在这一步有什么问题，可以随时问我～',
         audio_url: null,
       },
     } satisfies TutorialAction;
@@ -1025,6 +1069,51 @@ export async function sendTutorialVoiceInput(
       category: '当前步骤操作问答',
     },
     next_prompt: '处理好后可以说“下一步”，继续后面的操作。',
+  } satisfies TutorialAction;
+}
+
+export async function advanceTutorialStep(sessionId: string) {
+  if (API_MODE === 'real') {
+    return request<TutorialAction>(`/tutorial-sessions/${sessionId}/next-step`, {
+      method: 'POST',
+    });
+  }
+  await sleep(240);
+  const sessions = loadSessions();
+  const session = sessions[sessionId];
+  if (!session) throw new ApiError('教程会话已失效');
+  const tutorialSteps = session.tutorial_steps?.length
+    ? session.tutorial_steps
+    : TUTORIAL_STEPS;
+  const currentStepId = session.current_step?.step_id;
+  const currentIndex = tutorialSteps.findIndex((step) => step.step_id === currentStepId);
+  if (currentIndex >= tutorialSteps.length - 1) {
+    session.status = 'completed';
+    sessions[sessionId] = session;
+    saveSessions(sessions);
+    return {
+      action: 'capture_after_photo',
+      asr_transcript: '下一步',
+      tts_text: '全部步骤已经完成。我会先为你整理本次染发记录。',
+      tts_audio_url: null,
+    } satisfies TutorialAction;
+  }
+  const nextStep = tutorialSteps[Math.max(0, currentIndex) + 1];
+  session.current_step = nextStep;
+  session.tutorial_steps = tutorialSteps;
+  session.step_end_tts = {
+    text: '你在这一步有什么问题，可以随时问我～',
+    audio_url: null,
+  };
+  session.completed_step_count = Math.max(0, nextStep.step_no - 1);
+  sessions[sessionId] = session;
+  saveSessions(sessions);
+  return {
+    action: 'play_next_step',
+    asr_transcript: '下一步',
+    current_step: nextStep,
+    tts_text: '你在这一步有什么问题，可以随时问我～',
+    step_end_tts: session.step_end_tts,
   } satisfies TutorialAction;
 }
 

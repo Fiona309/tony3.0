@@ -503,63 +503,75 @@ export function productsForRoute(route: RouteType) {
     }));
 }
 
-export const TUTORIAL_STEPS: TutorialStep[] = [
-  {
-    step_id: 'step_01',
-    step_no: 1,
-    total_steps: 5,
-    start_time_ms: 110400,
-    end_time_ms: 119700,
-    title: '准备与分区',
-    description: '把商品、手套和工具放到手边，再将头发分成四个区域。',
-    points: ['戴好手套和围布', '发际线周围薄涂隔离霜', '用发夹固定四个区域'],
-    caution: '开始后不要临时离开，先确认全部用具齐全。',
-  },
-  {
-    step_id: 'step_02',
-    step_no: 2,
-    total_steps: 5,
-    start_time_ms: 119700,
-    end_time_ms: 129400,
-    title: '按商品说明调配',
-    description: '只采用当前商品说明中的比例，混合到颜色和质地均匀。',
-    points: ['使用非金属容器', '严格按说明配比', '调配完成后立即开始使用'],
-    caution: '不同品牌的比例不能互相套用。',
-  },
-  {
-    step_id: 'step_03',
-    step_no: 3,
-    total_steps: 5,
-    start_time_ms: 129400,
-    end_time_ms: 140400,
-    title: '从深色区域开始上色',
-    description: '布丁头先处理更深的发根，再逐缕覆盖发中和发尾。',
-    points: ['每次取一小缕头发', '保证每一面都有产品', '请同伴检查后脑区域'],
-  },
-  {
-    step_id: 'step_04',
-    step_no: 4,
-    total_steps: 5,
-    start_time_ms: 140400,
-    end_time_ms: 147900,
-    title: '等待显色',
-    description: '完成覆盖后按商品说明等待，让颜色稳定附着。',
-    points: ['不要额外加热', '避免产品接触眼睛', '明显刺痛时立即冲洗'],
-    caution: '演示倒计时缩短为 15 秒，实际请以商品说明为准。',
-    wait_seconds: 15,
-  },
-  {
-    step_id: 'step_05',
-    step_no: 5,
-    total_steps: 5,
-    start_time_ms: 147900,
-    end_time_ms: 168100,
-    title: '冲洗与染后护理',
-    description: '冲洗到水基本清澈，再使用配套护理完成锁色。',
-    points: ['使用偏凉的水冲洗', '第一次不要使用强清洁洗发水', '吹干后检查根尾颜色'],
-    caution: '前 48 小时尽量减少洗头。',
-  },
-];
+function tutorialStep(
+  tutorialId: string,
+  stepNo: number,
+  totalSteps: number,
+  startTimeMs: number,
+  endTimeMs: number,
+  title: string,
+  description: string,
+  points: string[],
+  caution?: string,
+): TutorialStep {
+  return {
+    step_id: `${tutorialId}_step_${String(stepNo).padStart(2, '0')}`,
+    step_no: stepNo,
+    total_steps: totalSteps,
+    start_time_ms: startTimeMs,
+    end_time_ms: endTimeMs,
+    title,
+    description,
+    points,
+    caution,
+    display_time_range: `${Math.floor(startTimeMs / 60000)}:${String(
+      Math.floor((startTimeMs % 60000) / 1000),
+    ).padStart(2, '0')}-${Math.floor(endTimeMs / 60000)}:${String(
+      Math.floor((endTimeMs % 60000) / 1000),
+    ).padStart(2, '0')}`,
+    source: 'sensevoice_auto_segment',
+  };
+}
+
+export const TUTORIAL_STEPS_BY_VIDEO_ID: Record<string, TutorialStep[]> = {
+  tutorial_blue: [
+    tutorialStep('tutorial_blue', 1, 4, 0, 24078, '介绍与准备', '介绍蓝色固色效果，准备固色发膜、洗发水和护发素。', ['确认目标是蓝色固色。', '准备固色发膜、固色洗发水和护发素。'], '产品说明优先于视频口播。'),
+    tutorialStep('tutorial_blue', 2, 4, 24078, 46370, '分区与涂抹', '按比例调配后从分区开始涂抹，让颜色覆盖更均匀。', ['头发多时先分区。', '干发直接涂抹并轻轻揉开。']),
+    tutorialStep('tutorial_blue', 3, 4, 46370, 70112, '等待与冲洗', '揉开后等待几分钟，再用偏凉水冲洗并使用同色洗发水。', ['不要用过高水温冲洗。', '冲洗时继续轻揉让颜色更均匀。'], '明显不适时提前冲洗。'),
+    tutorialStep('tutorial_blue', 4, 4, 70112, 101266, '护理与效果展示', '完成冲洗和吹干，观察蓝色维持和掉色情况。', ['吹风温度不要太高。', '染后减少频繁洗头。'], '前 48 小时尽量减少洗头。'),
+  ],
+  tutorial_red: [
+    tutorialStep('tutorial_red', 1, 4, 0, 20138, '介绍与准备', '介绍红色染发目标，准备旧衣服和皮肤隔离。', ['穿不怕弄脏的衣服。', '额头、脸颊和脖子后面先涂隔离。']),
+    tutorialStep('tutorial_red', 2, 4, 20138, 43454, '介绍与准备', '打开染发膏并准备工具，把需要混合的产品放到一起。', ['确认说明书和工具。', '按包装要求混合产品。'], '不要随意改变官方比例。'),
+    tutorialStep('tutorial_red', 3, 4, 43454, 81567, '等待与冲洗', '完成调配和上色后等待显色，再准备冲洗。', ['观察头顶上色情况。', '时间差不多后及时冲洗。'], '等待时间以商品说明为准。'),
+    tutorialStep('tutorial_red', 4, 4, 81567, 128637, '护理与效果展示', '查看洗后红色效果、均匀度和光泽感。', ['洗后检查发色是否均匀。', '观察不同光线下的颜色。']),
+  ],
+  tutorial_purple: [
+    tutorialStep('tutorial_purple', 1, 3, 0, 25271, '产品调配', '介绍紫色固色发膜，按干发状态准备上头。', ['干发状态下操作。', '根据想要的浓淡决定是否混护发素。']),
+    tutorialStep('tutorial_purple', 2, 3, 25271, 53888, '产品调配', '将发膜揉开到每一根头发，想要浅一点可泡水再淋。', ['尽量不要漏掉头发。', '后脑勺也要检查覆盖。']),
+    tutorialStep('tutorial_purple', 3, 3, 53888, 98833, '护理与效果展示', '全头涂好后检查后脑勺，等待十几到二十分钟后冲洗。', ['用镜子检查后脑勺。', '等待后再冲洗。'], '敏感头皮按产品说明保守控制时间。'),
+  ],
+  tutorial_pink: [
+    tutorialStep('tutorial_pink', 1, 3, 0, 32888, '介绍与准备', '介绍粉色固色目标，准备旧衣服和 NV 发膜。', ['准备一件不要的衣服。', '确认头皮状态再操作。']),
+    tutorialStep('tutorial_pink', 2, 3, 32888, 56190, '产品调配', '用少量发膜加白色护发素调配粉色，也可以准备泡水法。', ['少量多次调配。', '加水搅拌均匀后再泡。']),
+    tutorialStep('tutorial_pink', 3, 3, 56190, 98682, '护理与效果展示', '泡十来分钟，后脑勺和耳后多淋几遍，再固色洗一次。', ['后脑勺和耳后要覆盖。', '泡完后用固色产品清洗。']),
+  ],
+  tutorial_cold_tea: [
+    tutorialStep('tutorial_cold_tea', 1, 5, 0, 46173, '介绍与准备', '男生居家染发前先做防护，准备衣服、隔离和工具。', ['穿深色或不要的衣服。', '额头、耳后、脖子后面涂隔离。', '按说明书混合染膏。']),
+    tutorialStep('tutorial_cold_tea', 2, 5, 46173, 95532, '分区与涂抹', '从鬓角附近开始刷发中发尾，再用梳子梳开。', ['避开发根 1 到 2 厘米。', '先涂再梳，保证每一面粘到染膏。']),
+    tutorialStep('tutorial_cold_tea', 3, 5, 95532, 143007, '分区与涂抹', '补上鬓角、后脑勺和发根，控制整体停留时间后冲洗。', ['后脑勺要一层一层刷匀。', '发根最后补涂。'], '细软发和粗硬发等待时间不同，以说明为准。'),
+    tutorialStep('tutorial_cold_tea', 4, 5, 143007, 189049, '护理与效果展示', '冲洗后半干状态做护发，观察冷茶色显白效果。', ['先冲掉染膏再洗发。', '半干后护理发中发尾。']),
+    tutorialStep('tutorial_cold_tea', 5, 5, 189049, 238630, '护理与效果展示', '后续用护发素和护发精油护理，减少干涩和打结。', ['洗后护发素敷几分钟。', '吹干前使用护发精油。'], '染后前三天尽量不要频繁洗头。'),
+  ],
+  tutorial_cold_brown: [
+    tutorialStep('tutorial_cold_brown', 1, 4, 0, 32125, '介绍与准备', '第一次居家染发前清空周围环境，穿旧衣服并保护头皮。', ['三天不洗头可帮助保护头皮。', '清空周围日用品。', '发际线和脖子后面涂隔离。']),
+    tutorialStep('tutorial_cold_brown', 2, 4, 32125, 64049, '产品调配', '戴好耳套、手套和披肩，按 1 比 1 调配并加入精油。', ['染发剂和显发剂按比例混合。', '精油不要忘记加入。', '认真搅拌均匀。']),
+    tutorialStep('tutorial_cold_brown', 3, 4, 64049, 97971, '分区与涂抹', '把头发分成上下左右区域，从下层开始距离发根两指涂抹。', ['头发多可分成 6 个区。', '发中到发尾多涂。', '反复揉搓确保每根发丝覆盖。']),
+    tutorialStep('tutorial_cold_brown', 4, 4, 97971, 144193, '护理与效果展示', '补涂发根并检查均匀度，清洗后查看冷棕色光泽效果。', ['等待后再染发根。', '对镜检查是否涂抹均匀。', '清洗后观察不同光线效果。']),
+  ],
+};
+
+export const TUTORIAL_STEPS: TutorialStep[] = TUTORIAL_STEPS_BY_VIDEO_ID.tutorial_blue;
 
 export const EMPTY_ARCHIVE_DETAIL: ArchiveDetailData = {
   archive_id: '',

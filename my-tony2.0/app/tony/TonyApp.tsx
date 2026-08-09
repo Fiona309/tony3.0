@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  advanceTutorialStep,
   clearFlowDraft,
   createArchive,
   createCompletionRecord,
@@ -652,6 +653,11 @@ export default function TonyApp() {
     });
   };
 
+  const advanceTutorial = async (): Promise<TutorialAction> => {
+    if (!tutorialSession) throw new Error('教程会话已经失效');
+    return advanceTutorialStep(tutorialSession.tutorial_session_id);
+  };
+
   const updateTutorialStep = (
     step: TutorialStep,
     stepEndTTS?: TutorialSessionData['step_end_tts'],
@@ -1064,6 +1070,7 @@ export default function TonyApp() {
           }
         }}
         onSend={sendTutorialMessage}
+        onNextStep={advanceTutorial}
         onSessionStep={updateTutorialStep}
         onComplete={completeTutorial}
       /></AgentShell>

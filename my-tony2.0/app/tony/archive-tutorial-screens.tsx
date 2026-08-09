@@ -1386,6 +1386,7 @@ export function TutorialScreen({
   offline,
   onBack,
   onSend,
+  onNextStep,
   onSessionStep,
   onComplete,
 }: {
@@ -1393,16 +1394,18 @@ export function TutorialScreen({
   offline: boolean;
   onBack: () => void;
   onSend: (audio: File) => Promise<TutorialAction>;
+  onNextStep: () => Promise<TutorialAction>;
   onSessionStep: (step: TutorialStep, stepEndTTS?: StepEndTTS) => void;
   onComplete: (qaSummary: string[]) => Promise<void> | void;
 }) {
   const [phase, setPhase] = useState<
-    'video' | 'prompting' | 'waiting' | 'listening' | 'uploading' | 'answering'
+    'video' | 'prompting' | 'waiting' | 'listening' | 'thinking' | 'answering'
   >(() => (session.awaiting_voice_input ? 'waiting' : 'video'));
   const [transcript, setTranscript] = useState('');
   const [answer, setAnswer] = useState('');
   const [nextPrompt, setNextPrompt] = useState('');
   const [error, setError] = useState('');
+  const [voiceLevel, setVoiceLevel] = useState(0);
   const [replaySignal, setReplaySignal] = useState(0);
   const [countdownDone, setCountdownDone] = useState(false);
   const [timerPageOpen, setTimerPageOpen] = useState(false);
@@ -1412,8 +1415,31 @@ export function TutorialScreen({
   const audioContextRef = useRef<AudioContext | null>(null);
   const monitorFrameRef = useRef<number | null>(null);
   const discardRecordingRef = useRef(false);
+  const voiceRequestInFlightRef = useRef(false);
+  const lastHandledVoiceRef = useRef<{ transcript: string; at: number }>({
+    transcript: '',
+    at: 0,
+  });
+  const lastSilencePromptAtRef = useRef(0);
   const qaRef = useRef<string[]>([]);
   const step = session.current_step;
+  const isListening = phase === 'listening';
+  const isThinking = phase === 'thinking';
+  const isAnswering = phase === 'answering';
+  const voiceStatusText =
+    isListening
+      ? voiceLevel > 0.16
+        ? '正在听你说'
+        : '等你开口'
+      : isThinking
+        ? transcript
+          ? '听到了，正在思考'
+          : '已收到，正在理解'
+        : isAnswering
+          ? '正在回答'
+          : phase === 'prompting'
+            ? '正在播放提示'
+            : '等待你的问题';
   const assistantSubtitle =
     answer ||
     session.step_end_tts?.text ||
@@ -1448,6 +1474,7 @@ export function TutorialScreen({
       setAnswer('');
       setNextPrompt('');
       setError('');
+      setVoiceLevel(0);
       setCountdownDone(false);
       setTimerPageOpen(false);
       stopSpeaking();
@@ -1464,23 +1491,41 @@ export function TutorialScreen({
   );
 
   const handleAudio = async (audio: File) => {
+    if (voiceRequestInFlightRef.current) return;
     if (offline) {
       setError('当前网络不可用，请恢复网络后重新说一次。');
       setPhase('waiting');
       return;
     }
+    voiceRequestInFlightRef.current = true;
     setError('');
-    setPhase('uploading');
+    setPhase('thinking');
+    setVoiceLevel(0);
     try {
       const action = await onSend(audio);
       const heard = action.asr_transcript?.trim() ?? '';
+      const now = Date.now();
+      if (
+        heard &&
+        heard === lastHandledVoiceRef.current.transcript &&
+        now - lastHandledVoiceRef.current.at < 4500
+      ) {
+        setPhase('waiting');
+        window.setTimeout(() => {
+          void startListening();
+        }, 400);
+        return;
+      }
+      if (heard) {
+        lastHandledVoiceRef.current = { transcript: heard, at: now };
+      }
       setTranscript(heard);
       if (step.step_no === step.total_steps && isFinishUtterance(heard)) {
         await playTTS(
           action.action === 'capture_after_photo' ? action.tts_audio_url : null,
           action.action === 'capture_after_photo'
             ? action.tts_text
-            : '好的，本次染发教程已结束。现在为你生成完成记录。',
+          : '好的，本次染发教程已结束。现在为你生成完成记录。',
         );
         await onComplete(qaRef.current);
       } else if (action.action === 'answer') {
@@ -1491,6 +1536,9 @@ export function TutorialScreen({
         await playTTS(action.tts_audio_url, action.tts_text);
         resumeListening();
       } else if (action.action === 'play_next_step') {
+        setAnswer('');
+        setNextPrompt('');
+        setPhase('video');
         onSessionStep(action.current_step, action.step_end_tts);
       } else if (action.action === 'replay_current_step') {
         onSessionStep(action.current_step);
@@ -1501,15 +1549,51 @@ export function TutorialScreen({
       } else if (action.action === 'capture_after_photo') {
         await playTTS(action.tts_audio_url, action.tts_text);
         await onComplete(qaRef.current);
-      } else {
+      } else if (action.action === 'silence') {
         setAnswer(action.tts_text);
-        setPhase('answering');
-        await playTTS(action.tts_audio_url, action.tts_text);
+        setPhase('waiting');
+        const now = Date.now();
+        if (now - lastSilencePromptAtRef.current > 9000) {
+          lastSilencePromptAtRef.current = now;
+          await playTTS(action.tts_audio_url, action.tts_text);
+        }
         resumeListening();
       }
     } catch (actionError) {
       setError(actionError instanceof Error ? actionError.message : '没有听清，请再试一次');
       setPhase('waiting');
+    } finally {
+      voiceRequestInFlightRef.current = false;
+    }
+  };
+
+  const handleManualNext = async () => {
+    if (voiceRequestInFlightRef.current) return;
+    if (offline) {
+      setError('当前网络不可用，请恢复网络后再进入下一步。');
+      setPhase('waiting');
+      return;
+    }
+    voiceRequestInFlightRef.current = true;
+    setError('');
+    setAnswer('');
+    setNextPrompt('');
+    setVoiceLevel(0);
+    setPhase('thinking');
+    try {
+      const action = await onNextStep();
+      if (action.action === 'play_next_step') {
+        setPhase('video');
+        onSessionStep(action.current_step, action.step_end_tts);
+      } else if (action.action === 'capture_after_photo') {
+        await playTTS(action.tts_audio_url, action.tts_text);
+        await onComplete(qaRef.current);
+      }
+    } catch (actionError) {
+      setError(actionError instanceof Error ? actionError.message : '进入下一步失败，请再试一次');
+      setPhase('waiting');
+    } finally {
+      voiceRequestInFlightRef.current = false;
     }
   };
 
@@ -1557,8 +1641,14 @@ export function TutorialScreen({
         const discarded = discardRecordingRef.current;
         const resolvedType = recorder.mimeType || mimeType || 'audio/webm';
         cleanupAudioInput();
+        setVoiceLevel(0);
         if (discarded) return;
         const blob = new Blob(chunks, { type: resolvedType });
+        if (blob.size < 900) {
+          setError('我没有听清，你靠近一点再说一次。');
+          setPhase('waiting');
+          return;
+        }
         const extension = resolvedType.includes('mp4') ? 'm4a' : 'webm';
         const file = new File(
           [blob],
@@ -1578,6 +1668,8 @@ export function TutorialScreen({
       const startedAt = audioContext.currentTime * 1000;
       let speechStarted = false;
       let lastVoiceAt = startedAt;
+      let voiceBeganAt = 0;
+      let lastLevelUpdateAt = startedAt;
       const monitor = () => {
         if (recorder.state === 'inactive') return;
         analyser.getByteTimeDomainData(samples);
@@ -1588,14 +1680,30 @@ export function TutorialScreen({
         }
         const volume = Math.sqrt(energy / samples.length);
         const now = audioContext.currentTime * 1000;
+        if (now - lastLevelUpdateAt > 80) {
+          lastLevelUpdateAt = now;
+          setVoiceLevel(Math.min(1, volume / 0.12));
+        }
         if (volume > 0.035) {
+          if (!speechStarted) {
+            voiceBeganAt = now;
+          }
           speechStarted = true;
           lastVoiceAt = now;
         }
+        const enoughSpeech = speechStarted && now - voiceBeganAt >= 450;
         const silentAfterSpeech = speechStarted && now - lastVoiceAt >= 1500;
         const noSpeechTimeout = !speechStarted && now - startedAt >= 5000;
         const hardTimeout = now - startedAt >= 15000;
-        if (silentAfterSpeech || noSpeechTimeout || hardTimeout) {
+        if (noSpeechTimeout || (hardTimeout && !speechStarted)) {
+          discardRecordingRef.current = true;
+          recorder.stop();
+          window.setTimeout(() => {
+            void startListening();
+          }, 250);
+          return;
+        }
+        if ((silentAfterSpeech && enoughSpeech) || hardTimeout) {
           recorder.stop();
           return;
         }
@@ -1606,6 +1714,7 @@ export function TutorialScreen({
       setAnswer('');
       setNextPrompt('');
       setError('');
+      setVoiceLevel(0);
       setPhase('listening');
       recorder.start(250);
       monitorFrameRef.current = window.requestAnimationFrame(monitor);
@@ -1638,7 +1747,7 @@ export function TutorialScreen({
       return;
     }
     const prompt = session.step_end_tts ?? {
-      text: '你在这一步的操作过程中有什么问题，随时可以问我。',
+      text: '你在这一步有什么问题，可以随时问我～',
       audio_url: null,
     };
     setPhase('prompting');
@@ -1789,7 +1898,7 @@ export function TutorialScreen({
                 <button
                   type="button"
                   onClick={() => sendMockCommand('next')}
-                  disabled={phase === 'uploading'}
+                  disabled={phase === 'thinking'}
                   className="tap relative min-h-10 rounded-[12px] border-[1.5px] border-[#78a983] bg-[#eff8ec] px-3 text-left text-[9px]"
                 >
                   <span>直接说：</span>
@@ -1799,7 +1908,7 @@ export function TutorialScreen({
                 <button
                   type="button"
                   onClick={() => sendMockCommand('question')}
-                  disabled={phase === 'uploading'}
+                  disabled={phase === 'thinking'}
                   className="tap relative min-h-10 rounded-[12px] border-[1.5px] border-pink bg-[#fff1f5] px-3 text-left text-[9px]"
                 >
                   <span>试着问：</span>
@@ -1811,34 +1920,56 @@ export function TutorialScreen({
               <button
                 type="button"
                 onClick={() => void startListening()}
-                disabled={
+                  disabled={
                   phase === 'listening' ||
-                  phase === 'uploading' ||
+                  phase === 'thinking' ||
                   phase === 'prompting'
                 }
                 className="tap mt-2 flex min-h-9 w-full items-center justify-center gap-2 rounded-[48%_52%_46%_54%] border-2 border-ink bg-orange text-xs font-black text-ink disabled:opacity-40"
               >
                 <Microphone size={18} weight="fill" />
-                {phase === 'listening' ? '正在聆听…' : '重新开始聆听'}
+                {phase === 'listening' ? '正在听你说…' : '重新开始聆听'}
               </button>
             )}
 
-        <div className="flex h-7 shrink-0 items-center justify-center gap-2">
-          <div className="flex items-end justify-center gap-0.5 text-pink-dark" aria-hidden="true">
-            {[4, 8, 13, 7, 11, 6].map((height, index) => (
-              <span key={`left-${height}-${index}`} className="w-1 rounded-full bg-current" style={{ height }} />
-            ))}
-            <Microphone size={16} weight="fill" className="mx-1 text-[#765fc4]" />
-            {[5, 9, 14, 7, 12, 6].map((height, index) => (
-              <span key={`right-${height}-${index}`} className="w-1 rounded-full bg-current" style={{ height }} />
-            ))}
+        <div className="flex h-9 shrink-0 items-center justify-center gap-2">
+          <div
+            className={cx(
+              'flex h-7 min-w-[118px] items-center justify-center gap-1 rounded-full border border-[#cabdf2] bg-white/65 px-2 text-[#765fc4]',
+              isListening ? 'shadow-[0_0_0_3px_rgba(255,126,38,.12)]' : '',
+            )}
+            aria-hidden="true"
+          >
+            {[0.35, 0.62, 0.92, 0.55, 0.78, 0.48].map((weight, index) => {
+              const activeHeight = 5 + Math.round(voiceLevel * weight * 17);
+              const idleHeight = [5, 8, 12, 7, 10, 6][index];
+              const height = isListening ? activeHeight : idleHeight;
+              return (
+                <span
+                  key={`voice-${weight}-${index}`}
+                  className={cx(
+                    'w-1 rounded-full bg-current transition-[height,opacity] duration-100',
+                    isThinking || isAnswering ? 'animate-pulse opacity-80' : 'opacity-100',
+                  )}
+                  style={{
+                    height,
+                    transitionDelay: isListening ? `${index * 18}ms` : '0ms',
+                  }}
+                />
+              );
+            })}
+            {isThinking ? (
+              <SpinnerGap size={16} weight="bold" className="ml-1 animate-spin text-orange" />
+            ) : (
+              <Microphone
+                size={16}
+                weight="fill"
+                className={cx('ml-1', isListening ? 'text-orange' : 'text-[#765fc4]')}
+              />
+            )}
           </div>
           <p className="text-[9px] font-black text-[#6d5aaf]">
-            {phase === 'uploading'
-              ? '正在识别…'
-              : phase === 'prompting'
-                ? '正在播放提示…'
-                : '正在聆听…'}
+            {voiceStatusText}
           </p>
         </div>
         </div>
@@ -1865,15 +1996,10 @@ export function TutorialScreen({
           ) : (
             <PrimaryButton
               onClick={() => {
-                if (API_MODE === 'mock') {
-                  sendMockCommand('next');
-                } else {
-                  setError('请对着麦克风说“下一步”。');
-                  void startListening();
-                }
+                void handleManualNext();
               }}
             >
-              {API_MODE === 'mock' ? '下一步' : '说“下一步”'}
+              下一步
             </PrimaryButton>
           )}
         </div>
