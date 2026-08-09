@@ -22,33 +22,46 @@ const STAGES: { key: FlowStage; label: string }[] = [
   { key: 'buy', label: '怎么买' },
 ];
 
-export function FlowProgress({ stage, dark = false }: { stage: FlowStage; dark?: boolean }) {
+export function FlowProgress({ stage, dark = false, label }: {
+  stage: FlowStage;
+  dark?: boolean;
+  /**
+   * 覆盖【当前阶段】的文案。判断出「不能直染」时，节点还叫「能不能染」就等于
+   * 把已经得出的结论又藏回问句里——用户会以为判断还没做完。
+   */
+  label?: string;
+}) {
   const current = STAGES.findIndex((s) => s.key === stage);
   return (
-    <div className={cx('flex items-center gap-1 px-4 py-2', dark ? 'text-white' : 'text-ink')}>
+    <div className={cx('flex items-start px-4 py-2', dark ? 'text-white' : 'text-ink')}>
       {STAGES.map((s, i) => {
         const done = i < current;
         const on = i === current;
+        const passed = done || on;
         return (
-          <div key={s.key} className="flex flex-1 items-center gap-1">
-            <div className="flex flex-1 flex-col items-center gap-1">
+          <div key={s.key} className="flex min-w-0 flex-1 flex-col items-center">
+            {/* 圆点串在一条连接线上。连接线用左右两个半段拼，端点的半段留空，
+                这样第一个点左边、最后一个点右边不会多出一截悬空的线。 */}
+            <div className="flex h-3 w-full items-center">
+              <span className={cx('h-[2px] flex-1 rounded-full', i === 0 ? 'bg-transparent' : passed ? 'bg-pink/45' : dark ? 'bg-white/15' : 'bg-ink/12')} />
               <span
                 className={cx(
-                  'block h-[3px] w-full rounded-full',
-                  on ? 'bg-pink' : done ? (dark ? 'bg-white/55' : 'bg-ink/35') : dark ? 'bg-white/15' : 'bg-ink/12',
+                  'mx-1 block shrink-0 rounded-full',
+                  on ? 'size-[9px] bg-pink ring-4 ring-pink/20' : done ? 'size-[7px] bg-pink/55' : cx('size-[7px]', dark ? 'bg-white/25' : 'bg-ink/18'),
                 )}
               />
-              <span
-                className={cx(
-                  'text-[10px] leading-none',
-                  on
-                    ? dark ? 'font-black text-pink' : 'font-black text-pink-dark'
-                    : dark ? 'text-white/45' : 'text-ink-3',
-                )}
-              >
-                {s.label}
-              </span>
+              <span className={cx('h-[2px] flex-1 rounded-full', i === STAGES.length - 1 ? 'bg-transparent' : done ? 'bg-pink/45' : dark ? 'bg-white/15' : 'bg-ink/12')} />
             </div>
+            <span
+              className={cx(
+                'mt-1 truncate text-[10px] leading-none',
+                on
+                  ? dark ? 'font-black text-pink' : 'font-black text-pink-dark'
+                  : dark ? 'text-white/45' : 'text-ink-3',
+              )}
+            >
+              {on && label ? label : s.label}
+            </span>
           </div>
         );
       })}

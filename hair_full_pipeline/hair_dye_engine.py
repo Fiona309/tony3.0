@@ -427,6 +427,22 @@ def generate_variant_rgb(base_rgb, variant):
     return (r, g, b)
 
 
+def _darken_toward_base(base_rgb, level_gap):
+    """底色比目标暗 level_gap 度时，直染大致会呈现的颜色。
+
+    真实机理是残留底色（暗发以红橙为主）盖不住，整体压暗且往暖偏。
+    每差 1 度压暗约 12%，最多压到 55%，避免差很多度时直接变成死黑。
+    """
+    factor = max(0.45, 1.0 - 0.12 * max(0, int(level_gap)))
+    r, g, b = base_rgb
+    # 蓝绿通道衰减更快：残留的红橙色素最难被覆盖，所以暗底直染普遍偏暖。
+    return (
+        min(255, int(r * factor + 18)),
+        int(g * factor),
+        int(b * factor * 0.88),
+    )
+
+
 VARIANT_DEFS = [
     {"key": "standard", "label": "标准色"},
     {"key": "low", "label": "低饱和"},
@@ -440,9 +456,15 @@ def plan_generation(user_level, target_family, target_level, target_name):
     """
     规划生图方案
 
-    - 无风险：生目标度数的图 + 变体
-    - 有风险（差1度）：同时生用户度数偏色图 + 目标度数正常图 + 变体
-    - 不推荐：不生图
+    - 无风险（底色够浅）：生目标度数的图 + 变体
+    - 有风险（底色暗 1 度及以上）：同时生用户度数偏色图 + 目标度数正常图 + 变体
+
+    【不要再退化成"不生图"】早先的写法只处理 level_diff >= 0 和 == -1，
+    level_diff <= -2 走完 if/elif 一个分支都不进，variants 留空，
+    调用方按"方案不可用"抛 hair_full_pipeline_generation_plan_unavailable。
+    黑发(3-4度)染任何浅色都落在这一档，等于最主流的场景必然生图失败。
+    底色暗多少度是"要不要先漂"的判断，不是"能不能出效果图"的判断——
+    效果图照出，偏色风险由 risk_variant 表达。
     """
     base_color = lookup_color(target_family, target_level)
     if not base_color:
@@ -475,12 +497,16 @@ def plan_generation(user_level, target_family, target_level, target_name):
                 "label": v["label"],
                 "rgb": list(generate_variant_rgb(base_rgb, v["key"])),
             })
-    elif level_diff == -1:
+    else:
+        # 底色比目标暗：染出来会被残留底色拉偏。差得越多偏得越狠，
+        # 但依然要出图 —— 用户需要看到"直接染大概是什么样"才能理解为什么建议先漂。
         user_color = lookup_color(target_family, user_level)
         if user_color:
             risk_rgb = tuple(user_color["rgb"])
         else:
-            risk_rgb = generate_variant_rgb(base_rgb, "low")
+            # 色板没有该家族的这一度数（越暗越容易缺）。退回按暗度比例压暗标准色，
+            # 保证 risk 档始终有值，不会因为查表落空而整个方案不可用。
+            risk_rgb = _darken_toward_base(base_rgb, abs(level_diff))
 
         plan["risk_variant"] = {
             "key": "risk",

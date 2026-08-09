@@ -589,7 +589,11 @@ def generate_preview_images(
     target_level = _int_or_default(target_color.get("level"), 8)
     current_level = _int_or_default((current_color or {}).get("level"), _int_or_default(color_rule.get("current_level"), 8))
     is_bleach_ideal = generation_mode == "post_bleach_ideal"
-    generation_level = target_level if is_bleach_ideal else current_level
+    # 漂后方案按【理想漂后底色】生成（官方采样到的最高度数，通常 9 度白金），
+    # 不是按门槛度数。详见 _ideal_bleach_level。
+    generation_level = (
+        _ideal_bleach_level(target_family, target_level) if is_bleach_ideal else current_level
+    )
     pipeline_plan = _hair_full_generation_plan(
         user_level=generation_level,
         target_family=target_family,
@@ -613,18 +617,27 @@ def generate_preview_images(
         }
     base_color = pipeline_plan.get("base_color") or {}
     official_result = color_rule.get("official_result_color") or {}
+    # 漂后方案的"标准"必须是【理想漂后底色那一档】的官方实测色，和参考图一致。
+    # 走 pipeline_plan.base_color 会拿到门槛度数的暗浊色，正是用户抱怨的那个效果。
+    ideal_rgb = _matrix_level_colors(target_family, generation_level + 1).get("deep")
     target_rgb = (
-        (_rgb_tuple(base_color.get("rgb")) if is_bleach_ideal else _rgb_tuple(official_result.get("rgb")))
+        ((_rgb_tuple(ideal_rgb) or _rgb_tuple(base_color.get("rgb"))) if is_bleach_ideal
+         else _rgb_tuple(official_result.get("rgb")))
         or _rgb_tuple(base_color.get("rgb"))
         or _rgb_tuple(target_color.get("rgb"))
     )
     if target_rgb is None:
         raise RuntimeError("hair_full_pipeline_target_rgb_unavailable")
     target_hex = _hex_from_rgb(target_rgb)
-    # 直染方案保留偏深/标准/偏浅/偏色四档；漂后理想方案只有前三档。
-    # 偏色仅在知识库判定为 biased 时请求独立风险图，否则使用同一标准图的
-    # 物理色温衍生档，避免伪造一条知识库没有给出的风险结论。
+    # 直染方案保留偏浅/标准/偏深/偏色四档；漂后理想方案只有前三档。
+    # 这四档的色值与实时试色同源，全部直查官方效果矩阵：
+    #   偏浅 = 高一度   标准 = 本档   偏深 = 低一度   偏色 = 低两度
+    # （见 my-tony2.0/app/tony/hair-mirror-core.ts 的 toneVariants）
+    # 旧实现是对标准图做 s_factor 0.7/1.3 的本地饱和度微调，只动饱和度、
+    # 不动明度，四张图肉眼无法区分；偏色档传的还是标准色的 rgb，所以"偏绿"
+    # 从来没绿过。现在把矩阵里那几档的实测色一起传下去。
     has_risk = not is_bleach_ideal and result_quality == "biased"
+    level_colors = _matrix_level_colors(target_family, generation_level)
 
     generator = _hair_full_generator()
     with Image.open(current_image_path).convert("RGB") as before_image:
@@ -637,6 +650,7 @@ def generate_preview_images(
             user_level=generation_level,
             has_risk=has_risk,
             output_dir=str(generated_dir),
+            level_colors=level_colors,
         )
 
     variants = pipeline_result.get("variants") or []
@@ -645,10 +659,13 @@ def generate_preview_images(
     if standard is None:
         raise RuntimeError("hair_full_pipeline_standard_variant_missing")
 
+    # 顺序必须是 浅→标准→深，和试色屏滑块从左到右一致。
+    # low = 偏浅（高一度）、high = 偏深（低一度），键名是历史遗留，
+    # 语义以 glm_hair_generator.derive_tone_colors 为准。
     requested = [
-        ("low", "偏深"),
+        ("low", "淡一点"),
         ("standard", "标准"),
-        ("high", "偏浅"),
+        ("high", "浓一点"),
     ]
     if not is_bleach_ideal:
         requested.append(("risk" if has_risk and by_key.get("risk") else "warm", "偏色"))
@@ -702,10 +719,15 @@ def _configure_hair_full_generator(module: Any) -> None:
     current_api_url = str(getattr(pipeline_settings, "OPENROUTER_API_URL", "") or "")
     api_key = settings.openrouter_api_key or os.getenv("OPENROUTER_API_KEY") or current_api_key
     model = os.getenv("OPENROUTER_IMAGE_MODEL") or os.getenv("OPENROUTER_MODEL") or current_model or settings.openrouter_image_model
+    # current_api_url 必须排在 settings 后面。它不是"已配置的值"，而是 pipeline
+    # config.py 里写死的 openrouter.ai 默认值，永远非空；放前面的话 .env 里的
+    # OPENROUTER_BASE_URL（中转站）永远轮不到，请求会打到 openrouter.ai 换回
+    # 401 Missing Authentication header —— 因为我们的 key 只在中转站有效。
     api_url = (
         os.getenv("OPENROUTER_API_URL")
+        or (f"{settings.openrouter_base_url.rstrip('/')}/chat/completions"
+            if settings.openrouter_base_url else "")
         or current_api_url
-        or f"{settings.openrouter_base_url.rstrip('/')}/chat/completions"
     )
     os.environ["OPENROUTER_API_KEY"] = api_key
     os.environ["OPENROUTER_MODEL"] = model
@@ -735,6 +757,61 @@ def _select_pipeline_preview_variants(variants: list[dict[str, Any]], *, has_ris
             selected.append(variant)
             selected_keys.add(key)
     return selected
+
+
+def _ideal_bleach_level(color_zh: str, fallback: int) -> int:
+    """不能直染时，假设"已经漂到理想底色"的那个度数。
+
+    不能用 minDyeableLevel（最低可染门槛）。那是"勉强能染"的下限：蓝色门槛
+    6 度，官方 6 度实测是 rgb(47,82,73)——H184 S46 V28 的暗浊青，正是用户
+    截图里那个"很差、很阴间"的效果。而她要的是参考图那种亮蓝，
+    那是漂到 9 度白金之后才有的（9 度实测 H204 S87 V87）。
+
+    所以这里取该色系【官方采样过的最高度数】= 漂到头的理想底色。
+    能染走 current_base 用真实底色，不能染走这里用理想底色——两条路本就不同。
+    """
+    try:
+        with database._connect() as connection:
+            connection.row_factory = sqlite3.Row
+            row = connection.execute(
+                "SELECT MAX(base_level) AS mx FROM color_effect_matrix "
+                "WHERE color_zh = ? AND r_real IS NOT NULL",
+                (color_zh,),
+            ).fetchone()
+            if row and row["mx"]:
+                return int(row["mx"])
+    except Exception:
+        pass
+    return fallback
+
+
+def _matrix_level_colors(color_zh: str, level: int) -> dict[str, list[int]]:
+    """生图四档各自的官方实测色。
+
+    与实时试色 toneVariants 完全同一套取法：偏浅=高一度、偏深=低一度、
+    偏色=低两度，色值一律取 r_real（官方商品详情页采样），缺则取色卡 r。
+    官方没录的档位就不给，由生成端按 HSV 推算兜底。
+    """
+    wanted = {"light": level + 1, "deep": level - 1, "risk": level - 2}
+    out: dict[str, list[int]] = {}
+    try:
+        with database._connect() as connection:
+            connection.row_factory = sqlite3.Row
+            for key, lv in wanted.items():
+                row = connection.execute(
+                    "SELECT r, g, b, r_real, g_real, b_real FROM color_effect_matrix "
+                    "WHERE color_zh = ? AND base_level = ?",
+                    (color_zh, lv),
+                ).fetchone()
+                if row is None:
+                    continue
+                if row["r_real"] is not None:
+                    out[key] = [row["r_real"], row["g_real"], row["b_real"]]
+                elif row["r"] is not None:
+                    out[key] = [row["r"], row["g"], row["b"]]
+    except Exception:
+        return {}
+    return out
 
 
 def _hair_full_generation_plan(

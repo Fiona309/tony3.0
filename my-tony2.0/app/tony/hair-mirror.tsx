@@ -27,6 +27,7 @@ import {
   layer1CanDye,
   lookup,
   minDyeableLevel,
+  shadeEndpoints,
   toneVariants,
   type ColorMatrix,
   type Variant,
@@ -335,6 +336,8 @@ export type HairMirrorProps = {
   dyeHistory?: string;
   /** 当前发色色相，用于中和矩阵 */
   currentTone?: string;
+  /** 屏1 确认的发色名。详情弹层要写「什么颜色 · 多少度」，只写度数用户看不懂 */
+  currentColorName?: string;
   onLevelChange?: (level: number) => void;
   /** 在面板里换了色。必须同步回后端，否则商品页推的还是原来那个色 */
   onColorChange?: (videoId: string) => void | Promise<void>;
@@ -344,7 +347,7 @@ export type HairMirrorProps = {
 };
 
 export function HairMirror({
-  matrix, level, entryVideoId, dyeHistory, currentTone,
+  matrix, level, entryVideoId, dyeHistory, currentTone, currentColorName,
   onLevelChange, onColorChange, onBack, onAccept,
 }: HairMirrorProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -421,14 +424,15 @@ export function HairMirror({
   const active = variants[Math.min(stop, Math.max(0, variants.length - 1))] ?? null;
   variantRef.current = active;
 
-  /* 色度插值的两个端点：同色系官方六宫格里最深和最浅的那两个变体。
-     没有变体数据时退化成当前档位色本身（等于关掉这个效果）。 */
+  /* 色度插值的两个端点 = 【当前档位色】自己的明暗，不是别的颜色。
+
+     原来取的是同色系六宫格里最深/最浅的命名变体。蓝色拿到蓝黑色(S42) 和
+     雾霾蓝(S26)，而目标色是 8 度实测的 S81——等于把目标色往两个低饱和的
+     别的颜色上拽，实测标准档 S81 掉到 S60、偏色档 H165 被拉回 H194（绿没了）。
+     四档也因为共用同一对端点而被压平，看不出区别。详见 shadeEndpoints 注释。 */
   useEffect(() => {
-    const lum = (c: number[]) => c[0] * 0.299 + c[1] * 0.587 + c[2] * 0.114;
-    const vs = (matrix.variants?.[kb] ?? []).slice().sort((x, y) => lum(x.rgb) - lum(y.rgb));
-    const self = active?.rgb ?? [128, 128, 128];
-    shadeRef.current = vs.length >= 2 ? [vs[0].rgb, vs[vs.length - 1].rgb] : [self, self];
-  }, [matrix, kb, active]);
+    shadeRef.current = shadeEndpoints(active?.rgb ?? [128, 128, 128]);
+  }, [active]);
 
   /* 载入 MediaPipe：小模型先上，大模型后台补 */
   useEffect(() => {
@@ -757,6 +761,7 @@ export function HairMirror({
           <VerdictDetail
             matrix={matrix} level={level} video={picked}
             dyeHistory={dyeHistory} currentTone={currentTone}
+            currentColorName={currentColorName}
             onClose={() => setDetail(false)}
           />
         ) : null}
@@ -772,7 +777,7 @@ export function HairMirror({
             真正的风险警示留给「能不能染」那一屏，这里只做脚注不抢注意力。
             去黄那句是品牌原话，不是我们的推断。 */}
         {!canDye && active?.ok ? (
-          <p className="mb-1 text-center text-[10px] leading-4 text-white/40">
+          <p className="mb-1 text-center text-[10px] leading-4 text-ink-3">
             官方提示：需漂至 8 度及以上并去黄，偏黄底色上色后会偏{biasWord}
             <span className="mx-1.5 text-ink-3">·</span>
             漂 2 次损伤较大，建议去店里做

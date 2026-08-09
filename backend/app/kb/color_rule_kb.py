@@ -121,12 +121,20 @@ class ColorRuleKB:
                 matrix_row=None,
             )
 
-        transition_row = self._find_transition_row(color_row["color_zh"], profile)
-        if transition_row is not None:
-            return self._transition_decision(current_level, color_row, transition_row)
-
+        # 两张表回答的是两个不同的问题，不能互相否决：
+        #   color_effect_matrix     底色【度数】够不够浅 —— 第一层，决定能不能染
+        #   color_transition_rules  底色【色相】和目标色冲不冲突 —— 第二层，决定会不会偏色
+        # 此前 transition 查到就直接 return，等于让一张【没有 base_level 字段】的
+        # 色相表一票否决度数表：8 度在色阶里叫"浅金色"→归一成"金"→蓝色|金=不能染，
+        # 于是所有 8 度用户想染蓝色都被判成要先漂，而效果矩阵里蓝色@8度明明是 normal。
+        # 判断屏（走效果矩阵）说能染、方案页（走色相表）说要漂，就是这么来的。
         matrix_row = self._find_matrix_row(color_row["color_zh"], current_level)
+        transition_row = self._find_transition_row(color_row["color_zh"], profile)
+
         if matrix_row is None:
+            # 度数没录入时才退回色相表——此时它是唯一能说话的依据。
+            if transition_row is not None:
+                return self._transition_decision(current_level, color_row, transition_row)
             return self._unknown_decision(
                 current_level=current_level,
                 target_name=color_row["color_zh"],
@@ -135,10 +143,16 @@ class ColorRuleKB:
 
         quality = matrix_row["result_quality"]
         if quality == "not_recommended":
+            # 底色太深，色相表救不回来：染膏只能加色素，拿不走已有的色素。
             return self._not_recommended_decision(current_level, color_row, matrix_row)
-        if quality == "biased":
-            return self._biased_decision(current_level, color_row, matrix_row)
-        return self._normal_decision(current_level, color_row, matrix_row)
+
+        # 度数这一关过了。色相冲突只降级成偏色风险，不再取消商品推荐。
+        hue_conflict = transition_row is not None and transition_row["decision"] != "可以"
+        if quality == "biased" or hue_conflict:
+            return self._biased_decision(
+                current_level, color_row, matrix_row, transition_row if hue_conflict else None
+            )
+        return self._normal_decision(current_level, color_row, matrix_row, transition_row)
 
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.database_path)
@@ -201,6 +215,10 @@ class ColorRuleKB:
                     m.g,
                     m.b,
                     m.hex,
+                    m.r_real,
+                    m.g_real,
+                    m.b_real,
+                    m.hex_real,
                     m.rgb_quality,
                     r.result_quality,
                     r.reason
@@ -275,7 +293,26 @@ class ColorRuleKB:
 
     @staticmethod
     def _official_color(matrix_row: dict[str, Any] | None) -> dict[str, Any] | None:
-        if not matrix_row or matrix_row["r"] is None:
+        """判断/试色/生图共用的呈色。
+
+        必须优先给 r_real（官方商品详情页「使用后」逐格采样），和 /api/color-matrix
+        给实时试色的那一路完全一致。此前这里只读 r —— 那是总矩阵小色卡的值，
+        噪声大且明显更艳：蓝色 7 度 chart 是 V65 而 real 只有 V34，8 度 S96 vs S81。
+        于是同一个"标准"，试色屏用 real、生图用 chart，两边天生对不上。
+        """
+        if not matrix_row:
+            return None
+        if matrix_row.get("r_real") is not None:
+            return {
+                "rgb": {
+                    "r": matrix_row["r_real"],
+                    "g": matrix_row["g_real"],
+                    "b": matrix_row["b_real"],
+                },
+                "hex": matrix_row["hex_real"],
+                "rgb_quality": matrix_row["rgb_quality"],
+            }
+        if matrix_row["r"] is None:
             return None
         return {
             "rgb": {"r": matrix_row["r"], "g": matrix_row["g"], "b": matrix_row["b"]},
@@ -380,20 +417,32 @@ class ColorRuleKB:
         current_level: int,
         color_row: dict[str, Any],
         matrix_row: dict[str, Any],
+        transition_row: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         target = color_row["color_zh"]
+        risks = [
+            {
+                "title": "按商品说明操作",
+                "severity": "low",
+                "reason": matrix_row["reason"],
+                "suggestion": "仍需按商品说明控制停留时间和涂抹均匀度。",
+            }
+        ]
+        # 色相表说"可以"时会带一个 add_color，那是配方方向，属于有用的操作提示。
+        if transition_row is not None and transition_row["decision"] == "可以" and transition_row["add_color"]:
+            risks.append(
+                {
+                    "title": "配方方向",
+                    "severity": "low",
+                    "reason": transition_row["reason"],
+                    "suggestion": f"配方方向上只补{transition_row['add_color']}，不要一次叠加多个颜色。",
+                }
+            )
         return {
             "feasibility": "reachable",
             "summary": f"当前 {current_level} 度底色染{target}在官方效果矩阵中属于推荐且正常显色。",
             "reachability_score": 88,
-            "risks": [
-                {
-                    "title": "按商品说明操作",
-                    "severity": "low",
-                    "reason": matrix_row["reason"],
-                    "suggestion": "仍需按商品说明控制停留时间和涂抹均匀度。",
-                }
-            ],
+            "risks": risks,
             "can_recommend_product": True,
             "color_rule": self._rule_debug(
                 current_level=current_level, color_row=color_row, matrix_row=matrix_row
@@ -405,18 +454,33 @@ class ColorRuleKB:
         current_level: int,
         color_row: dict[str, Any],
         matrix_row: dict[str, Any],
+        transition_row: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         target = color_row["color_zh"]
+        if transition_row is not None:
+            # 度数够、但色相冲突：底色残留的色相会和染膏做减色混合，成色被带偏。
+            # 这是"会偏色"，不是"不能染"——用户可以选择接受偏色后的样子。
+            current_color = transition_row["current_color_zh"]
+            summary = (
+                f"当前 {current_level} 度底色的度数够染{target}，"
+                f"但{current_color}底色残留会把成色带偏。"
+            )
+            reason = transition_row["reason"]
+            suggestion = "试色屏拖到最右边可以看到偏色的样子；不能接受就先由专业人士处理底色。"
+        else:
+            summary = f"当前 {current_level} 度底色可以尝试{target}，但官方效果图标注存在偏色风险。"
+            reason = matrix_row["reason"]
+            suggestion = "如果不能接受偏色，建议先由专业人士处理底色后再染。"
         return {
             "feasibility": "conditional",
-            "summary": f"当前 {current_level} 度底色可以尝试{target}，但官方效果图标注存在偏色风险。",
+            "summary": summary,
             "reachability_score": 65,
             "risks": [
                 {
                     "title": "可能偏色",
                     "severity": "medium",
-                    "reason": matrix_row["reason"],
-                    "suggestion": "如果不能接受偏色，建议先由专业人士处理底色后再染。",
+                    "reason": reason,
+                    "suggestion": suggestion,
                 }
             ],
             "can_recommend_product": True,

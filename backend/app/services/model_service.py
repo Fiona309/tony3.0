@@ -457,7 +457,9 @@ class ModelService:
         payload = {
             "model": self.settings.vision_model,
             "temperature": 0.1,
-            "max_tokens": 1600,
+            # 砍掉 hsv/lab/第三候选后，实际输出稳定在 400 token 以内。
+            # 识别延迟几乎全花在逐字生成上，留太大只会让模型话痨。
+            "max_tokens": 700,
             "response_format": {"type": "json_object"},
             "messages": [
                 {
@@ -511,7 +513,8 @@ class ModelService:
 1. 第一张是用户当前头发照片。
 2. 第二张是博主/目标发色参考图。
 
-返回 JSON，字段必须使用以下结构：
+返回 JSON，字段必须使用以下结构。
+不要输出 hsv 和 lab —— 系统会由 rgb 精确换算，你多写只会拖慢响应：
 {
   "current_hair": {
     "region_mode": "single|root_mid_end|unknown",
@@ -521,11 +524,9 @@ class ModelService:
       "saturation": "light|medium|dark",
       "display_name": "中文发色名",
       "rgb": {"r": 0-255, "g": 0-255, "b": 0-255},
-      "hsv": {"h": 0-360, "s": 0-100, "v": 0-100},
-      "lab": {"l": 0-100, "a": -128-127, "b": -128-127},
       "confidence": 0-1
     },
-    "color_options": [最多 3 个候选 color，不要包含 confidence]
+    "color_options": [最多 2 个候选 color，只要 tone/level/display_name/rgb]
   },
   "target_color": {
     "tone": "black|brown|yellow|orange|red|pink|purple|blue|green|gray|unknown",
@@ -533,11 +534,9 @@ class ModelService:
     "saturation": "light|medium|dark",
     "display_name": "中文目标色名",
     "rgb": {"r": 0-255, "g": 0-255, "b": 0-255},
-    "hsv": {"h": 0-360, "s": 0-100, "v": 0-100},
-    "lab": {"l": 0-100, "a": -128-127, "b": -128-127},
     "confidence": 0-1
   },
-  "target_color_options": [最多 3 个候选 target_color，不要包含 confidence],
+  "target_color_options": [最多 2 个候选 target_color，只要 tone/level/display_name/rgb],
   "hair_length": "ear|shoulder|chest|waist|below_waist|unknown",
   "hair_volume": "low|medium|high|unknown",
   "dye_history": "natural|bleached_1|bleached_2|bleached_3_plus|dyed_black|unknown",
@@ -548,13 +547,44 @@ class ModelService:
     "current_color": 0-1,
     "target_color": 0-1
   },
-  "analysis_summary": "一句中文摘要"
+  "analysis_summary": "一句中文摘要，20 字以内"
 }
 
 要求：
 - 不要决定是否推荐染发。
-- 度数 level 表示染发行业常用底色度数，1 最深，10 最浅。
 - 如果无法判断，使用 unknown，但仍给出最接近的候选。
+
+【格式硬性要求】
+tone / hair_length / hair_volume / dye_history 的值必须原样使用上面列出的
+英文枚举，不要翻译成中文。写"冷色调""肩部"这类中文会被系统判为无效并丢弃，
+等于识别白做。display_name 才是中文发色名。
+
+【底色度数 level 判定标准】1 最深、10 最浅，对照下表取最接近的一档：
+- 1-2 度：纯黑、自然黑，几乎看不出反光色
+- 3-4 度：深棕、黑棕，阳光下透红棕调
+- 5-6 度：中棕、栗棕，室内也能看出棕色
+- 7 度：浅棕、深金棕，明显偏亮
+- 8 度：金色、浅黄，已接近漂过的底色
+- 9-10 度：浅金、白金、银灰，几乎无色素
+判断时看发中段到发尾在光照均匀处的颜色，不要只看高光或阴影。
+
+【头发长度 hair_length 判定参照】以人物身体部位为准，不要凭感觉：
+- ear：发尾在耳垂及以上（短发）
+- shoulder：发尾落在肩线附近
+- chest：发尾到胸口（锁骨以下、胸线上下）
+- waist：发尾到腰部
+- below_waist：发尾超过腰部
+若人物是半身照、发尾被裁掉，按可见部分推测并调低 hair_length 置信度。
+注意图片可能是手机截图，含状态栏和 App 界面，请忽略这些 UI 元素只看人物。
+
+【漂染历史 dye_history 判定规则 —— 必须遵守】
+- 当前发色是黑色或棕色（tone 为 black 或 brown）时，一律返回 "natural"，
+  即默认没有漂过。东亚人天生发色就是黑棕，不要因为发色偏亮就猜漂过。
+- 当前发色是其他任何颜色（yellow / orange / red / pink / purple / blue /
+  green / gray）时，一律返回 "bleached_2"，即默认漂过两次。这些颜色在
+  天然发色上不可能出现，必须经过漂发才能呈现。
+- 只有完全看不清头发时才用 unknown。
+这条规则优先于你从图片纹理得到的任何印象。
 """.strip()
 
     def _hair_profile_analysis_from_vlm_json(
@@ -606,6 +636,25 @@ class ModelService:
             ),
         }
 
+        model_dye_history = self._enum_or_none(
+            parsed.get("dye_history"),
+            # 旧值 dyed_no_bleach / bleached_1_2 仍接受，由 normalize_dye_history 归一化
+            {
+                "natural",
+                "dyed_no_bleach",
+                "bleached_1",
+                "bleached_2",
+                "bleached_1_2",
+                "bleached_3_plus",
+                "dyed_black",
+                "unknown",
+            },
+        )
+        # 漂染历史由发色反推，不采信模型的自由判断。
+        # 产品规则：黑/棕 = 没漂过；其它颜色 = 漂过两次。
+        # prompt 里写了同样的规则，但 prompt 是软约束，这里做硬兜底。
+        dye_history = self._dye_history_from_tone(current_color.get("tone"), model_dye_history)
+
         return HairProfileVisionAnalysis(
             current_color=current_color,
             current_color_options=current_options,
@@ -616,20 +665,7 @@ class ModelService:
                 {"ear", "shoulder", "chest", "waist", "below_waist", "unknown"},
             ),
             hair_volume=self._enum_or_none(parsed.get("hair_volume"), {"low", "medium", "high", "unknown"}),
-            dye_history=self._enum_or_none(
-                parsed.get("dye_history"),
-                # 旧值 dyed_no_bleach / bleached_1_2 仍接受，由 normalize_dye_history 归一化
-                {
-                    "natural",
-                    "dyed_no_bleach",
-                    "bleached_1",
-                    "bleached_2",
-                    "bleached_1_2",
-                    "bleached_3_plus",
-                    "dyed_black",
-                    "unknown",
-                },
-            ),
+            dye_history=dye_history,
             attribute_confidences=attribute_confidences,
             raw={
                 "provider": "openai_next",
@@ -638,6 +674,28 @@ class ModelService:
                 "usage": raw_response.get("usage"),
             },
         )
+
+    @staticmethod
+    def _dye_history_from_tone(tone: Any, model_value: str | None) -> str:
+        """按当前发色反推漂染历史。
+
+        产品规则（优先于模型判断）：
+        - 黑色 / 棕色 → natural，默认没漂过。东亚人天生就是黑棕发，
+          发色偏亮不代表漂过。
+        - 其它任何颜色 → bleached_2，默认漂过两次。黄橙红粉紫蓝绿灰
+          在天然发色上不可能出现，必须先漂浅才能上色。
+        用户可以在确认页手动改，这里只负责给一个符合常识的默认值。
+        """
+        tone_value = str(tone or "").strip().lower()
+        if tone_value in {"black", "brown"}:
+            return "natural"
+        if tone_value in {
+            "yellow", "orange", "red", "pink",
+            "purple", "blue", "green", "gray",
+        }:
+            return "bleached_2"
+        # tone 都没识别出来时，保留模型原值，实在没有就交给下游归一化。
+        return model_value or "unknown"
 
     def _mock_transcribe(self, original_filename: str) -> TranscribeResult:
         filename = original_filename.lower()
@@ -912,10 +970,14 @@ class ModelService:
             "s": self._int_range(hsv_source.get("s"), 0, 100, self._hsv_dict((rgb["r"], rgb["g"], rgb["b"]))["s"]),
             "v": self._int_range(hsv_source.get("v"), 0, 100, self._hsv_dict((rgb["r"], rgb["g"], rgb["b"]))["v"]),
         }
+        # lab 不再要求模型输出：让它逐位吐 hsv/lab 会把 completion 拉到 1000+
+        # token，而识别延迟几乎全花在逐字生成上（实测输出减半、耗时从 17s 降到 10s）。
+        # 这两组值都能由 rgb 精确换算，本地算既快又准。模型给了就用它的，没给就换算。
+        lab_default = self._lab_from_rgb((rgb["r"], rgb["g"], rgb["b"]))
         lab = {
-            "l": self._float_range(lab_source.get("l"), 0, 100, float(fallback.get("lab", {}).get("l", 50)) if isinstance(fallback.get("lab"), dict) else 50.0),
-            "a": self._float_range(lab_source.get("a"), -128, 127, float(fallback.get("lab", {}).get("a", 0)) if isinstance(fallback.get("lab"), dict) else 0.0),
-            "b": self._float_range(lab_source.get("b"), -128, 127, float(fallback.get("lab", {}).get("b", 0)) if isinstance(fallback.get("lab"), dict) else 0.0),
+            "l": self._float_range(lab_source.get("l"), 0, 100, lab_default["l"]),
+            "a": self._float_range(lab_source.get("a"), -128, 127, lab_default["a"]),
+            "b": self._float_range(lab_source.get("b"), -128, 127, lab_default["b"]),
         }
 
         color = {
@@ -1008,6 +1070,29 @@ class ModelService:
     @staticmethod
     def _lab_dict(lab: tuple[float, float, float]) -> dict[str, float]:
         return {"l": float(lab[0]), "a": float(lab[1]), "b": float(lab[2])}
+
+    @staticmethod
+    def _lab_from_rgb(rgb: tuple[int, int, int]) -> dict[str, float]:
+        """sRGB -> CIE Lab（D65）。用于免掉模型输出 lab 这三行。"""
+        def _linear(channel: float) -> float:
+            channel /= 255.0
+            return channel / 12.92 if channel <= 0.04045 else ((channel + 0.055) / 1.055) ** 2.4
+
+        r, g, b = (_linear(float(value)) for value in rgb)
+        # sRGB -> XYZ，再按 D65 白点归一
+        x = (r * 0.4124 + g * 0.3576 + b * 0.1805) / 0.95047
+        y = r * 0.2126 + g * 0.7152 + b * 0.0722
+        z = (r * 0.0193 + g * 0.1192 + b * 0.9505) / 1.08883
+
+        def _f(t: float) -> float:
+            return t ** (1 / 3) if t > 0.008856 else (7.787 * t + 16 / 116)
+
+        fx, fy, fz = _f(x), _f(y), _f(z)
+        return {
+            "l": round(max(0.0, 116 * fy - 16), 2),
+            "a": round(500 * (fx - fy), 2),
+            "b": round(200 * (fy - fz), 2),
+        }
 
     @staticmethod
     def _level_from_lab(lab: tuple[float, float, float]) -> int:

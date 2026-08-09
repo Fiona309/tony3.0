@@ -112,7 +112,9 @@ export function HairConfirmScreen({
       current_hair: {
         ...p.current_hair,
         region_mode: 'single',
-        color: { ...color, level: lv, tone: LEVEL_TONE[lv - 1], display_name: `${lv} 度 ${LEVEL_NAME[lv - 1]}` },
+        // display_name 只写颜色名，不带度数 —— 度数在 PhotoCard 下方单独显示，
+        // 写成「3 度 深棕色」会让判断屏出现「3 度 深棕色 3 度」这种重复。
+        color: { ...color, level: lv, tone: LEVEL_TONE[lv - 1], display_name: LEVEL_NAME[lv - 1] },
       },
     }));
   };
@@ -160,10 +162,31 @@ export function HairConfirmScreen({
         {/* 并排对比：把"我现在什么样"和"我想要什么样"摆在一起，
             后面所有确认动作才有理由 */}
         <div className="grid grid-cols-2 gap-3">
-          <PhotoCard title="现在的发色" src={currentPhotoUrl} alt="你上传的照片" />
+          {/* 图下必须写清"什么颜色 + 多少度"。只放照片，用户无从判断 AI 到底认成了什么，
+              也就不知道该不该改。 */}
+          <PhotoCard title="现在的发色" src={currentPhotoUrl} alt="你上传的照片"
+            colorName={color.display_name} level={level} swatch={LEVEL_SWATCH[level - 1]} />
           <PhotoCard title="目标发色" src={target.cover_url ?? ''} alt={target.color_name}
-            fallback={target.accent ?? '#8a8a8a'} />
+            fallback={target.accent ?? '#8a8a8a'}
+            colorName={profile.target_color?.display_name || target.color_name}
+            level={profile.target_color?.level ?? 0}
+            swatch={target.accent ?? undefined} />
         </div>
+
+        {/* 识别经常认错发色名，光给色阶不够——得让用户能直接把名字改对 */}
+        <ColorNameRow
+          value={color.display_name}
+          onChange={(name) =>
+            setProfile((p) => ({
+              ...p,
+              current_hair: {
+                ...p.current_hair,
+                region_mode: 'single',
+                color: { ...color, display_name: name },
+              },
+            }))
+          }
+        />
 
         <div className="mt-4 grid gap-3">
           <Accordion
@@ -239,7 +262,12 @@ export function HairConfirmScreen({
   );
 }
 
-function PhotoCard({ title, src, alt, fallback }: { title: string; src: string; alt: string; fallback?: string }) {
+function PhotoCard({
+  title, src, alt, fallback, colorName, level, swatch,
+}: {
+  title: string; src: string; alt: string; fallback?: string;
+  colorName?: string; level?: number; swatch?: string;
+}) {
   return (
     <div className="rounded-[20px] border border-ink/12 bg-white p-2.5">
       <p className="pb-2 text-center text-[13px] font-black text-ink-2">{title}</p>
@@ -249,7 +277,70 @@ function PhotoCard({ title, src, alt, fallback }: { title: string; src: string; 
         style={fallback && !src ? { background: fallback } : undefined}>
         {src ? <MediaImage src={src} alt={alt} className="object-cover object-top" /> : null}
       </div>
+      {colorName ? (
+        <div className="flex items-center justify-center gap-1.5 pt-2">
+          {swatch ? (
+            <span className="size-[13px] shrink-0 rounded-full border border-ink/15"
+              style={{ background: swatch }} aria-hidden />
+          ) : null}
+          <span className="truncate text-[12.5px] font-black">{colorName}</span>
+          {level ? <span className="shrink-0 text-[12.5px] font-black text-ink-2">{level} 度</span> : null}
+        </div>
+      ) : null}
     </div>
+  );
+}
+
+/** 当前发色名的手动订正行。识别不准时，改度数改不动"叫什么"，得能直接输入。 */
+function ColorNameRow({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value);
+
+  const commit = () => {
+    const next = draft.trim();
+    if (next && next !== value) onChange(next);
+    else setDraft(value);
+    setEditing(false);
+  };
+
+  return (
+    <section className="mt-3 rounded-[20px] border border-ink/12 bg-white px-4 py-3">
+      <div className="flex items-center gap-2">
+        <span className="text-[15px] font-black">我的当前发色</span>
+        {editing ? (
+          <>
+            <input
+              autoFocus
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') commit();
+                if (e.key === 'Escape') { setDraft(value); setEditing(false); }
+              }}
+              maxLength={12}
+              placeholder="例如：自然黑发"
+              aria-label="手动输入当前发色"
+              className="min-w-0 flex-1 rounded-[11px] border border-pink bg-white px-2.5 py-1.5 text-[14px] font-bold outline-none"
+            />
+            <button type="button" onClick={commit}
+              className="tap shrink-0 rounded-full bg-pink px-3 py-1.5 text-[12px] font-black text-white">
+              保存
+            </button>
+          </>
+        ) : (
+          <>
+            <span className="flex-1 truncate text-right text-[15px] font-black text-ink-2">{value}</span>
+            <button type="button" onClick={() => { setDraft(value); setEditing(true); }}
+              className="tap shrink-0 rounded-full border border-ink/20 px-3 py-1.5 text-[12px] font-black text-ink-2">
+              修改
+            </button>
+          </>
+        )}
+      </div>
+      <p className="mt-1.5 text-[11px] leading-4 text-ink-3">
+        AI 认错了就直接改这里，下面的度数和漂染历史也一起核对一下。
+      </p>
+    </section>
   );
 }
 

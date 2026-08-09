@@ -877,6 +877,10 @@ export default function TonyApp() {
             video={entry}
             dyeHistory={profile.dye_history}
             currentTone={profile.current_hair?.color?.tone}
+            currentColorName={
+              profile.current_hair?.color?.display_name
+              ?? profile.current_hair?.regions?.end.color?.display_name
+            }
             currentPhotoUrl={currentPhotoUrl}
             targetPhotoUrl={selectedVideo.target_frame_url || selectedVideo.cover_url}
             onBack={() => setScreen('profile')}
@@ -917,6 +921,10 @@ export default function TonyApp() {
             entryVideoId={selectedVideo.video_id}
             dyeHistory={profile.dye_history}
             currentTone={profile.current_hair?.color?.tone}
+            currentColorName={
+              profile.current_hair?.color?.display_name
+              ?? profile.current_hair?.regions?.end.color?.display_name
+            }
             onLevelChange={changeBaseLevel}
             onColorChange={changeTargetColor}
             onBack={() => setScreen('verdict')}

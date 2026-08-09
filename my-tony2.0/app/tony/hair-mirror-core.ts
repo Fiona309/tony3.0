@@ -143,6 +143,50 @@ export function scaleSat(rgb: number[], k: number): [number, number, number] {
   return rgb.map((v) => clamp255(l + (v - l) * k)) as [number, number, number];
 }
 
+export function rgb2hsv([r, g, b]: number[]): [number, number, number] {
+  const R = r / 255, G = g / 255, B = b / 255;
+  const mx = Math.max(R, G, B), mn = Math.min(R, G, B), d = mx - mn;
+  let h = 0;
+  if (d > 1e-6) {
+    if (mx === R) h = ((G - B) / d + (G < B ? 6 : 0)) / 6;
+    else if (mx === G) h = ((B - R) / d + 2) / 6;
+    else h = ((R - G) / d + 4) / 6;
+  }
+  return [h, mx <= 0 ? 0 : d / mx, mx];
+}
+
+export function hsv2rgb(h: number, s: number, v: number): [number, number, number] {
+  const i = Math.floor(h * 6), f = h * 6 - i;
+  const p = v * (1 - s), q = v * (1 - f * s), t = v * (1 - (1 - f) * s);
+  const [R, G, B] = [[v, t, p], [q, v, p], [p, v, t], [p, q, v], [t, p, v], [v, p, q]][((i % 6) + 6) % 6];
+  return [clamp255(R * 255), clamp255(G * 255), clamp255(B * 255)];
+}
+
+/**
+ * 「色度随明度走」的两个端点（shader 里的 targetDark / targetLite）。
+ *
+ * 原来取的是官方六宫格里同色系【最深和最浅的命名变体】。蓝色拿到的是
+ * 蓝黑色(H222 S42) 和雾霾蓝(H209 S26)——跟目标色（8 度实测 H207 S81）
+ * 根本不是一个饱和度档次，而且是另外两个颜色，不是同一个颜色的明暗。
+ *
+ * shader 里 tgt = mix(target, mix(dark, lite, ·), chromaVar)，等于把目标色
+ * 往这两个低饱和端点上拽。实测后果（chromaVar=0.5）：
+ *   标准 8 度  S81 → S60      偏浅 9 度  S87 → S66
+ *   偏深 7 度  S78 → S50      偏色 6 度  H165 → H194（绿色被拉回蓝）
+ * 四档的差异也被一起压平。这就是「蓝色不够蓝 / 饱和度太低 / 偏浅偏深看不出
+ * 区别 / 偏绿完全不绿」的共同来源——一个 bug，四个症状。
+ *
+ * 端点应当是【同一个颜色的明暗变化】：锁住 H 与 S，只动 V。
+ * 头发暗部色素更实（饱和略高），亮部有表面反射冲淡（饱和略低），按这个方向微调。
+ * 0.62 / 1.40 让两端在 V 上大致对称，mix 到中点时基本落回目标色本身。
+ */
+export function shadeEndpoints(rgb: number[]): [number[], number[]] {
+  const [h, s, v] = rgb2hsv(rgb);
+  const dark = hsv2rgb(h, Math.min(1, s * 1.06), v * 0.62);
+  const lite = hsv2rgb(h, s * 0.9, Math.min(1, v * 1.4));
+  return [dark, lite];
+}
+
 /**
  * 偏色 = 染膏色与「该底色度数残留的暖色」做减色混合。
  *
@@ -207,10 +251,38 @@ export type Layer1 = {
   smoothed: boolean;
 };
 
+/**
+ * 把度数夹进官方矩阵录入的范围。
+ *
+ * 矩阵只录了 3~9 度，而天生黑发是 1~2 度——这批用户查任何颜色都拿不到 entry，
+ * 于是「现在能染的颜色」一个都列不出来，A 方案按钮永远是灰的、点了没反应。
+ * 但物理上 1 度和 3 度对「能不能上色」的答案是一样的：都只有深色系能显色。
+ * 所以越界时夹到最近的已录度数，并标 smoothed 让 UI 注明这是推断。
+ * 只夹【范围外】，范围内的空缺不碰——那是真实断层。
+ */
+function clampToMatrix(cm: ColorMatrix, kbColor: string, level: number): { level: number; clamped: boolean } {
+  const levels = Object.keys(cm.matrix?.[kbColor] ?? {}).map(Number);
+  if (!levels.length) return { level, clamped: false };
+  const lo = Math.min(...levels);
+  const hi = Math.max(...levels);
+  if (level < lo) return { level: lo, clamped: true };
+  if (level > hi) return { level: hi, clamped: true };
+  return { level, clamped: false };
+}
+
 export function layer1CanDye(cm: ColorMatrix, kbColor: string, level: number): Layer1 {
-  const e = entryAt(cm, kbColor, level);
+  const near = clampToMatrix(cm, kbColor, level);
+  const e = entryAt(cm, kbColor, near.level);
   if (!e) {
     return { can: false, why: `官方效果矩阵未覆盖 ${level} 度底色，无法判断。`, smoothed: false };
+  }
+  if (near.clamped) {
+    const blocked = e.q === 'not_recommended' || e.q === 'unknown';
+    return {
+      can: !blocked,
+      why: `${e.why || ''}（${level} 度超出官方矩阵录入范围，按最接近的 ${near.level} 度推断）`,
+      smoothed: true,
+    };
   }
   // 没有色值意味着官方效果图没给这个组合出样本——即不建议染。
   // 例外：补录的 3~4 度只录了结论没录色值，靠 q 明确表态。
@@ -221,6 +293,8 @@ export function layer1CanDye(cm: ColorMatrix, kbColor: string, level: number): L
 /** 该色系最低可染的底色度数，直接取自知识库。
  *  用于告诉用户"要漂到几度"——此前 UI 里写死 max(8, 当前度数+4)，
  *  与知识库无关，导致 6 度用户被告知要漂到 10 度，而蓝色其实 6 度起就能染。 */
+export { clampToMatrix };
+
 export function minDyeableLevel(cm: ColorMatrix, kbColor: string): number | null {
   const fam = cm.matrix?.[kbColor] ?? {};
   const ok = Object.entries(fam)

@@ -42,7 +42,14 @@ export function PlanResultScreen({
   const bleach = plan.generation_mode === 'post_bleach_ideal';
   const entry = matrix?.videos.find((item) => item.video_id === target.video_id);
   const kb = entry?.kb_color ?? '';
-  const requiredLevel = matrix && kb ? minDyeableLevel(matrix, kb) ?? target.target_color?.level ?? 8 : target.target_color?.level ?? 8;
+  // minDyeableLevel 是【门槛下限】，不是漂发目标。用户已经比门槛还浅时，
+  // 写"漂到约 6 度"方向就是反的（8 度比 6 度浅，那是往回染黑）。
+  // 底色只可能越漂越浅，所以漂后目标至少不低于当前度数。
+  const minLevel = matrix && kb ? minDyeableLevel(matrix, kb) : null;
+  const requiredLevel = Math.max(
+    minLevel ?? target.target_color?.level ?? 8,
+    currentLevel,
+  );
   const stages = matrix && kb ? fadeStages(matrix, kb, bleach ? requiredLevel : currentLevel) : [];
   const hold = matrix && kb ? holdLabel(matrix, kb) : '';
   const texture = matrix && kb
@@ -52,7 +59,9 @@ export function PlanResultScreen({
   const expectedCount = bleach ? 3 : 4;
   const previews = plan.preview_images.slice(0, expectedCount);
   const summary = bleach
-    ? `漂到约 ${requiredLevel} 度后，可以按理想底色模拟${target.color_name}。`
+    ? requiredLevel > currentLevel
+      ? `从 ${currentLevel} 度漂到约 ${requiredLevel} 度后，可以按理想底色模拟${target.color_name}。`
+      : `按理想底色模拟${target.color_name}的效果，你当前 ${currentLevel} 度的底色不需要再漂浅。`
     : verdict?.biasRisky
       ? `可以染，但实际效果可能偏色。`
       : `可以染，效果会基于你的 ${currentLevel} 度真实底色。`;
@@ -87,7 +96,9 @@ export function PlanResultScreen({
           </div>
         </section>
 
-        {bleach ? (
+        {/* 只有确实要再漂浅时才警告。底色已经够浅还挂"不建议居家漂发"，
+            用户会以为自己必须多做一步不该做的操作。 */}
+        {bleach && requiredLevel > currentLevel ? (
           <section className="mt-3 rounded-[22px] border border-[#efb7a7] bg-[#fff8f5] px-4 py-3.5">
             <h2 className="text-[13px] font-black text-[#c95750]">强烈不建议居家漂发</h2>
             <p className="mt-1.5 text-[10.5px] leading-[1.6] text-ink-2">建议由专业理发师把底色安全漂到 {requiredLevel} 度左右。居家操作容易导致断发、斑驳、局部过度损伤或刺激头皮。</p>
@@ -103,7 +114,8 @@ export function PlanResultScreen({
             <div className={cx('mt-3 grid gap-2', bleach ? 'grid-cols-3' : 'grid-cols-4')}>
               {previews.map((item) => (
                 <button key={item.preview_level} type="button" onClick={() => onIntensityChange(item.preview_level)} className={cx('tap overflow-hidden rounded-[15px] border-2 bg-cream text-left', selectedIntensity === item.preview_level ? 'border-pink' : 'border-transparent')}>
-                  <div className="aspect-[3/4] overflow-hidden"><MediaImage src={item.url} alt={item.label} className="object-cover" /></div>
+                  {/* relative 不能省：MediaImage 是 next/image 的 fill */}
+                  <div className="relative aspect-[3/4] overflow-hidden"><MediaImage src={item.url} alt={item.label} className="object-cover" /></div>
                   <p className="py-1.5 text-center text-[10px] font-black">{item.label}</p>
                 </button>
               ))}
@@ -152,5 +164,5 @@ export function PlanResultScreen({
 }
 
 function HairPhoto({ title, src, caption }: { title: string; src: string; caption: string }) {
-  return <div className="text-center"><p className="mb-2 text-[11px] font-black">{title}</p><div className="aspect-[4/5] overflow-hidden rounded-[16px] bg-cream">{src ? <MediaImage src={src} alt={title} className="object-cover" /> : null}</div><p className="mt-1.5 truncate text-[9.5px] font-bold">{caption}</p></div>;
+  return <div className="text-center"><p className="mb-2 text-[11px] font-black">{title}</p><div className="relative aspect-[4/5] overflow-hidden rounded-[16px] bg-cream">{src ? <MediaImage src={src} alt={title} className="object-cover" /> : null}</div><p className="mt-1.5 truncate text-[9.5px] font-bold">{caption}</p></div>;
 }

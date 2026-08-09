@@ -835,10 +835,12 @@ class MockStore:
             if decision["can_recommend_product"]
             else "post_bleach_ideal"
         )
+        # 标签照实写：low/high 是标准图的本地 HSV 微调（饱和度 ×0.7 / ×1.3），
+        # 变的是浓淡不是深浅。标成"偏深/偏浅"用户会以为能看到更浅的发色。
         labels = (
-            ["偏深", "标准", "偏浅", "偏色"]
+            ["淡一点", "标准", "浓一点", "偏色"]
             if generation_mode == "current_base"
-            else ["偏深", "标准", "偏浅"]
+            else ["淡一点", "标准", "浓一点"]
         )
         # 真实模式下绝不拿演示素材冒充生成结果。任务完成前始终返回空数组。
         images: list[dict] = []
