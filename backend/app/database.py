@@ -867,33 +867,59 @@ class Database:
         最持久），标 industry_reference 以区别于官方效果图实测数据。UI 必须显示
         "参考"字样，后续靠用户回访数据替换为实测值。
         """
-        # (色系, 保色期周数下限, 上限, 第1~5周的阶段名)
+        # (色系, 保色期下限, 上限, [(第N周阶段名, 该阶段色值), ...])
+        #
+        # 色值按中文阶段名定色相、再按褪彩程度定明度饱和度，是产品给的权威数据。
+        # 不能靠减色物理模型推：蓝与残留的橙是互补色，插值会穿过灰、乘法出不了黄，
+        # 算出来是一串浑浊的褐色，和"蓝→蓝绿→绿→黄绿"这个真实观感对不上。
+        # 前端 fadeStages 里那套物理推算只在这里没值时兜底。
         FADE = [
-            ("蓝色", 2, 3, ["蓝色", "浅蓝色", "蓝绿色", "绿色", "黄绿色"]),
-            ("紫色", 1, 2, ["紫色", "浅紫色", "灰紫色", "米黄色", "黄色"]),
-            ("粉色", 1, 2, ["粉色", "浅粉色", "藕粉色", "米粉色", "浅黄色"]),
-            ("红色", 4, 6, ["红色", "玫红色", "橘红色", "橘色", "浅橘色"]),
-            ("黑茶色", 6, 8, ["黑茶色", "深茶色", "茶棕色", "浅茶棕", "浅棕色"]),
-            ("奶茶灰棕", 6, 8, ["奶茶灰棕", "浅灰棕", "浅棕色", "米棕色", "浅黄棕"]),
+            ("蓝色", 2, 3, [
+                ("蓝色", "#5691CB"), ("浅蓝色", "#66ABCE"), ("蓝绿色", "#75D1CA"),
+                ("绿色", "#83D38E"), ("黄绿色", "#C1D691"),
+            ]),
+            ("紫色", 1, 2, [
+                ("紫色", "#813E68"), ("浅紫色", "#904D83"), ("灰紫色", "#9F5D9F"),
+                ("米黄色", "#AE996F"), ("黄色", "#BDB181"),
+            ]),
+            ("粉色", 1, 2, [
+                ("粉色", "#EAA7B1"), ("浅粉色", "#E9A7AB"), ("藕粉色", "#E9B0A8"),
+                ("米粉色", "#E8C4A9"), ("浅黄色", "#E7D8AB"),
+            ]),
+            ("红色", 4, 6, [
+                ("红色", "#A21F1C"), ("玫红色", "#AC3549"), ("橘红色", "#B5664E"),
+                ("橘色", "#BF8C68"), ("浅橘色", "#C8A581"),
+            ]),
+            ("黑茶色", 6, 8, [
+                ("黑茶色", "#534D48"), ("深茶色", "#665B53"), ("茶棕色", "#78695E"),
+                ("浅茶棕", "#8B7868"), ("浅棕色", "#9D8572"),
+            ]),
+            ("奶茶灰棕", 6, 8, [
+                ("奶茶灰棕", "#A79890"), ("浅灰棕", "#AC998C"), ("浅棕色", "#B19A89"),
+                ("米棕色", "#B59D87"), ("浅黄棕", "#BAA287"),
+            ]),
         ]
         now = _now()
         for color_zh, lo, hi, stages in FADE:
-            for index, stage_name in enumerate(stages, start=1):
+            for index, (stage_name, hex_value) in enumerate(stages, start=1):
+                r, g, b = (int(hex_value[i : i + 2], 16) for i in (1, 3, 5))
                 connection.execute(
                     """
                     INSERT INTO color_fade (
                         color_zh, week, stage_name, hold_weeks_min, hold_weeks_max,
-                        source, updated_at
+                        source, updated_at, r, g, b, hex
                     )
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ON CONFLICT(color_zh, week) DO UPDATE SET
                         stage_name = excluded.stage_name,
                         hold_weeks_min = excluded.hold_weeks_min,
                         hold_weeks_max = excluded.hold_weeks_max,
                         source = excluded.source,
-                        updated_at = excluded.updated_at
+                        updated_at = excluded.updated_at,
+                        r = excluded.r, g = excluded.g, b = excluded.b, hex = excluded.hex
                     """,
-                    (color_zh, index, stage_name, lo, hi, "industry_reference", now),
+                    (color_zh, index, stage_name, lo, hi, "industry_reference", now,
+                     r, g, b, hex_value),
                 )
 
     def _seed_operation_qa(self, connection: sqlite3.Connection) -> None:
