@@ -32,7 +32,7 @@ class ProductKB:
             rows = connection.execute(
                 """
                 SELECT sku.*, p.brand, p.product_name, p.product_type, p.risk_notes,
-                       p.collected_at, p.price_evidence_path, u.quantity_policy_text,
+                       p.collected_at, p.price_evidence_path, p.purchase_url, u.quantity_policy_text,
                        u.operation_text, u.operation_image_path, u.evidence_path AS usage_evidence_path
                 FROM product_sku AS sku
                 JOIN products AS p ON p.product_id = sku.product_id
@@ -86,9 +86,8 @@ class ProductKB:
                         "selected_spec": row["selected_spec"],
                         "evidence_path": row["evidence_path"] or row["price_evidence_path"],
                     },
-                    # The source document intentionally contains no literal URL.
-                    "purchase_url": None,
-                    "purchase_mode": "douyin_link_pending",
+                    "purchase_url": row["purchase_url"],
+                    "purchase_mode": "douyin_direct_link" if row["purchase_url"] else "douyin_link_pending",
                     "purchase_channel": row["purchase_channel"],
                     "aliases": row["aliases"],
                     "base_levels": row["base_levels_text"],
