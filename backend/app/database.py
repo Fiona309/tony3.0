@@ -18,6 +18,13 @@ HAIRDYE_COLOR_MATRIX_CSV = PROJECT_ROOT / "docs" / "hairdye_color_palette_rgb.cs
 OPERATION_QA_TSV = PROJECT_ROOT / "docs" / "操作问题知识库.tsv"
 COLOR_TRANSITION_MATRIX_MD = PROJECT_ROOT / "docs" / "target_color_current_color_simple_matrix(1).md"
 PRODUCT_KB_DOCX = PROJECT_ROOT / "docs" / "商品知识库（SKU级RAG版）(1).docx"
+PRODUCT_RAG_SOURCE = (
+    PROJECT_ROOT
+    / "my-tony2.0"
+    / "knowledge-base"
+    / "products"
+    / "product-recommendation-rag-source.json"
+)
 PRODUCT_KB_SOURCE = "docs/商品知识库（SKU级RAG版）(1).docx"
 PRODUCT_KB_COLLECTED_AT = "2026-07-26T01:18:00+08:00"
 WORD_NS = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
@@ -106,6 +113,18 @@ def _product_id(brand: str, product_name: str) -> str:
     return f"product_{digest}"
 
 
+def _product_purchase_urls() -> dict[tuple[str, str], str]:
+    """Load canonical Douyin links from the versioned product knowledge base."""
+    if not PRODUCT_RAG_SOURCE.exists():
+        return {}
+    payload = json.loads(PRODUCT_RAG_SOURCE.read_text(encoding="utf-8"))
+    return {
+        (str(product.get("brand_name") or ""), str(product.get("product_name") or "")): url
+        for product in payload.get("products", [])
+        if (url := str(product.get("douyin_url") or "").strip())
+    }
+
+
 def _price(value: str) -> float:
     match = re.search(r"(\d+(?:\.\d+)?)", value.replace(",", ""))
     if not match:
@@ -126,6 +145,7 @@ class Database:
             self._seed_dark_base_levels(connection)
             self._seed_color_fade(connection)
             self._seed_product_knowledge_base(connection)
+            self._sync_product_purchase_urls(connection)
 
     def record_event(
         self,
@@ -362,6 +382,7 @@ class Database:
                 product_image_path TEXT,
                 unused_price_text TEXT,
                 purchase_channel TEXT NOT NULL,
+                purchase_url TEXT,
                 risk_notes TEXT,
                 source TEXT NOT NULL,
                 collected_at TEXT NOT NULL,
@@ -370,6 +391,9 @@ class Database:
             )
             """
         )
+        product_columns = {row[1] for row in connection.execute("PRAGMA table_info(products)")}
+        if "purchase_url" not in product_columns:
+            connection.execute("ALTER TABLE products ADD COLUMN purchase_url TEXT")
         connection.execute(
             """
             CREATE TABLE IF NOT EXISTS product_sku (
@@ -602,6 +626,7 @@ class Database:
             raise ValueError("商品知识库 DOCX 缺少商品、SKU 或用量表")
 
         now = _now()
+        purchase_urls = _product_purchase_urls()
         products_by_identity: dict[tuple[str, str], str] = {}
         for row in tables[1][1:]:
             if len(row) != 14:
@@ -630,9 +655,9 @@ class Database:
                     product_id, brand, product_name, product_type, selected_price,
                     selected_spec, selected_color, checkout_quantity, price_evidence_path,
                     capacity, confirmed_sku_count, product_image_path, unused_price_text,
-                    purchase_channel, risk_notes, source, collected_at, updated_at
+                    purchase_channel, purchase_url, risk_notes, source, collected_at, updated_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(product_id) DO UPDATE SET
                     brand = excluded.brand, product_name = excluded.product_name,
                     product_type = excluded.product_type, selected_price = excluded.selected_price,
@@ -642,7 +667,8 @@ class Database:
                     confirmed_sku_count = excluded.confirmed_sku_count,
                     product_image_path = excluded.product_image_path,
                     unused_price_text = excluded.unused_price_text,
-                    purchase_channel = excluded.purchase_channel, risk_notes = excluded.risk_notes,
+                    purchase_channel = excluded.purchase_channel,
+                    purchase_url = excluded.purchase_url, risk_notes = excluded.risk_notes,
                     source = excluded.source, collected_at = excluded.collected_at,
                     updated_at = excluded.updated_at
                 """,
@@ -663,6 +689,7 @@ class Database:
                     product_image_path,
                     unused_price_text,
                     purchase_channel,
+                    purchase_urls.get((brand, product_name)),
                     risk_notes,
                     PRODUCT_KB_SOURCE,
                     PRODUCT_KB_COLLECTED_AT,
@@ -782,6 +809,18 @@ class Database:
                     PRODUCT_KB_COLLECTED_AT,
                     now,
                 ),
+            )
+
+    def _sync_product_purchase_urls(self, connection: sqlite3.Connection) -> None:
+        """Backfill links into the tracked/legacy SQLite product rows."""
+        for (brand, product_name), purchase_url in _product_purchase_urls().items():
+            connection.execute(
+                """
+                UPDATE products
+                SET purchase_url = ?
+                WHERE brand = ? AND product_name = ?
+                """,
+                (purchase_url, brand, product_name),
             )
 
     def _seed_dark_base_levels(self, connection: sqlite3.Connection) -> None:
