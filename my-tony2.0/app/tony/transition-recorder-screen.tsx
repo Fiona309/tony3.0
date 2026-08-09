@@ -13,12 +13,14 @@ import {
 import { HairMirror, type HairMirrorSurface } from './hair-mirror';
 import type { ColorMatrix } from './hair-mirror-core';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? '/api';
-const TEMPLATE_PATH = API_BASE_URL.startsWith('http://') || API_BASE_URL.startsWith('https://')
-  ? `${new URL(API_BASE_URL).origin}/media/mock-assets/red/transition.mp4`
-  : '/media/mock-assets/red/transition.mp4';
+// 固定走同源的 /media/*（next.config.ts 里已经 rewrite 到 BACKEND_ORIGIN）。
+// 之前按 NEXT_PUBLIC_API_BASE_URL 拼成 http://localhost:8001/... 的绝对地址，
+// 一旦后端端口 / CORS_ORIGINS / 前端端口三者有任意一个对不上，<video> 就静默
+// 加载失败——画面全黑、时长 0:00、没有任何报错。同源取模板把这三个变量一起消掉，
+// 顺带让 createMediaElementSource 不会因跨域被判定为污染而静音。
+const TEMPLATE_PATH = '/media/mock-assets/red/transition.mp4';
 // 版本参数避免浏览器继续播放之前错误模板的缓存。
-const TEMPLATE_URL = `${TEMPLATE_PATH}?v=red-transition-2`;
+const TEMPLATE_URL = `${TEMPLATE_PATH}?v=red-transition-3`;
 const TRANSITION_AT = 5;
 
 type Stage = 'demo' | 'ready' | 'countdown' | 'recording' | 'review';
@@ -50,6 +52,10 @@ export function TransitionRecorderScreen({
   const [countdown, setCountdown] = useState(3);
   const [elapsed, setElapsed] = useState(0);
   const [templateDuration, setTemplateDuration] = useState(15);
+  // 模板视频能不能播，必须是一个显式状态：它加载失败时 <video> 不抛异常、
+  // 只是永远停在 0:00，用户看到的就是「模板播放失败」却没有任何提示。
+  const [templateReady, setTemplateReady] = useState(false);
+  const [templateError, setTemplateError] = useState('');
   const [effectEnabled, setEffectEnabled] = useState(false);
   const [cameraReady, setCameraReady] = useState(false);
   const [error, setError] = useState('');
@@ -65,10 +71,16 @@ export function TransitionRecorderScreen({
   const audioSourceElementRef = useRef<HTMLVideoElement | null>(null);
   const audioDestinationRef = useRef<MediaStreamAudioDestinationNode | null>(null);
   const recordingTimerRef = useRef<number | null>(null);
+  // 这次停止是「正常拍完」还是「出错中止」。onstop 无条件跳 review 正是
+  // 「点了拍摄直接蹦出一条 0:00 空成片」的元凶：beginRecording 的 catch 里
+  // 调 stopRecording()，onstop 抢先把 stage 设成 review，把 catch 末尾的
+  // setStage('ready') 覆盖掉，于是失败被伪装成了成功。
+  const abortedRef = useRef(false);
   const resultUrlRef = useRef(resultUrl);
   useEffect(() => { resultUrlRef.current = resultUrl; }, [resultUrl]);
 
-  const stopRecording = useCallback(() => {
+  const stopRecording = useCallback((aborted = false) => {
+    if (aborted) abortedRef.current = true;
     if (recordingTimerRef.current !== null) window.clearInterval(recordingTimerRef.current);
     recordingTimerRef.current = null;
     templateRef.current?.pause();
@@ -154,11 +166,29 @@ export function TransitionRecorderScreen({
       recorder.ondataavailable = (event) => {
         if (event.data.size) chunksRef.current.push(event.data);
       };
-      recorder.onerror = () => setError('录制中断了，请重新拍一次。');
+      recorder.onerror = () => {
+        setError('录制中断了，请重新拍一次。');
+        stopRecording(true);
+      };
       recorder.onstop = () => {
         stream.getTracks().forEach((track) => track.stop());
+        // 中止收场：不产出成片，把用户放回可以重拍的界面。
+        if (abortedRef.current) {
+          abortedRef.current = false;
+          chunksRef.current = [];
+          setStage('ready');
+          return;
+        }
         const type = recorder.mimeType || mimeType || 'video/webm';
         const blob = new Blob(chunksRef.current, { type });
+        // 空 blob 说明一帧都没录到（模板没播、画布没供流），
+        // 与其给一条打不开的 0:00 成片，不如说清楚并让他重拍。
+        if (blob.size < 1024) {
+          chunksRef.current = [];
+          setError('这次没录到画面，请确认模板视频能正常播放后再拍一次。');
+          setStage('ready');
+          return;
+        }
         const extension = type.includes('mp4') ? 'mp4' : 'webm';
         const file = new File([blob], `Tony-转场-${Date.now()}.${extension}`, { type });
         setResultFile(file);
@@ -173,16 +203,26 @@ export function TransitionRecorderScreen({
       setStage('recording');
       template.muted = false;
       await template.play();
+      // play() resolve 了不代表真的在走：模板没加载出来时它会停在 0:00，
+      // 于是录满 15 秒也全是静止画面。这里等它真正推进再继续。
+      const startedAt = Date.now();
+      let advanced = false;
       recordingTimerRef.current = window.setInterval(() => {
         const time = template.currentTime;
+        if (time > 0.05) advanced = true;
+        if (!advanced && Date.now() - startedAt > 1500) {
+          setError('模板视频没能播放，请退出这个页面重进一次。');
+          stopRecording(true);
+          return;
+        }
         setElapsed(time);
         if (time >= TRANSITION_AT) setEffectEnabled(true);
         const duration = Number.isFinite(template.duration) && template.duration > 0 ? template.duration : 10;
-        if (time >= duration - 0.05 || template.ended) stopRecording();
+        if (advanced && (time >= duration - 0.05 || template.ended)) stopRecording();
       }, 80);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : '录制启动失败，请重试。');
-      stopRecording();
+      stopRecording(true);
       setStage('ready');
     }
   }, [cameraReady, ensureAudioGraph, stopRecording]);
@@ -261,19 +301,41 @@ export function TransitionRecorderScreen({
           </div>
         </header>
         <div className="relative min-h-0 flex-1 overflow-hidden bg-black">
-          {/* crossOrigin 必须有：NEXT_PUBLIC_API_BASE_URL 是绝对地址时模板走
-              跨域取，没声明 crossOrigin 的话 createMediaElementSource 会认为音频
-              被 CORS 污染，静默把音轨路由成无声——不报错，就是没声音。 */}
-          <video ref={templateRef} src={TEMPLATE_URL} crossOrigin="anonymous" controls playsInline preload="auto" onLoadedMetadata={(event) => setTemplateDuration(event.currentTarget.duration)} className="size-full object-cover">
+          {/* 模板走同源 /media/*，不再需要 crossOrigin：跨域时缺它会让
+              createMediaElementSource 认为音频被 CORS 污染而静默无声，
+              同源则从根上没有这个问题。 */}
+          <video
+            ref={templateRef}
+            src={TEMPLATE_URL}
+            controls
+            playsInline
+            preload="auto"
+            onLoadedMetadata={(event) => {
+              setTemplateDuration(event.currentTarget.duration);
+              setTemplateReady(true);
+              setTemplateError('');
+            }}
+            onError={() => {
+              setTemplateReady(false);
+              setTemplateError('模板视频加载失败，请确认后端服务在运行后刷新页面。');
+            }}
+            className="size-full object-cover"
+          >
             当前浏览器无法播放转场模板。
           </video>
           <div className="pointer-events-none absolute left-4 top-4 rounded-full bg-black/55 px-3 py-1.5 text-[11px] font-bold backdrop-blur">
             看到手掌 → 跟着遮镜
           </div>
+          {templateError ? (
+            <div className="absolute inset-x-6 top-1/2 -translate-y-1/2 rounded-2xl bg-black/80 px-4 py-3 text-center text-[12px] font-bold leading-5 text-[#ffaaa4] backdrop-blur">
+              {templateError}
+            </div>
+          ) : null}
         </div>
         <div className="shrink-0 px-4 pb-[max(16px,env(safe-area-inset-bottom))] pt-4">
-          <button type="button" onClick={() => setStage('ready')} className="flex w-full items-center justify-center gap-2 rounded-full bg-pink py-3.5 text-[14px] font-black">
-            <VideoCamera size={18} weight="fill" /> 我看懂了，开始跟拍
+          {/* 模板都没加载出来就别放人进录制页：那边只会拍出一条 0:00 的空片。 */}
+          <button type="button" disabled={!templateReady} onClick={() => setStage('ready')} className="flex w-full items-center justify-center gap-2 rounded-full bg-pink py-3.5 text-[14px] font-black disabled:opacity-45">
+            <VideoCamera size={18} weight="fill" /> {templateReady ? '我看懂了，开始跟拍' : templateError ? '模板加载失败' : '正在加载模板…'}
           </button>
         </div>
       </div>
@@ -323,9 +385,22 @@ export function TransitionRecorderScreen({
 
       <div className="absolute left-4 top-[max(68px,calc(env(safe-area-inset-top)+58px))] z-20 w-[34%] max-w-[150px] overflow-hidden rounded-2xl border border-white/35 bg-black shadow-2xl">
         <div className="aspect-[9/16]">
-          {/* 录制阶段这个 <video> 才是真正给 MediaRecorder 供音的那个，
-              crossOrigin 少了它成片就没音轨。 */}
-          <video ref={templateRef} src={TEMPLATE_URL} crossOrigin="anonymous" playsInline preload="auto" onLoadedMetadata={(event) => setTemplateDuration(event.currentTarget.duration)} className="size-full object-cover" />
+          {/* 录制阶段这个 <video> 才是真正给 MediaRecorder 供音的那个。 */}
+          <video
+            ref={templateRef}
+            src={TEMPLATE_URL}
+            playsInline
+            preload="auto"
+            onLoadedMetadata={(event) => {
+              setTemplateDuration(event.currentTarget.duration);
+              setTemplateReady(true);
+            }}
+            onError={() => {
+              setTemplateReady(false);
+              setError('模板视频加载失败，请退出这个页面重进一次。');
+            }}
+            className="size-full object-cover"
+          />
         </div>
         <p className="bg-black/85 py-1.5 text-center text-[9px] font-bold tracking-wide text-white/70">动作参考</p>
       </div>
@@ -348,8 +423,8 @@ export function TransitionRecorderScreen({
           <p className="mb-2 flex items-center justify-center gap-1 text-[10px] text-white/65"><Sparkle size={12} weight="fill" /> 染后段将模拟漂至 9 度的目标效果</p>
         )}
         {!recording && stage !== 'countdown' && (
-          <button type="button" disabled={!cameraReady} onClick={() => void startCountdown()} className="flex w-full items-center justify-center gap-2 rounded-full bg-pink py-3.5 text-[14px] font-black disabled:opacity-45">
-            <Play size={17} weight="fill" /> {cameraReady ? `开始 ${Math.ceil(templateDuration)} 秒跟拍` : '正在准备相机与实时试色…'}
+          <button type="button" disabled={!cameraReady || !templateReady} onClick={() => void startCountdown()} className="flex w-full items-center justify-center gap-2 rounded-full bg-pink py-3.5 text-[14px] font-black disabled:opacity-45">
+            <Play size={17} weight="fill" /> {!cameraReady ? '正在准备相机与实时试色…' : !templateReady ? '正在加载模板视频…' : `开始 ${Math.ceil(templateDuration)} 秒跟拍`}
           </button>
         )}
         {recording && <div className="mx-auto h-1.5 max-w-[300px] overflow-hidden rounded-full bg-white/20"><div className="h-full bg-pink transition-[width] duration-100" style={{ width: `${Math.min(100, elapsed / templateDuration * 100)}%` }} /></div>}

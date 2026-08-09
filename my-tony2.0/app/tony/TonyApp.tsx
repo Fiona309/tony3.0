@@ -15,6 +15,7 @@ import {
   getPlanResult,
   getPreviewTask,
   getProductRecommendations,
+  gotoTutorialStep,
   loadFlowDraft,
   saveFlowDraft,
   sendTutorialVoiceInput,
@@ -655,7 +656,16 @@ export default function TonyApp() {
 
   const advanceTutorial = async (): Promise<TutorialAction> => {
     if (!tutorialSession) throw new Error('教程会话已经失效');
-    return advanceTutorialStep(tutorialSession.tutorial_session_id);
+    // event_id 跟当前步绑定：同一步内重复点击是同一个事件，后端幂等去重。
+    return advanceTutorialStep(
+      tutorialSession.tutorial_session_id,
+      `${tutorialSession.tutorial_session_id}:${tutorialSession.current_step.step_id}:next`,
+    );
+  };
+
+  const gotoTutorial = async (stepNo: number): Promise<TutorialAction> => {
+    if (!tutorialSession) throw new Error('教程会话已经失效');
+    return gotoTutorialStep(tutorialSession.tutorial_session_id, stepNo);
   };
 
   const updateTutorialStep = (
@@ -668,7 +678,11 @@ export default function TonyApp() {
             ...current,
             current_step: step,
             step_end_tts: stepEndTTS ?? current.step_end_tts,
-            completed_step_count: Math.max(0, step.step_no - 1),
+            // 取历史最大值：点「上一步」回看不该把已完成进度改小
+            completed_step_count: Math.max(
+              current.completed_step_count ?? 0,
+              Math.max(0, step.step_no - 1),
+            ),
           }
         : current,
     );
@@ -1071,6 +1085,7 @@ export default function TonyApp() {
         }}
         onSend={sendTutorialMessage}
         onNextStep={advanceTutorial}
+        onGotoStep={gotoTutorial}
         onSessionStep={updateTutorialStep}
         onComplete={completeTutorial}
       /></AgentShell>

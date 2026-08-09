@@ -893,8 +893,35 @@ def get_tutorial_session(tutorial_session_id: str, request: Request):
 
 
 @app.post("/api/tutorial-sessions/{tutorial_session_id}/next-step")
-def next_tutorial_step(tutorial_session_id: str, request: Request):
-    action = store.next_tutorial_step(tutorial_session_id, user_key=user_key(request))
+def next_tutorial_step(
+    tutorial_session_id: str,
+    request: Request,
+    payload: dict[str, Any] | None = None,
+):
+    client_event_id = None
+    if isinstance(payload, dict):
+        raw = payload.get("client_event_id")
+        client_event_id = str(raw).strip() or None if raw is not None else None
+    action = store.next_tutorial_step(
+        tutorial_session_id,
+        user_key=user_key(request),
+        client_event_id=client_event_id,
+    )
+    _hydrate_action_step_end_tts(action)
+    return ok(action)
+
+
+@app.post("/api/tutorial-sessions/{tutorial_session_id}/goto-step")
+def goto_tutorial_step(tutorial_session_id: str, payload: dict[str, Any], request: Request):
+    try:
+        step_no = int(payload["step_no"])
+    except (KeyError, TypeError, ValueError):
+        return failure("缺少或非法字段: step_no")
+    action = store.goto_tutorial_step(
+        tutorial_session_id,
+        step_no,
+        user_key=user_key(request),
+    )
     _hydrate_action_step_end_tts(action)
     return ok(action)
 
@@ -919,6 +946,22 @@ def _hydrate_action_step_end_tts(action: dict[str, Any]) -> None:
         return
     tts = model_service.synthesize_speech(text)
     step_end_tts["audio_url"] = tts.audio_url
+
+
+@app.post("/api/tts")
+async def synthesize_tts(payload: dict[str, Any]):
+    """把任意一句话合成成语音，供前端那些没有现成 audio_url 的地方使用。
+
+    在这条接口之前，闹钟页、倒计时提示这类纯前端文案只能退回浏览器
+    speechSynthesis——那正是用户听到的「机械女声」，和后端 Qwen 的声线
+    完全是两个人。统一从这里出声，全 App 才只有一个声音。
+    """
+    text = str(payload.get("text") or "").strip()
+    if not text:
+        return failure("缺少字段: text")
+    # 合成是同步的网络请求，别占着事件循环。
+    tts = await run_in_threadpool(model_service.synthesize_speech, text)
+    return ok({"audio_url": tts.audio_url, "provider": tts.provider, "fallback_reason": tts.fallback_reason})
 
 
 @app.post("/api/tutorial-sessions/{tutorial_session_id}/completion-record")

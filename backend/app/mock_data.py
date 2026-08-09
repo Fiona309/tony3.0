@@ -469,12 +469,31 @@ def _scaled_default_tutorial_steps(tutorial_video_id: str | None) -> list[dict]:
     return steps
 
 
+def _apply_step_wait_seconds(steps: list[dict]) -> list[dict]:
+    """给没有 wait_seconds 的步骤按标题补上默认等待时长。
+
+    人工整理的 MANUAL 分段没走 _build_tutorial_step，于是丢了
+    STEP_DISPLAY_DEFAULTS 里的 wait_seconds——前端的语音定闹钟只认这个字段，
+    字段一丢，「等待与冲洗」那一步的闹钟页就永远进不去。
+    只补 STEP_DISPLAY_DEFAULTS 里显式配了 wait_seconds 的标题，其余保持原样。
+    """
+    for step in steps:
+        if step.get("wait_seconds"):
+            continue
+        defaults = STEP_DISPLAY_DEFAULTS.get(str(step.get("title") or ""))
+        if defaults and defaults.get("wait_seconds"):
+            step["wait_seconds"] = defaults["wait_seconds"]
+    return steps
+
+
 def _tutorial_steps_for_video_id(tutorial_video_id: str | None) -> list[dict]:
     manual_steps = MANUAL_TUTORIAL_STEPS_BY_VIDEO_ID.get(str(tutorial_video_id or ""))
     if manual_steps:
-        return deepcopy(manual_steps)
+        return _apply_step_wait_seconds(deepcopy(manual_steps))
     steps = TUTORIAL_STEPS_BY_VIDEO_ID.get(str(tutorial_video_id or ""))
-    return deepcopy(steps) if steps else _scaled_default_tutorial_steps(tutorial_video_id)
+    if steps:
+        return _apply_step_wait_seconds(deepcopy(steps))
+    return _apply_step_wait_seconds(_scaled_default_tutorial_steps(tutorial_video_id))
 
 
 def _tutorial_display_title(media_item: dict | None) -> str:
@@ -1426,11 +1445,18 @@ class MockStore:
             tts_audio_url=None,
         )
 
-    def next_tutorial_step(self, session_id: str, user_key: str | None = None) -> dict:
-        event_id = _id("manual_next")
+    def next_tutorial_step(
+        self,
+        session_id: str,
+        user_key: str | None = None,
+        client_event_id: str | None = None,
+    ) -> dict:
         session = self._require_owned(self.sessions, session_id, "教程会话不存在", "session", user_key)
         self._sync_session_steps(session, user_key=user_key)
         current_step_id = str(session.get("current_step", {}).get("step_id") or "")
+        # 前端传稳定 event_id 时走 voice_input_from_transcript 现成的幂等缓存，
+        # 用户手抖连点两下只会前进一步；不传才退回一次一个新 id 的老行为。
+        event_id = client_event_id or _id("manual_next")
         return self.voice_input_from_transcript(
             session_id,
             current_step_id,
@@ -1440,6 +1466,43 @@ class MockStore:
             tts_audio_url=None,
             user_key=user_key,
         )
+
+    def goto_tutorial_step(
+        self,
+        session_id: str,
+        step_no: int,
+        user_key: str | None = None,
+    ) -> dict:
+        """按步号直接跳转，给前端的「上一步 / 下一步」按钮兜底。
+
+        不复用 voice_input_from_transcript：那条路按 step_id 查找，查不到会静默
+        default=0 把用户扔回第一步。这里按 step_no 定位并做边界钳制。
+        """
+        session = self._require_owned(self.sessions, session_id, "教程会话不存在", "session", user_key)
+        self._sync_session_steps(session, user_key=user_key)
+        tutorial_steps = session.get("tutorial_steps") or []
+        if not tutorial_steps:
+            raise ValueError("当前教程没有可用的分步数据")
+        index = min(max(int(step_no) - 1, 0), len(tutorial_steps) - 1)
+        session["current_step"] = deepcopy(tutorial_steps[index])
+        # 取历史最大值：往回退不该把已完成进度改小。
+        session["completed_step_count"] = max(
+            int(session.get("completed_step_count") or 0),
+            index,
+        )
+        session["awaiting_voice_input"] = False
+        step_end_tts = {
+            "text": "你在这一步有什么问题，可以随时问我～",
+            "audio_url": None,
+        }
+        session["step_end_tts"] = deepcopy(step_end_tts)
+        self._persist("session", session_id, session, user_key)
+        return {
+            "action": "play_next_step",
+            "current_step": deepcopy(session["current_step"]),
+            "tts_text": step_end_tts["text"],
+            "step_end_tts": step_end_tts,
+        }
 
     def voice_input_from_transcript(
         self,

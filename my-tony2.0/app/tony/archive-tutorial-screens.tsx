@@ -31,7 +31,7 @@ import {
   useRef,
   useState,
 } from 'react';
-import { API_MODE } from './api';
+import { API_MODE, synthesizeSpeech } from './api';
 import { ArchiveReferenceView } from './archive-reference-view';
 import type {
   AfterVideoTaskData,
@@ -854,7 +854,12 @@ export function TutorialPrepareScreen({
   );
 }
 
-function speak(text: string) {
+/**
+ * 浏览器内置合成。声线是系统那个机械女声，跟后端 Qwen 的声线对不上，
+ * 所以只当【最后的兜底】：后端合成拿不到时才用，不再直接调用它。
+ * 想出声一律走 say()。
+ */
+function browserSpeak(text: string) {
   return new Promise<void>((resolve) => {
     if (
       typeof window === 'undefined' ||
@@ -874,27 +879,73 @@ function speak(text: string) {
   });
 }
 
+/**
+ * 说一句话。优先用后端合成的声音，让全 App 保持同一个声线；
+ * 后端不可用（mock 模式 / 合成失败）时才退回浏览器那个机械声。
+ */
+async function say(text: string) {
+  if (!text) return;
+  const audioUrl = await synthesizeSpeech(text);
+  await playTTS(audioUrl, text);
+}
+
+/**
+ * 正在播放的 TTS 音频。放模块级是为了让 stopSpeaking() 能真的把它按停——
+ * 之前 audio 是 Promise 里的局部变量，外面根本拿不到，所以「打断 AI」无从谈起。
+ */
+let currentTTSAudio: HTMLAudioElement | null = null;
+
 async function playTTS(audioUrl: string | null | undefined, text: string) {
+  stopSpeaking();
   if (!audioUrl) {
-    await speak(text);
+    await browserSpeak(text);
     return;
   }
   await new Promise<void>((resolve) => {
     const audio = new Audio(audioUrl);
-    audio.onended = () => resolve();
+    currentTTSAudio = audio;
+    const finish = () => {
+      if (currentTTSAudio === audio) currentTTSAudio = null;
+      resolve();
+    };
+    audio.onended = finish;
+    audio.onpause = () => {
+      // 被 stopSpeaking() 掐断时也要让等待它的 Promise 解开，
+      // 否则调用方会永远卡在 await 上。
+      if (currentTTSAudio !== audio) resolve();
+    };
     audio.onerror = () => {
-      void speak(text).then(resolve);
+      if (currentTTSAudio === audio) currentTTSAudio = null;
+      void browserSpeak(text).then(resolve);
     };
     void audio.play().catch(() => {
-      void speak(text).then(resolve);
+      if (currentTTSAudio === audio) currentTTSAudio = null;
+      void browserSpeak(text).then(resolve);
     });
   });
 }
 
+/** 立刻掐断 AI 的声音：后端 TTS 和浏览器合成两条路都要停。 */
 function stopSpeaking() {
+  const audio = currentTTSAudio;
+  if (audio) {
+    currentTTSAudio = null;
+    audio.onended = null;
+    audio.onerror = null;
+    audio.pause();
+  }
   if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
     window.speechSynthesis.cancel();
   }
+}
+
+/** AI 是否正在出声 */
+function isSpeakingNow() {
+  if (currentTTSAudio && !currentTTSAudio.paused) return true;
+  if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+    return window.speechSynthesis.speaking;
+  }
+  return false;
 }
 
 interface SpeechRecognitionEventLike {
@@ -1086,84 +1137,115 @@ function SegmentVideo({
   );
 }
 
-function CountdownCard({
-  seconds,
-  onReady,
-}: {
-  seconds: number;
-  onReady: () => void;
-}) {
-  const [remaining, setRemaining] = useState(seconds);
-  const endAtRef = useRef<number | null>(null);
+const CN_DIGITS: Record<string, number> = {
+  零: 0, 一: 1, 二: 2, 两: 2, 三: 3, 四: 4, 五: 5,
+  六: 6, 七: 7, 八: 8, 九: 9,
+};
 
-  useEffect(() => {
-    endAtRef.current = Date.now() + seconds * 1000;
-    const sync = () => {
-      const endAt = endAtRef.current ?? Date.now();
-      setRemaining(Math.max(0, Math.ceil((endAt - Date.now()) / 1000)));
-    };
-    const timer = window.setInterval(sync, 250);
-    const handleVisibility = () => {
-      if (document.visibilityState === 'visible') sync();
-    };
-    document.addEventListener('visibilitychange', handleVisibility);
-    return () => {
-      window.clearInterval(timer);
-      document.removeEventListener('visibilitychange', handleVisibility);
-    };
-  }, [seconds]);
+/**
+ * 从「定一个15分钟的闹钟」「二十分钟」「半小时」里解析出分钟数。
+ * 解析不出返回 null，由调用方回落到步骤的默认等待时长。
+ */
+export function parseSpokenMinutes(text: string): number | null {
+  const raw = String(text || '');
+  if (!raw) return null;
 
-  useEffect(() => {
-    if (remaining === 0) {
-      if ('vibrate' in navigator) navigator.vibrate?.(120);
-      speak('等待时间结束，可以继续了。');
+  const clamp = (value: number) =>
+    Number.isFinite(value) && value >= 1 && value <= 180 ? Math.round(value) : null;
+
+  // 「半小时」「半个小时」
+  if (/半\s*(个)?\s*(小时|钟头)/.test(raw)) return 30;
+
+  // 阿拉伯数字优先：15分钟 / 1.5小时 / 1个小时
+  const arabicMinute = raw.match(/(\d+(?:\.\d+)?)\s*分/);
+  if (arabicMinute) return clamp(Number(arabicMinute[1]));
+  const arabicHour = raw.match(/(\d+(?:\.\d+)?)\s*(个)?\s*(小时|钟头)/);
+  if (arabicHour) return clamp(Number(arabicHour[1]) * 60);
+
+  // 中文数字：十五分钟 / 二十分钟 / 一个小时
+  const cnMinute = raw.match(/([零一二两三四五六七八九十百]+)\s*分/);
+  const cnHour = raw.match(/([零一二两三四五六七八九十]+)\s*(个)?\s*(小时|钟头)/);
+  const target = cnMinute?.[1] ?? cnHour?.[1];
+  if (target) {
+    const parsed = parseChineseNumber(target);
+    if (parsed !== null) return clamp(cnMinute ? parsed : parsed * 60);
+  }
+
+  // 只说了个光秃秃的数字，也当成分钟：「定个20的闹钟」
+  const bareNumber = raw.match(/(\d+)/);
+  if (bareNumber && /闹钟|计时|定时|提醒/.test(raw)) return clamp(Number(bareNumber[1]));
+
+  return null;
+}
+
+/** 支持「十」「十五」「二十」「三十五」「一百二十」这类口语说法 */
+function parseChineseNumber(text: string): number | null {
+  if (!text) return null;
+  let total = 0;
+  let section = 0;
+  let current = 0;
+  let sawDigit = false;
+  for (const char of text) {
+    if (char in CN_DIGITS) {
+      current = CN_DIGITS[char];
+      sawDigit = true;
+    } else if (char === '十') {
+      section += (current || 1) * 10;
+      current = 0;
+      sawDigit = true;
+    } else if (char === '百') {
+      section += (current || 1) * 100;
+      current = 0;
+      sawDigit = true;
+    } else {
+      return null;
     }
-  }, [remaining]);
+  }
+  total += section + current;
+  return sawDigit ? total : null;
+}
 
-  return (
-    <div className="sketch-card border border-[#d5ae55] bg-[#fff6d9] p-4">
-      <div className="flex items-center gap-3">
-        <span className="grid size-11 place-items-center rounded-[16px] bg-white text-ink shadow-soft">
-          <Timer size={22} weight="fill" />
-        </span>
-        <div>
-          <p className="text-xs font-bold text-ink-3">
-            {remaining > 0 ? '演示等待中' : '可以继续了'}
-          </p>
-          <p className="numerals mt-0.5 text-2xl font-black">
-            00:{String(remaining).padStart(2, '0')}
-          </p>
-        </div>
-      </div>
-      <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/70">
-        <div
-          className="h-full origin-left rounded-full bg-sky-dark transition-transform duration-300"
-          style={{ transform: `scaleX(${remaining / seconds})` }}
-        />
-      </div>
-      <button
-        type="button"
-        onClick={onReady}
-        className="tap mt-4 min-h-11 w-full rounded-[15px] bg-white px-4 text-xs font-black text-ink shadow-soft"
-      >
-        {remaining > 0 ? '跳过演示倒计时' : '我准备好了，继续'}
-      </button>
-    </div>
-  );
+/**
+ * 这句话是不是在要求定闹钟 / 计时。
+ * 只做关键词匹配，不上模型——用户说完就要立刻进闹钟页，等不起一轮 LLM。
+ */
+export function isAlarmRequest(text: string): boolean {
+  const raw = String(text || '');
+  if (!raw) return false;
+  if (/(取消|关掉|关闭|不要|别)\s*(闹钟|计时|倒计时)/.test(raw)) return false;
+  return /闹钟|计时器|倒计时|定时|提醒我|计个时|计时/.test(raw);
+}
+
+function formatSpokenDuration(minutes: number) {
+  if (minutes >= 60 && minutes % 60 === 0) return `${minutes / 60} 小时`;
+  return `${minutes} 分钟`;
+}
+
+function formatClock(totalSeconds: number) {
+  const safe = Math.max(0, Math.floor(totalSeconds));
+  const minutes = Math.floor(safe / 60);
+  const seconds = safe % 60;
+  return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 }
 
 export function TutorialTimerStage({
   step,
+  initialMinutes = null,
   onBack,
   onContinue,
 }: {
   step: TutorialStep;
+  /** 用户在教程页说闹钟时已经报过的分钟数，有值就直接开始计时 */
+  initialMinutes?: number | null;
   onBack: () => void;
   onContinue: () => void;
 }) {
-  const demoSeconds = 10;
+  // 步骤自带的等待时长就是默认值（「等待与冲洗」是 600 秒）
+  const defaultSeconds = Math.max(1, step.wait_seconds ?? 600);
+  const defaultMinutes = Math.max(1, Math.round(defaultSeconds / 60));
   const [status, setStatus] = useState<'setup' | 'listening' | 'running' | 'done'>('setup');
-  const [remaining, setRemaining] = useState(demoSeconds);
+  const [totalSeconds, setTotalSeconds] = useState(defaultSeconds);
+  const [remaining, setRemaining] = useState(defaultSeconds);
   const [heardText, setHeardText] = useState('');
   const [voiceError, setVoiceError] = useState('');
   const alarmContextRef = useRef<AudioContext | null>(null);
@@ -1171,10 +1253,6 @@ export function TutorialTimerStage({
   const alarmFiredRef = useRef(false);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const recognizedTimerIntentRef = useRef(false);
-
-  useEffect(() => {
-    void playTTS(null, '现在可以对 Tony 说，定一个十五分钟的闹钟。');
-  }, []);
 
   const ring = useCallback(() => {
     const context = alarmContextRef.current;
@@ -1196,7 +1274,7 @@ export function TutorialTimerStage({
       });
     }
     navigator.vibrate?.([160, 80, 160]);
-    speak('时间到了，可以继续下一步了。');
+    void say('时间到了，可以继续下一步了。');
   }, []);
 
   useEffect(() => {
@@ -1228,16 +1306,45 @@ export function TutorialTimerStage({
     [],
   );
 
-  const startTimer = useCallback(() => {
-    recognitionRef.current?.abort();
-    recognitionRef.current = null;
-    if (!alarmContextRef.current) alarmContextRef.current = new AudioContext();
-    alarmFiredRef.current = false;
-    deadlineRef.current = Date.now() + demoSeconds * 1000;
-    setRemaining(demoSeconds);
-    setVoiceError('');
-    setStatus('running');
-    speak('好的，已经为你设置十五分钟闹钟。演示需要设计成十秒钟，我现在开始计时。');
+  /** minutes 为空时用步骤默认时长；播报的一定是真实计时时长，不写死台词。 */
+  const startTimer = useCallback(
+    (minutes?: number | null) => {
+      recognitionRef.current?.abort();
+      recognitionRef.current = null;
+      if (!alarmContextRef.current) alarmContextRef.current = new AudioContext();
+      const useMinutes = minutes && minutes > 0 ? minutes : defaultMinutes;
+      const seconds = useMinutes * 60;
+      alarmFiredRef.current = false;
+      deadlineRef.current = Date.now() + seconds * 1000;
+      setTotalSeconds(seconds);
+      setRemaining(seconds);
+      setVoiceError('');
+      setStatus('running');
+      void say(
+        minutes && minutes > 0
+          ? `好的，已经为你设置${formatSpokenDuration(useMinutes)}的闹钟，现在开始计时。`
+          : `没太听清时长，先按这一步默认的${formatSpokenDuration(useMinutes)}计时。`,
+      );
+    },
+    [defaultMinutes],
+  );
+
+  // 进入这一页时：用户在教程页已经报过时长就直接开始计时，
+  // 只说了「定个闹钟」没说时长才在这里问一句。
+  useEffect(() => {
+    // 放进 timeout 里跑：直接在 effect 体内 setState 会触发级联渲染。
+    const timer = window.setTimeout(() => {
+      if (initialMinutes && initialMinutes > 0) {
+        startTimer(initialMinutes);
+        return;
+      }
+      void say(
+        `这一步需要等待显色。可以对我说，定一个${formatSpokenDuration(defaultMinutes)}的闹钟。`,
+      );
+    }, 0);
+    return () => window.clearTimeout(timer);
+    // 只在进入闹钟页时执行一次
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const startVoiceTimer = async () => {
@@ -1246,11 +1353,11 @@ export function TutorialTimerStage({
     recognizedTimerIntentRef.current = false;
     const Recognition = browserSpeechRecognition();
     if (!Recognition) {
-      setHeardText('已收到，开始 10 秒演示计时');
-      startTimer();
+      setVoiceError('当前浏览器不支持语音识别，已按默认时长开始计时。');
+      startTimer(null);
       return;
     }
-    await playTTS(null, '请说，定一个十五分钟的闹钟。');
+    await say(`请说，定一个${formatSpokenDuration(defaultMinutes)}的闹钟。`);
     const recognition = new Recognition();
     recognitionRef.current = recognition;
     recognition.lang = 'zh-CN';
@@ -1261,24 +1368,34 @@ export function TutorialTimerStage({
         .map((result) => result[0]?.transcript ?? '')
         .join('')
         .trim();
-      setHeardText(transcript || '已收到，开始 10 秒演示计时');
       recognizedTimerIntentRef.current = true;
-      startTimer();
+      const minutes = parseSpokenMinutes(transcript);
+      setHeardText(transcript);
+      if (minutes === null && transcript) {
+        setVoiceError(`没听出具体时长，先按默认的${formatSpokenDuration(defaultMinutes)}计时。`);
+      }
+      startTimer(minutes);
     };
     recognition.onerror = () => {
-      setHeardText('已收到，开始 10 秒演示计时');
+      if (recognizedTimerIntentRef.current) return;
       recognizedTimerIntentRef.current = true;
-      startTimer();
+      setVoiceError('没能听清，已按默认时长开始计时。');
+      startTimer(null);
     };
     recognition.onend = () => {
-      if (!recognizedTimerIntentRef.current) {
-        setHeardText('已收到，开始 10 秒演示计时');
-        recognizedTimerIntentRef.current = true;
-        startTimer();
-      }
+      if (recognizedTimerIntentRef.current) return;
+      recognizedTimerIntentRef.current = true;
+      setVoiceError('没听到声音，已按默认时长开始计时。');
+      startTimer(null);
     };
     setStatus('listening');
     recognition.start();
+  };
+
+  /** 调试/演示用：直接把倒计时拉到终点，不用真等十分钟 */
+  const skipToEnd = () => {
+    deadlineRef.current = Date.now();
+    setRemaining(0);
   };
 
   return (
@@ -1304,7 +1421,8 @@ export function TutorialTimerStage({
           </span>
           <div className="mt-4 rounded-[20px] border-2 border-[#8f7bd1] bg-white px-4 py-5 text-center">
             <p className="text-[11px] text-ink-3">试着说：</p>
-            <p className="mt-1 text-xl font-black">“定一个15分钟的闹钟”</p>
+            <p className="mt-1 text-xl font-black">“定一个{defaultMinutes}分钟的闹钟”</p>
+            <p className="mt-1.5 text-[11px] text-ink-3">说几分钟就是几分钟，也可以说“半小时”</p>
           </div>
           <div className="mt-4 flex items-center justify-center gap-2 text-pink-dark" aria-hidden="true">
             {[12, 22, 15, 30, 18, 26, 12, 20, 14].map((height, index) => (
@@ -1320,8 +1438,8 @@ export function TutorialTimerStage({
         <section className="mt-4 flex flex-1 flex-col items-center justify-center border border-[#e5aa28] bg-[#fff9e3] p-5 text-center">
           <div className="relative grid size-40 place-items-center rounded-full border-[3px] border-ink bg-white shadow-[4px_5px_0_#f0c35d]">
             <Timer size={45} weight="duotone" className="absolute top-5 text-[#d69b16]" />
-            <p className="numerals mt-10 text-[48px] font-black leading-none">
-              00:{String(status === 'setup' ? demoSeconds : remaining).padStart(2, '0')}
+            <p className="numerals mt-10 text-[42px] font-black leading-none">
+              {formatClock(status === 'setup' ? defaultSeconds : remaining)}
             </p>
             {status === 'done' ? (
               <span className="absolute -right-3 top-2 grid size-12 animate-bounce place-items-center rounded-full border-2 border-ink bg-pink text-white">
@@ -1340,11 +1458,11 @@ export function TutorialTimerStage({
           </h2>
           <p className="mt-2 text-xs text-ink-2">
             {status === 'setup'
-              ? '点击下方按钮后说一句话即可。演示倒计时设计为 10 秒。'
+              ? `点击下方按钮后说一句话即可。不说时长就按默认的 ${defaultMinutes} 分钟。`
               : status === 'listening'
-                ? '正在接收语音，识别结束后会直接开始 10 秒演示计时。'
+                ? '正在接收语音，说出分钟数后立刻开始计时。'
               : status === 'running'
-                ? '可以锁屏或去做别的事，到点我会响铃。'
+                ? `本次计时 ${formatSpokenDuration(Math.round(totalSeconds / 60))}，可以锁屏或去做别的事，到点我会响铃。`
                 : '请回来检查显色情况，然后继续下一步。'}
           </p>
           {heardText ? (
@@ -1363,9 +1481,18 @@ export function TutorialTimerStage({
             </PrimaryButton>
           ) : null}
           {status === 'listening' ? (
-            <PrimaryButton className="mt-5" onClick={startTimer} icon={<Timer size={18} weight="fill" />}>
-              直接开始 10 秒计时
+            <PrimaryButton className="mt-5" onClick={() => startTimer(null)} icon={<Timer size={18} weight="fill" />}>
+              直接按 {defaultMinutes} 分钟计时
             </PrimaryButton>
+          ) : null}
+          {status === 'running' ? (
+            <button
+              type="button"
+              onClick={skipToEnd}
+              className="tap mt-4 rounded-full border-2 border-dashed border-[#c99a2e] px-4 py-1.5 text-[11px] font-bold text-[#a2770f]"
+            >
+              跳到结束（演示用）
+            </button>
           ) : null}
         </section>
       </div>
@@ -1387,6 +1514,7 @@ export function TutorialScreen({
   onBack,
   onSend,
   onNextStep,
+  onGotoStep,
   onSessionStep,
   onComplete,
 }: {
@@ -1395,6 +1523,7 @@ export function TutorialScreen({
   onBack: () => void;
   onSend: (audio: File) => Promise<TutorialAction>;
   onNextStep: () => Promise<TutorialAction>;
+  onGotoStep: (stepNo: number) => Promise<TutorialAction>;
   onSessionStep: (step: TutorialStep, stepEndTTS?: StepEndTTS) => void;
   onComplete: (qaSummary: string[]) => Promise<void> | void;
 }) {
@@ -1409,13 +1538,26 @@ export function TutorialScreen({
   const [replaySignal, setReplaySignal] = useState(0);
   const [countdownDone, setCountdownDone] = useState(false);
   const [timerPageOpen, setTimerPageOpen] = useState(false);
+  // 用户在教程页说「定一个15分钟的闹钟」时解析出的分钟数，
+  // 带进闹钟页直接开始计时，不用让他再对着闹钟页重说一遍。
+  const [alarmSpokenMinutes, setAlarmSpokenMinutes] = useState<number | null>(null);
   const [finishConfirm, setFinishConfirm] = useState(false);
+  // 本步要点默认收起，让视频占满画面；需要时再展开成浮层看全文。
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const monitorFrameRef = useRef<number | null>(null);
   const discardRecordingRef = useRef(false);
   const voiceRequestInFlightRef = useRef(false);
+  // 切步请求独立于语音请求：语音在飞时点「下一步」不该被静默吞掉。
+  const stepRequestInFlightRef = useRef(false);
+  const [stepBusy, setStepBusy] = useState(false);
+  // 发起异步动作时记下当时的 step_id；回来时对不上就丢弃，
+  // 防止「点按钮」和「语音返回 play_next_step」撞车导致跨两步。
+  const stepTokenRef = useRef(session.current_step.step_id);
+  // AI 说话期间的打断哨兵的关闭函数
+  const bargeInStopRef = useRef<(() => void) | null>(null);
   const lastHandledVoiceRef = useRef<{ transcript: string; at: number }>({
     transcript: '',
     at: 0,
@@ -1444,6 +1586,15 @@ export function TutorialScreen({
     answer ||
     session.step_end_tts?.text ||
     `先看视频完成“${step.title}”。${step.description}`;
+  // 字幕条的胶带标签跟着 phase 走，别在 AI 没出声时还写「小助手正在说」
+  const subtitleLabel =
+    isListening
+      ? '我在听你说'
+      : isThinking
+        ? '正在思考'
+        : isAnswering || phase === 'prompting'
+          ? '小助手正在说'
+          : '随时可以问我';
 
   const cleanupAudioInput = useCallback(() => {
     if (monitorFrameRef.current !== null) {
@@ -1461,12 +1612,14 @@ export function TutorialScreen({
 
   const cancelRecording = useCallback(() => {
     discardRecordingRef.current = true;
+    bargeInStopRef.current?.();
     const recorder = recorderRef.current;
     if (recorder && recorder.state !== 'inactive') recorder.stop();
     cleanupAudioInput();
   }, [cleanupAudioInput]);
 
   useEffect(() => {
+    stepTokenRef.current = step.step_id;
     const timer = window.setTimeout(() => {
       cancelRecording();
       setPhase(session.awaiting_voice_input ? 'waiting' : 'video');
@@ -1477,6 +1630,8 @@ export function TutorialScreen({
       setVoiceLevel(0);
       setCountdownDone(false);
       setTimerPageOpen(false);
+      setAlarmSpokenMinutes(null);
+      setDetailsOpen(false);
       stopSpeaking();
     }, 0);
     return () => window.clearTimeout(timer);
@@ -1497,12 +1652,16 @@ export function TutorialScreen({
       setPhase('waiting');
       return;
     }
+    // 记下发起时所处的步骤：用户点按钮切步后，这条在飞的语音结果必须作废，
+    // 否则它会在新步骤上擅自开麦、甚至再跳一步。
+    const token = step.step_id;
     voiceRequestInFlightRef.current = true;
     setError('');
     setPhase('thinking');
     setVoiceLevel(0);
     try {
       const action = await onSend(audio);
+      if (stepTokenRef.current !== token) return;
       const heard = action.asr_transcript?.trim() ?? '';
       const now = Date.now();
       if (
@@ -1520,6 +1679,17 @@ export function TutorialScreen({
         lastHandledVoiceRef.current = { transcript: heard, at: now };
       }
       setTranscript(heard);
+      // 「定个闹钟」在这里就地接住：这条指令的归宿是本地闹钟页，
+      // 不该按后端返回的 answer/next 去走，否则用户说了也白说。
+      if (isAlarmRequest(heard)) {
+        cancelRecording();
+        stopSpeaking();
+        // 用户已经报了时长就直接用；没报就用这一步的默认时长。
+        setAlarmSpokenMinutes(parseSpokenMinutes(heard));
+        setPhase('waiting');
+        setTimerPageOpen(true);
+        return;
+      }
       if (step.step_no === step.total_steps && isFinishUtterance(heard)) {
         await playTTS(
           action.action === 'capture_after_photo' ? action.tts_audio_url : null,
@@ -1533,7 +1703,11 @@ export function TutorialScreen({
         setNextPrompt(action.next_prompt);
         if (heard) qaRef.current.push(`${heard}：${action.tts_text}`);
         setPhase('answering');
+        // 一问一答：AI 答到一半用户想追问，随时可以插话
+        if (API_MODE !== 'mock') void startBargeInWatch();
         await playTTS(action.tts_audio_url, action.tts_text);
+        if (stepTokenRef.current !== token) return;
+        if (recorderRef.current?.state === 'recording') return;
         resumeListening();
       } else if (action.action === 'play_next_step') {
         setAnswer('');
@@ -1555,11 +1729,15 @@ export function TutorialScreen({
         const now = Date.now();
         if (now - lastSilencePromptAtRef.current > 9000) {
           lastSilencePromptAtRef.current = now;
+          if (API_MODE !== 'mock') void startBargeInWatch();
           await playTTS(action.tts_audio_url, action.tts_text);
         }
+        if (stepTokenRef.current !== token) return;
+        if (recorderRef.current?.state === 'recording') return;
         resumeListening();
       }
     } catch (actionError) {
+      if (stepTokenRef.current !== token) return;
       setError(actionError instanceof Error ? actionError.message : '没有听清，请再试一次');
       setPhase('waiting');
     } finally {
@@ -1567,38 +1745,145 @@ export function TutorialScreen({
     }
   };
 
-  const handleManualNext = async () => {
-    if (voiceRequestInFlightRef.current) return;
+  /**
+   * 按钮切步的统一入口。跟语音路径用各自的锁——语音请求在飞时点按钮也必须有反应，
+   * 这正是之前「点下一步没动静」的头号死因。
+   */
+  const runStepChange = async (
+    fetchAction: () => Promise<TutorialAction>,
+    failMessage: string,
+  ) => {
+    if (stepRequestInFlightRef.current) return;
     if (offline) {
-      setError('当前网络不可用，请恢复网络后再进入下一步。');
+      setError('当前网络不可用，请恢复网络后再切换步骤。');
       setPhase('waiting');
       return;
     }
-    voiceRequestInFlightRef.current = true;
+    const token = step.step_id;
+    stepRequestInFlightRef.current = true;
+    setStepBusy(true);
+    // 主动掐掉在飞的语音链路：用户已经用按钮表态了，别再等 AI 说完。
+    cancelRecording();
+    stopSpeaking();
+    voiceRequestInFlightRef.current = false;
     setError('');
     setAnswer('');
+    setTranscript('');
     setNextPrompt('');
     setVoiceLevel(0);
     setPhase('thinking');
     try {
-      const action = await onNextStep();
+      const action = await fetchAction();
+      // 期间已经换过步（比如语音也返回了切步），这次结果作废
+      if (stepTokenRef.current !== token) return;
       if (action.action === 'play_next_step') {
         setPhase('video');
+        setCountdownDone(false);
         onSessionStep(action.current_step, action.step_end_tts);
       } else if (action.action === 'capture_after_photo') {
         await playTTS(action.tts_audio_url, action.tts_text);
         await onComplete(qaRef.current);
+      } else {
+        // 后端返回了预期外的 action，也要把 phase 放回可交互态，
+        // 否则会永久卡在 thinking，界面像死了一样。
+        setPhase('waiting');
+        setError('这次没能切换步骤，请再点一次。');
       }
     } catch (actionError) {
-      setError(actionError instanceof Error ? actionError.message : '进入下一步失败，请再试一次');
+      if (stepTokenRef.current !== token) return;
+      setError(actionError instanceof Error ? actionError.message : failMessage);
       setPhase('waiting');
     } finally {
-      voiceRequestInFlightRef.current = false;
+      stepRequestInFlightRef.current = false;
+      setStepBusy(false);
     }
   };
 
-  const startListening = async () => {
+  const handleManualNext = () =>
+    runStepChange(onNextStep, '进入下一步失败，请再试一次');
+
+  const handleManualPrev = () =>
+    runStepChange(
+      () => onGotoStep(step.step_no - 1),
+      '返回上一步失败，请再试一次',
+    );
+
+  /**
+   * AI 说话期间的打断哨兵：只做 RMS 音量检测，不录音、不发请求。
+   * 听到持续人声就掐掉 TTS，并把麦克风流原地交给 startListening 开始录。
+   *
+   * 外放（不戴耳机）时最大的风险是被 AI 自己的声音触发，三重保险：
+   * (a) getUserMedia 开了 echoCancellation；
+   * (b) TTS 在放时用更高的阈值；
+   * (c) 要求连续超阈 300ms，滤掉瞬时尖峰。
+   */
+  const startBargeInWatch = async () => {
+    if (bargeInStopRef.current) return;
+    if (!navigator.mediaDevices?.getUserMedia || typeof AudioContext === 'undefined') return;
+    let stream: MediaStream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true },
+      });
+    } catch {
+      // 没有麦克风权限就安静降级：用户还能用麦克风按钮手动打断
+      return;
+    }
+    const audioContext = new AudioContext();
+    const analyser = audioContext.createAnalyser();
+    analyser.fftSize = 1024;
+    audioContext.createMediaStreamSource(stream).connect(analyser);
+    const samples = new Uint8Array(analyser.fftSize);
+    let frame: number | null = null;
+    let handedOver = false;
+    let voiceSince = 0;
+
+    const stop = (keepStream = false) => {
+      bargeInStopRef.current = null;
+      if (frame !== null) window.cancelAnimationFrame(frame);
+      void audioContext.close().catch(() => undefined);
+      if (!keepStream) stream.getTracks().forEach((track) => track.stop());
+    };
+    bargeInStopRef.current = () => stop(false);
+
+    const tick = () => {
+      if (handedOver) return;
+      analyser.getByteTimeDomainData(samples);
+      let energy = 0;
+      for (const value of samples) {
+        const normalized = (value - 128) / 128;
+        energy += normalized * normalized;
+      }
+      const volume = Math.sqrt(energy / samples.length);
+      const now = audioContext.currentTime * 1000;
+      // AI 还在出声时抬高门槛，避免外放自激；AI 停了就用常规阈值
+      const threshold = isSpeakingNow() ? 0.06 : 0.035;
+      if (volume > threshold) {
+        if (!voiceSince) voiceSince = now;
+        if (now - voiceSince >= 300) {
+          handedOver = true;
+          stop(true);
+          stopSpeaking();
+          void startListening(stream);
+          return;
+        }
+      } else {
+        voiceSince = 0;
+      }
+      frame = window.requestAnimationFrame(tick);
+    };
+    frame = window.requestAnimationFrame(tick);
+  };
+
+  /**
+   * @param handoverStream 打断哨兵已经拿到的麦克风流。直接接管而不是重新
+   * getUserMedia，能省掉一次授权往返——否则用户开口的头几个字会被吞掉。
+   */
+  const startListening = async (handoverStream?: MediaStream) => {
+    bargeInStopRef.current?.();
     if (recorderRef.current?.state === 'recording') return;
+    // 切步请求在飞时不要抢麦：新步骤马上就到，这时开麦只会录到过渡噪音。
+    if (stepRequestInFlightRef.current) return;
     if (offline) {
       setError('当前网络不可用，暂时无法上传语音。');
       setPhase('waiting');
@@ -1612,16 +1897,19 @@ export function TutorialScreen({
       setPhase('waiting');
       return;
     }
-    cancelRecording();
+    // 接管来的流不能被 cancelRecording 顺手关掉
+    if (!handoverStream) cancelRecording();
     discardRecordingRef.current = false;
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          channelCount: 1,
-          echoCancellation: true,
-          noiseSuppression: true,
-        },
-      });
+      const stream =
+        handoverStream ??
+        (await navigator.mediaDevices.getUserMedia({
+          audio: {
+            channelCount: 1,
+            echoCancellation: true,
+            noiseSuppression: true,
+          },
+        }));
       streamRef.current = stream;
       const mimeType = [
         'audio/webm;codecs=opus',
@@ -1741,17 +2029,29 @@ export function TutorialScreen({
   };
 
   const segmentEnded = () => {
-    if (step.wait_seconds && !countdownDone) {
-      setPhase('waiting');
-      setTimerPageOpen(true);
-      return;
-    }
-    const prompt = session.step_end_tts ?? {
-      text: '你在这一步有什么问题，可以随时问我～',
-      audio_url: null,
-    };
+    // 需要等待的步骤不再自动弹闹钟页——闹钟由用户开口要，才叫「语音助手」。
+    // 这里只把这件事说出来，用户说「定个闹钟」时 handleAudio 会接住。
+    const prompt =
+      step.wait_seconds && !countdownDone
+        ? {
+            text: `这一步需要等待显色。想计时的话，对我说一句「定一个${Math.max(1, Math.round(step.wait_seconds / 60))}分钟的闹钟」就行。`,
+            audio_url: null,
+          }
+        : session.step_end_tts ?? {
+            text: '你在这一步有什么问题，可以随时问我～',
+            audio_url: null,
+          };
+    const token = step.step_id;
     setPhase('prompting');
-    void playTTS(prompt.audio_url, prompt.text).then(resumeListening);
+    // 开播的同时就布下打断哨兵：不用等 AI 说完才轮到用户开口
+    if (API_MODE !== 'mock') void startBargeInWatch();
+    void playTTS(prompt.audio_url, prompt.text).then(() => {
+      // TTS 播完时可能已经换步了，这时不能在新步骤上擅自开麦
+      if (stepTokenRef.current !== token) return;
+      // 被打断的话哨兵已经接管去录音了，这里不要再抢
+      if (recorderRef.current?.state === 'recording') return;
+      resumeListening();
+    });
   };
 
   const sendMockCommand = (
@@ -1770,10 +2070,15 @@ export function TutorialScreen({
     return (
       <TutorialTimerStage
         step={step}
-        onBack={() => setTimerPageOpen(false)}
+        initialMinutes={alarmSpokenMinutes}
+        onBack={() => {
+          setTimerPageOpen(false);
+          setAlarmSpokenMinutes(null);
+        }}
         onContinue={() => {
           setCountdownDone(true);
           setTimerPageOpen(false);
+          setAlarmSpokenMinutes(null);
           setPhase('waiting');
         }}
       />
@@ -1828,69 +2133,82 @@ export function TutorialScreen({
             当前离线：视频可继续播放，语音问答将在网络恢复后重试。
           </p>
         ) : null}
-        <div
-          className={cx(
-            'grid h-[296px] shrink-0 grid-cols-[auto_1fr] items-stretch gap-0',
-          )}
-        >
-          <div className="relative h-full min-h-0 aspect-[9/16] overflow-hidden">
-            <div className="h-full overflow-hidden border-2 border-ink">
-              <SegmentVideo
-                url={session.tutorial_video.url}
-                step={step}
-                onSegmentEnd={segmentEnded}
-                replaySignal={replaySignal}
-              />
+        {/* 视频是这一屏的主角：占满剩余高度。
+            这里不能再写 aspect-[9/16]——外层 .tony-agent-shell 桌面端已经锁了
+            9:16 且高度是 100dvh，视频再锁一次比例会把字幕条和底栏挤出
+            overflow:hidden 的可视区，按钮在 DOM 里但点不到。 */}
+        <div className="relative min-h-0 flex-1 overflow-hidden border-2 border-ink">
+          <SegmentVideo
+            url={session.tutorial_video.url}
+            step={step}
+            onSegmentEnd={segmentEnded}
+            replaySignal={replaySignal}
+          />
+
+          {/* 要点收在右上角，默认不挡画面 */}
+          <button
+            type="button"
+            onClick={() => setDetailsOpen((open) => !open)}
+            aria-expanded={detailsOpen}
+            className="tap absolute right-2 top-2 z-20 flex items-center gap-1 rounded-full border-2 border-ink bg-yellow px-2.5 py-1 text-[11px] font-black text-ink shadow-[2px_2px_0_rgba(0,0,0,.25)]"
+          >
+            <ListBullets size={13} weight="bold" />
+            本步详情
+            <CaretUp size={11} weight="bold" className={cx('transition-transform', detailsOpen ? '' : 'rotate-180')} />
+          </button>
+
+          {detailsOpen ? (
+            <div className="absolute inset-x-2 bottom-[86px] top-11 z-10 flex flex-col overflow-hidden">
+              <NotebookCard tone="yellow" className="flex min-h-0 flex-1 flex-col overflow-hidden p-3 pt-4">
+                <h2 className="shrink-0 text-[15px] font-black">
+                  <ScribbleUnderline>{step.title}</ScribbleUnderline>
+                </h2>
+                <div className="mt-2 min-h-0 flex-1 overflow-y-auto pr-1">
+                  <p className="text-[12px] font-bold leading-5">{step.description}</p>
+                  {step.points?.length ? (
+                    <ul className="mt-2.5 space-y-1.5 border-t border-dashed border-line pt-2.5">
+                      {step.points.map((point) => (
+                        <li key={point} className="flex gap-1.5 text-[12px] font-bold leading-[1.45]">
+                          <span className="mt-[3px] grid size-4 shrink-0 place-items-center rounded-full bg-sage text-white">
+                            <Check size={10} weight="bold" />
+                          </span>
+                          {point}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                  {step.caution ? (
+                    <p className="mt-2.5 border-t border-dashed border-line pt-2 text-[12px] font-bold leading-[1.45] text-[#b36f00]">
+                      ⚠ {step.caution}
+                    </p>
+                  ) : null}
+                </div>
+              </NotebookCard>
             </div>
-          </div>
-          <NotebookCard tone="yellow" className="h-full overflow-hidden p-2 pt-5">
-            <span className="absolute -left-2 top-5 flex flex-col gap-5" aria-hidden="true">
-              {[0, 1, 2, 3, 4].map((item) => <span key={item} className="h-2.5 w-4 rounded-full border-2 border-ink bg-cream" />)}
-            </span>
-            <DoodleIcon kind="heart" className="absolute right-2 top-5 rotate-12" size={16} />
-            <h1 className="text-sm font-black">
-              <ScribbleUnderline>{step.title}</ScribbleUnderline>
-            </h1>
-            <p className="mt-2 text-[9px] font-bold leading-3.5">{step.description}</p>
-            {step.points?.length ? (
-              <ul className="mt-2 space-y-1 border-t border-dashed border-line pt-2">
-                {step.points.slice(0, 3).map((point) => (
-                  <li key={point} className="flex gap-1 text-[8px] font-bold leading-3">
-                    <span className="grid size-3.5 shrink-0 place-items-center rounded-full bg-sage text-white"><Check size={9} weight="bold" /></span>
-                    {point}
-                  </li>
-                ))}
-              </ul>
-            ) : null}
-            {step.caution ? <p className="mt-1 text-[7px] font-bold leading-3 text-[#b36f00]">⚠ {step.caution}</p> : null}
-            <DoodleIcon tone="yellow" className="absolute bottom-2 right-2 rotate-12" size={17} />
-          </NotebookCard>
+          ) : null}
         </div>
 
-        {phase !== 'video' && step.wait_seconds && !countdownDone ? (
-          <div className="mt-2">
-            <CountdownCard
-              seconds={step.wait_seconds}
-              onReady={() => setCountdownDone(true)}
-            />
-          </div>
-        ) : null}
+        {/* 这里不再自动塞倒计时卡片。等待时长要不要计时、计多久，
+            由用户开口说了算——说「定个闹钟」才进闹钟页。 */}
 
-        <section className="relative mt-2 min-h-[72px] shrink-0 border-[1.6px] border-[#8f7bd1] bg-[#f6f2ff] px-3 pb-1 pt-4">
+        {/* 双向字幕：你说的和小助手说的都要看得清，不再把用户那句缩成 8px */}
+        <section className="relative mt-2.5 shrink-0 border-[1.6px] border-[#8f7bd1] bg-[#f6f2ff] px-3 pb-2 pt-4">
           <TapeLabel tone="lavender" className="absolute -left-1 -top-2 !px-3 !py-1 text-[10px]">
-            小助手正在说 <SpeakerHigh className="ml-1 inline" size={14} weight="fill" />
+            {subtitleLabel} <SpeakerHigh className="ml-1 inline" size={14} weight="fill" />
           </TapeLabel>
           <DoodleIcon kind="sparkle" tone="lavender" className="absolute right-2 top-2" size={15} />
-          <p className="text-[16px] font-black leading-[1.3] text-ink-2">
-            {assistantSubtitle}
-          </p>
           {transcript ? (
-            <p className="mt-1 text-right text-[8px] font-bold text-[#6d5aaf]">
-              你说：{transcript}
+            <p className="mb-1.5 flex gap-1.5 border-b border-dashed border-[#c4b6ec] pb-1.5 text-[14px] font-bold leading-[1.35] text-[#5b4a9c]">
+              <span className="shrink-0 font-black">你说</span>
+              <span className="min-w-0">{transcript}</span>
             </p>
           ) : null}
-          {nextPrompt ? <p className="mt-1 text-[8px] text-ink-3">{nextPrompt}</p> : null}
-          {error ? <p className="mt-1 text-[8px] font-bold text-red-900">{error}</p> : null}
+          <p className="flex gap-1.5 text-[16px] font-black leading-[1.35] text-ink-2">
+            <span className="shrink-0 text-[14px] text-[#8f7bd1]">Tony</span>
+            <span className="min-w-0">{assistantSubtitle}</span>
+          </p>
+          {nextPrompt ? <p className="mt-1 text-[11px] font-bold text-ink-3">{nextPrompt}</p> : null}
+          {error ? <p className="mt-1 text-[11px] font-bold text-red-900">{error}</p> : null}
         </section>
 
         {API_MODE === 'mock' ? (
@@ -1916,26 +2234,33 @@ export function TutorialScreen({
                   <DoodleIcon kind="heart" className="absolute right-1 top-1" size={13} />
                 </button>
               </div>
-            ) : (
-              <button
-                type="button"
-                onClick={() => void startListening()}
-                  disabled={
-                  phase === 'listening' ||
-                  phase === 'thinking' ||
-                  phase === 'prompting'
-                }
-                className="tap mt-2 flex min-h-9 w-full items-center justify-center gap-2 rounded-[48%_52%_46%_54%] border-2 border-ink bg-orange text-xs font-black text-ink disabled:opacity-40"
-              >
-                <Microphone size={18} weight="fill" />
-                {phase === 'listening' ? '正在听你说…' : '重新开始聆听'}
-              </button>
-            )}
+            ) : null}
 
-        <div className="flex h-9 shrink-0 items-center justify-center gap-2">
+        {/* 麦克风按钮和声波状态并成一行，省下的高度全给视频 */}
+        <div className="mt-2 flex h-10 shrink-0 items-center gap-2">
+          {API_MODE === 'mock' ? null : (
+            <button
+              type="button"
+              onClick={() => {
+                // 手动打断兜底：AI 正说着也能按，先掐声音再开麦
+                stopSpeaking();
+                void startListening();
+              }}
+              // thinking 时后端请求在飞，这时开麦收到的话会被丢掉，只有它 disable
+              disabled={phase === 'listening' || phase === 'thinking' || stepBusy}
+              className="tap flex min-h-9 flex-1 items-center justify-center gap-1.5 rounded-[48%_52%_46%_54%] border-2 border-ink bg-orange text-[12px] font-black text-ink disabled:opacity-40"
+            >
+              <Microphone size={17} weight="fill" />
+              {phase === 'listening'
+                ? '正在听你说…'
+                : phase === 'prompting' || phase === 'answering'
+                  ? '打断，我要说话'
+                  : '重新开始聆听'}
+            </button>
+          )}
           <div
             className={cx(
-              'flex h-7 min-w-[118px] items-center justify-center gap-1 rounded-full border border-[#cabdf2] bg-white/65 px-2 text-[#765fc4]',
+              'flex h-7 shrink-0 items-center justify-center gap-1 rounded-full border border-[#cabdf2] bg-white/65 px-2 text-[#765fc4]',
               isListening ? 'shadow-[0_0_0_3px_rgba(255,126,38,.12)]' : '',
             )}
             aria-hidden="true"
@@ -1968,27 +2293,38 @@ export function TutorialScreen({
               />
             )}
           </div>
-          <p className="text-[9px] font-black text-[#6d5aaf]">
+          <p className="shrink-0 text-[10px] font-black text-[#6d5aaf]">
             {voiceStatusText}
           </p>
         </div>
         </div>
 
       <BottomBar className="!pb-1 !pt-1">
-        <div className="grid grid-cols-[.8fr_1.35fr] gap-2 [&_.candy-btn]:!min-h-8 [&_.candy-btn]:!text-xs">
+        {/* 语音之外的兜底：任何时候都能用按钮切步，包括 AI 正在说话时 */}
+        <div className="grid grid-cols-[.72fr_.72fr_1.3fr] gap-1.5 [&_.candy-btn]:!min-h-8 [&_.candy-btn]:!px-1.5 [&_.candy-btn]:!text-xs">
+          <SecondaryButton
+            onClick={() => {
+              void handleManualPrev();
+            }}
+            disabled={step.step_no <= 1 || stepBusy}
+            icon={<ArrowLeft size={16} weight="bold" />}
+          >
+            <span className="whitespace-nowrap text-[13px]">上一步</span>
+          </SecondaryButton>
           <SecondaryButton
             onClick={() => {
               setReplaySignal((value) => value + 1);
               setPhase('video');
               setAnswer('');
             }}
-            icon={<Repeat size={17} weight="bold" />}
+            icon={<Repeat size={16} weight="bold" />}
           >
-            <span className="whitespace-nowrap text-[13px]">重播本步</span>
+            <span className="whitespace-nowrap text-[13px]">重播</span>
           </SecondaryButton>
           {step.step_no === step.total_steps ? (
             <PrimaryButton
               onClick={() => setFinishConfirm(true)}
+              disabled={stepBusy}
               icon={<CheckCircle size={18} weight="fill" />}
             >
               完成染发
@@ -1998,8 +2334,9 @@ export function TutorialScreen({
               onClick={() => {
                 void handleManualNext();
               }}
+              disabled={stepBusy}
             >
-              下一步
+              {stepBusy ? '切换中…' : '下一步'}
             </PrimaryButton>
           )}
         </div>

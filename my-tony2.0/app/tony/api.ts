@@ -1072,10 +1072,16 @@ export async function sendTutorialVoiceInput(
   } satisfies TutorialAction;
 }
 
-export async function advanceTutorialStep(sessionId: string) {
+export async function advanceTutorialStep(
+  sessionId: string,
+  clientEventId?: string,
+) {
   if (API_MODE === 'real') {
+    // 传稳定的 client_event_id，后端按 (session_id, event_id) 幂等，
+    // 连点两下「下一步」不会一次跨两步。
     return request<TutorialAction>(`/tutorial-sessions/${sessionId}/next-step`, {
       method: 'POST',
+      body: JSON.stringify(clientEventId ? { client_event_id: clientEventId } : {}),
     });
   }
   await sleep(240);
@@ -1115,6 +1121,72 @@ export async function advanceTutorialStep(sessionId: string) {
     tts_text: '你在这一步有什么问题，可以随时问我～',
     step_end_tts: session.step_end_tts,
   } satisfies TutorialAction;
+}
+
+/** 按步号直接跳转，给「上一步 / 下一步」按钮兜底。步号越界由后端钳制。 */
+export async function gotoTutorialStep(sessionId: string, stepNo: number) {
+  if (API_MODE === 'real') {
+    return request<TutorialAction>(`/tutorial-sessions/${sessionId}/goto-step`, {
+      method: 'POST',
+      body: JSON.stringify({ step_no: stepNo }),
+    });
+  }
+  await sleep(200);
+  const sessions = loadSessions();
+  const session = sessions[sessionId];
+  if (!session) throw new ApiError('教程会话已失效');
+  const tutorialSteps = session.tutorial_steps?.length
+    ? session.tutorial_steps
+    : TUTORIAL_STEPS;
+  const index = Math.min(Math.max(stepNo - 1, 0), tutorialSteps.length - 1);
+  const target = tutorialSteps[index];
+  session.current_step = target;
+  session.tutorial_steps = tutorialSteps;
+  session.step_end_tts = {
+    text: '你在这一步有什么问题，可以随时问我～',
+    audio_url: null,
+  };
+  // 取历史最大值：往回退不该把已完成进度改小
+  session.completed_step_count = Math.max(
+    session.completed_step_count ?? 0,
+    index,
+  );
+  sessions[sessionId] = session;
+  saveSessions(sessions);
+  return {
+    action: 'play_next_step',
+    current_step: target,
+    tts_text: '你在这一步有什么问题，可以随时问我～',
+    step_end_tts: session.step_end_tts,
+  } satisfies TutorialAction;
+}
+
+/**
+ * 把一句话交给后端合成语音，拿回 data: URI。
+ *
+ * 目的是让全 App 只有一个声音：那些没有现成 audio_url 的前端文案
+ * （闹钟播报、倒计时提示）以前只能退回浏览器 speechSynthesis，
+ * 于是用户会听到一个突兀的机械女声，和后端 Qwen 声线完全是两个人。
+ * 合成失败返回 null，由调用方决定是否退回浏览器合成。
+ */
+const ttsCache = new Map<string, string | null>();
+
+export async function synthesizeSpeech(text: string): Promise<string | null> {
+  const key = text.trim();
+  if (!key || API_MODE !== 'real') return null;
+  if (ttsCache.has(key)) return ttsCache.get(key) ?? null;
+  try {
+    const data = await request<{ audio_url: string | null }>('/tts', {
+      method: 'POST',
+      body: JSON.stringify({ text: key }),
+    });
+    const url = data.audio_url ?? null;
+    // 闹钟播报这类固定文案会反复说，缓存住省一次网络往返。
+    if (ttsCache.size < 40) ttsCache.set(key, url);
+    return url;
+  } catch {
+    return null;
+  }
 }
 
 export async function submitAfterPhoto(
