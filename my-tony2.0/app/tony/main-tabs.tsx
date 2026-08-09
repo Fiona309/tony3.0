@@ -9,6 +9,7 @@ import {
   ShoppingBagOpen,
   Star,
   UserCircle,
+  VideoCamera,
 } from '@phosphor-icons/react';
 import type { ArchiveSummary, HairProfileData, PrimaryProduct } from './types';
 import { AppFrame, MediaImage, PrimaryButton, cx } from './ui';
@@ -238,10 +239,12 @@ export function MyScreen({
   profile,
   archives,
   onOpenArchive,
+  onTransitionVideos,
 }: {
   profile: HairProfileData | null;
   archives: ArchiveSummary[];
   onOpenArchive: (archiveId: string) => void;
+  onTransitionVideos: () => void;
 }) {
   const collection = archives.length ? archives : [
     { archive_id: 'demo-1', target_color_name: '冷茶棕', product_name: '染发记录', shade_name: '冷茶棕' },
@@ -265,6 +268,22 @@ export function MyScreen({
             <div><p className="text-xl font-black">{profile ? 1 : 0}</p><p className="text-[10px] text-ink-3">发质档案</p></div>
           </div>
         </section>
+        <button
+          type="button"
+          onClick={onTransitionVideos}
+          className="tap mt-5 flex w-full items-center gap-4 rounded-[24px] bg-ink p-4 text-left text-white shadow-card"
+        >
+          <span className="grid size-12 shrink-0 place-items-center rounded-[17px] bg-pink text-white">
+            <VideoCamera size={24} weight="fill" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-[15px] font-black">我的转场视频</span>
+            <span className="mt-1 block text-[11px] text-white/55">
+              跟拍模板、预览并保存到手机
+            </span>
+          </span>
+          <ArrowRight size={18} weight="bold" />
+        </button>
         <section className="mt-7">
           <div className="flex items-end justify-between"><h2 className="text-xl font-black">我的发色收集</h2><span className="text-xs text-ink-3">我染过的颜色</span></div>
           <div className="mt-3 flex snap-x gap-3 overflow-x-auto pb-3 [scrollbar-width:none]">

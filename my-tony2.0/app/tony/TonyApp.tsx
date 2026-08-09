@@ -8,7 +8,6 @@ import {
   createDemoProfile,
   createHairProfile,
   createTutorialSession,
-  getAfterVideoTask,
   getArchive,
   getArchives,
   getColorMatrix,
@@ -19,13 +18,10 @@ import {
   loadFlowDraft,
   saveFlowDraft,
   sendTutorialVoiceInput,
-  submitAfterPhoto,
   updateHairProfile,
   uploadImage,
 } from './api';
 import {
-  AfterPhotoScreen,
-  AfterVideoScreen,
   ArchiveConfirmScreen,
   ArchiveDetailScreen,
   ArchiveSavedScreen,
@@ -42,6 +38,7 @@ import {
 } from './decision-screens';
 import { HairConfirmScreen } from './hair-confirm-screen';
 import { HairMirror } from './hair-mirror';
+import { TransitionRecorderScreen } from './transition-recorder-screen';
 import { VerdictScreen } from './verdict-screen';
 import type { PlanVerdict } from './decision-screens';
 import {
@@ -61,7 +58,6 @@ import {
   type MainTab,
 } from './main-tabs';
 import type {
-  AfterVideoTaskData,
   ArchiveDetailData,
   ArchiveSummary,
   Budget,
@@ -99,7 +95,6 @@ type Screen =
   | 'tutorial'
   | 'completion'
   | 'afterPhoto'
-  | 'afterVideo'
   | 'shopHub'
   | 'tutorialHub'
   | 'me';
@@ -233,10 +228,8 @@ export default function TonyApp() {
   const [completionRecord, setCompletionRecord] =
     useState<CompletionRecord | null>(null);
   const [completionSaved, setCompletionSaved] = useState(false);
-
-  const [afterVideoTask, setAfterVideoTask] =
-    useState<AfterVideoTaskData | null>(null);
-  const afterPollRef = useRef(0);
+  const [transitionLoading, setTransitionLoading] = useState(false);
+  const [transitionError, setTransitionError] = useState('');
 
   const loadVideos = useCallback(async () => {
     setVideosLoading(true);
@@ -622,6 +615,33 @@ export default function TonyApp() {
     }
   }, []);
 
+  const openTransitionRecorder = async (archiveId?: string) => {
+    const targetArchiveId = archiveId ?? archiveDetail?.archive_id ?? archives[0]?.archive_id;
+    if (!targetArchiveId) {
+      window.alert('请先完成一次染发分析并保存方案，再生成转场视频。');
+      setScreen('discover');
+      return;
+    }
+    setScreen('afterPhoto');
+    setTransitionLoading(true);
+    setTransitionError('');
+    try {
+      const [detail, matrix] = await Promise.all([
+        archiveDetail?.archive_id === targetArchiveId
+          ? Promise.resolve(archiveDetail)
+          : getArchive(targetArchiveId),
+        colorMatrix ? Promise.resolve(colorMatrix) : getColorMatrix(),
+      ]);
+      setArchiveDetail(detail);
+      setSelectedArchiveId(targetArchiveId);
+      setColorMatrix(matrix);
+    } catch (error) {
+      setTransitionError(error instanceof Error ? error.message : '转场视频所需数据加载失败');
+    } finally {
+      setTransitionLoading(false);
+    }
+  };
+
   const startTutorial = async () => {
     if (!archiveDetail) return;
     setTutorialStarting(true);
@@ -706,83 +726,6 @@ export default function TonyApp() {
     }
   };
 
-  const pollAfterVideo = useCallback(async (taskId: string) => {
-    const pollGeneration = afterPollRef.current + 1;
-    afterPollRef.current = pollGeneration;
-    for (let index = 0; index < 240; index += 1) {
-      if (afterPollRef.current !== pollGeneration) return;
-      if (index > 0) await wait(2000);
-      if (afterPollRef.current !== pollGeneration) return;
-      try {
-        const task = await getAfterVideoTask(taskId);
-        setAfterVideoTask(task);
-        if (task.status !== 'generating') return;
-      } catch (error) {
-        setAfterVideoTask({
-          generation_task_id: taskId,
-          status: 'failed',
-          error_message: error instanceof Error ? error.message : '生成任务查询失败',
-          fallback_message:
-            '视频生成状态暂时无法获取，你的教程完成记录不受影响。',
-        });
-        return;
-      }
-    }
-    setAfterVideoTask({
-      generation_task_id: taskId,
-      status: 'failed',
-      error_message: 'poll_timeout',
-      fallback_message: '生成时间较长，请稍后在档案中查看。',
-    });
-  }, []);
-
-  const submitAfterPhotoFlow = async (file: File) => {
-    if (!archiveDetail) throw new Error('档案详情已经失效');
-    let activeSession = tutorialSession;
-    if (!activeSession) {
-      activeSession = await createTutorialSession(archiveDetail.archive_id);
-      setTutorialSession(activeSession);
-    }
-    const uploaded = await uploadImage(file, 'after_hair');
-    const submitted = await submitAfterPhoto(
-      activeSession.tutorial_session_id,
-      uploaded.image_id,
-    );
-    if (submitted.status === 'completed' && submitted.url) {
-      setAfterVideoTask({
-        generation_task_id: submitted.generation_task_id,
-        status: 'completed',
-        url: submitted.url,
-        storage_key: submitted.storage_key ?? '',
-        cover_url: submitted.cover_url ?? uploaded.url,
-        cover_storage_key: submitted.cover_storage_key ?? '',
-      });
-      setScreen('afterVideo');
-      return;
-    }
-    if (submitted.status === 'failed') {
-      setAfterVideoTask({
-        generation_task_id: submitted.generation_task_id,
-        status: 'failed',
-        error_message: submitted.error_message ?? 'transition_video_generation_failed',
-        fallback_message:
-          submitted.fallback_message ??
-          '转场视频生成失败，可稍后重试；你的教程完成记录不受影响。',
-      });
-      setScreen('afterVideo');
-      return;
-    }
-    const generating: AfterVideoTaskData = {
-      generation_task_id: submitted.generation_task_id,
-      status: 'generating',
-      progress_percent: 8,
-      message: submitted.message ?? '正在生成你的染后转场视频，请稍候。',
-    };
-    setAfterVideoTask(generating);
-    setScreen('afterVideo');
-    void pollAfterVideo(submitted.generation_task_id);
-  };
-
   if (screen === 'discover') {
     return (
       <DiscoveryScreen
@@ -824,6 +767,7 @@ export default function TonyApp() {
           profile={profile}
           archives={archives}
           onOpenArchive={(archiveId) => void openArchiveDetail(archiveId)}
+          onTransitionVideos={() => void openTransitionRecorder(archives[0]?.archive_id)}
         />
       </AgentShell>
     );
@@ -1113,30 +1057,51 @@ export default function TonyApp() {
         saved={completionSaved}
         onSave={() => void saveCompletion()}
         onArchives={() => void openArchives()}
-        onTransitionVideo={() => setScreen('afterPhoto')}
+        onTransitionVideo={() => void openTransitionRecorder(archiveDetail.archive_id)}
       /></AgentShell>
     );
   }
 
-  if (screen === 'afterPhoto') {
+  if (screen === 'afterPhoto' && (transitionLoading || transitionError || !archiveDetail || !colorMatrix)) {
     return (
-      <AgentShell active="tutorial" onChange={changeMainTab}><AfterPhotoScreen
-        onBack={() => setScreen('completion')}
-        onUse={async (file) => submitAfterPhotoFlow(file)}
-      /></AgentShell>
+      <AgentShell active="tutorial" onChange={changeMainTab}>
+        <div className="grid h-full place-items-center bg-cream px-8 text-center">
+          <div>
+            <p className="text-[15px] font-black text-ink">
+              {transitionError || '正在准备你的转场视频…'}
+            </p>
+            <p className="mt-2 text-xs leading-5 text-ink-3">
+              {transitionError ? '没有使用替代数据，请检查连接后重试。' : '正在读取你的染发档案和实时试色色卡。'}
+            </p>
+            {transitionError && (
+              <button
+                type="button"
+                onClick={() => void openTransitionRecorder(selectedArchiveId || undefined)}
+                className="mt-5 rounded-full bg-ink px-6 py-3 text-sm font-black text-white"
+              >
+                重新加载
+              </button>
+            )}
+          </div>
+        </div>
+      </AgentShell>
     );
   }
 
-  if (screen === 'afterVideo' && afterVideoTask) {
+  if (screen === 'afterPhoto' && archiveDetail && colorMatrix) {
+    const entryVideoId = archiveDetail.entry_video_id;
+    const archiveLevel = archiveDetail.profile_snapshot.current_hair.color?.level ?? mirrorLevel;
+    const matrixVideo = colorMatrix.videos.find((video) => video.video_id === entryVideoId);
+    const canDyeDirectly = matrixVideo?.kb_color
+      ? layer1CanDye(colorMatrix, matrixVideo.kb_color, archiveLevel).can
+      : true;
     return (
-      <AgentShell active="tutorial" onChange={changeMainTab}><AfterVideoScreen
-        task={afterVideoTask}
+      <AgentShell active="tutorial" onChange={changeMainTab}><TransitionRecorderScreen
+        matrix={colorMatrix}
+        level={canDyeDirectly ? archiveLevel : 9}
+        entryVideoId={entryVideoId}
+        simulatedNineDegree={!canDyeDirectly}
         onBack={() => setScreen('completion')}
-        onRetry={() => {
-          afterPollRef.current += 1;
-          setAfterVideoTask(null);
-          setScreen('afterPhoto');
-        }}
       /></AgentShell>
     );
   }
