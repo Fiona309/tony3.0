@@ -61,6 +61,8 @@ export function TransitionRecorderScreen({
   const chunksRef = useRef<Blob[]>([]);
   const audioContextRef = useRef<AudioContext | null>(null);
   const audioSourceRef = useRef<MediaElementAudioSourceNode | null>(null);
+  // 记住音频源当前绑在哪个 <video> 上，元素换了就得重建音频图
+  const audioSourceElementRef = useRef<HTMLVideoElement | null>(null);
   const audioDestinationRef = useRef<MediaStreamAudioDestinationNode | null>(null);
   const recordingTimerRef = useRef<number | null>(null);
   const resultUrlRef = useRef(resultUrl);
@@ -92,10 +94,25 @@ export function TransitionRecorderScreen({
     const audioContext = audioContextRef.current;
     if (audioContext.state === 'suspended') await audioContext.resume();
     audioDestinationRef.current ??= audioContext.createMediaStreamDestination();
-    if (!audioSourceRef.current) {
+
+    // 必须按【当前这个 video 元素】判断，不能只看 audioSourceRef 是否存在。
+    // demo / 录制 / 回看 是三棵独立的 DOM 树，templateRef 会先后指向两个不同的
+    // <video>。startCountdown 在 demo 那棵树上建好音频图后，进入录制阶段
+    // React 卸载旧树、挂上新 <video>，而 audioSourceRef 还绑在已卸载的旧元素上，
+    // 于是录制时播放的声音根本没进 audioDestination —— 成片音轨全静音。
+    if (audioSourceRef.current && audioSourceElementRef.current === template) return;
+    if (audioSourceRef.current) {
+      audioSourceRef.current.disconnect();
+      audioSourceRef.current = null;
+    }
+    // createMediaElementSource 对同一个元素只能调一次，重复调用会抛错。
+    try {
       audioSourceRef.current = audioContext.createMediaElementSource(template);
+      audioSourceElementRef.current = template;
       audioSourceRef.current.connect(audioContext.destination);
       audioSourceRef.current.connect(audioDestinationRef.current);
+    } catch {
+      audioSourceElementRef.current = null;
     }
   }, []);
 
@@ -210,6 +227,7 @@ export function TransitionRecorderScreen({
     void audioContextRef.current?.close();
     audioContextRef.current = null;
     audioSourceRef.current = null;
+    audioSourceElementRef.current = null;
     audioDestinationRef.current = null;
     setEffectEnabled(false);
     setElapsed(0);
@@ -257,7 +275,10 @@ export function TransitionRecorderScreen({
           <span className="grid size-9 place-items-center rounded-full bg-[#7fd39a]/15 text-[#7fd39a]"><Check size={19} weight="bold" /></span>
           <div><p className="text-[15px] font-black">转场拍好了</p><p className="text-[11px] text-white/50">参考画面不会出现在成片里</p></div>
         </header>
-        <div className="min-h-0 flex-1 bg-black"><video src={resultUrl} controls playsInline autoPlay loop muted preload="auto" onLoadedData={(event) => void event.currentTarget.play()} className="size-full object-cover" /></div>
+        {/* 回看播放器不能 muted：成片里录了模板音乐，静音的话用户会以为没录上声音。
+            自动播放策略要求静音才能 autoPlay，但这里是用户点完"开始→结束"才进来的，
+            已经有用户手势，出声播放不会被浏览器拦。 */}
+        <div className="min-h-0 flex-1 bg-black"><video src={resultUrl} controls playsInline autoPlay loop preload="auto" onLoadedData={(event) => void event.currentTarget.play()} className="size-full object-cover" /></div>
         <div className="grid shrink-0 grid-cols-[.82fr_1.18fr] gap-2.5 px-4 pb-[max(16px,env(safe-area-inset-bottom))] pt-4">
           <button type="button" onClick={retry} className="flex items-center justify-center gap-1.5 rounded-full border border-white/20 py-3.5 text-[13px] font-bold"><ArrowCounterClockwise size={17} /> 重拍</button>
           <button type="button" onClick={() => void saveResult()} className="flex items-center justify-center gap-1.5 rounded-full bg-pink py-3.5 text-[13px] font-black"><DownloadSimple size={18} weight="bold" /> 保存到手机</button>
