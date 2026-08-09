@@ -5,7 +5,6 @@ import {
   clearFlowDraft,
   createArchive,
   createCompletionRecord,
-  createDemoProfile,
   createHairProfile,
   createTutorialSession,
   getAfterVideoTask,
@@ -37,9 +36,9 @@ import {
   CalculatingScreen,
   CameraScreen,
   DiscoveryScreen,
-  PlanScreen,
   ProductsScreen,
 } from './decision-screens';
+import { PlanResultScreen } from './plan-result-screen';
 import { HairConfirmScreen } from './hair-confirm-screen';
 import { HairMirror } from './hair-mirror';
 import { VerdictScreen } from './verdict-screen';
@@ -120,12 +119,12 @@ export default function TonyApp() {
   const [currentImageId, setCurrentImageId] = useState('');
   const [profile, setProfile] = useState<HairProfileData | null>(null);
   const [plan, setPlan] = useState<PlanResultData | null>(null);
+  const [planTargetVideoId, setPlanTargetVideoId] = useState('');
   const [planStage, setPlanStage] = useState(0);
   const [planError, setPlanError] = useState('');
-  const [demoLoading, setDemoLoading] = useState(false);
-  const [demoError, setDemoError] = useState('');
   const [colorMatrix, setColorMatrix] = useState<ColorMatrix | null>(null);
   const [mirrorLevel, setMirrorLevel] = useState(5);
+  const prewarmPlanRef = useRef<(profileId: string, targetVideoId: string) => void>(() => undefined);
 
   /* 底色是三层判断共同的输入。用户在结论屏改了它，必须同步回后端，
      否则方案页仍用 vision 识别的原值计算，会与试色屏的结论直接矛盾。 */
@@ -138,13 +137,15 @@ export default function TonyApp() {
       if (!color) return;
       void updateHairProfile(profile.profile_id, {
         current_hair: { ...currentHair, color: { ...color, level: nextLevel } },
-      } as HairProfileUpdate).catch(() => undefined);
+      } as HairProfileUpdate)
+        .then(() => prewarmPlanRef.current(profile.profile_id, selectedVideo?.video_id ?? ''))
+        .catch(() => undefined);
       setProfile({
         ...profile,
         current_hair: { ...currentHair, color: { ...color, level: nextLevel } },
       });
     },
-    [profile],
+    [profile, selectedVideo],
   );
 
   /* 三层判断结果。与结论屏、试色屏调用同一组函数、同一个底色，
@@ -202,16 +203,17 @@ export default function TonyApp() {
   /* 在判断屏或试色面板里换了颜色。必须把新的目标色写回后端画像，
      否则方案页与商品推荐仍按原来那个色算，用户会拿到对不上的商品。 */
   const changeTargetColor = useCallback(
-    (nextVideoId: string) => {
+    async (nextVideoId: string) => {
       const next = videos.find((v) => v.video_id === nextVideoId);
       if (!next || next.video_id === selectedVideo?.video_id) return;
       setSelectedVideo(next);
       setRecommendation(null);
       if (!profile || !next.target_color) return;
-      void updateHairProfile(profile.profile_id, {
+      await updateHairProfile(profile.profile_id, {
         target_color: next.target_color,
-      } as HairProfileUpdate).catch(() => undefined);
+      } as HairProfileUpdate);
       setProfile({ ...profile, target_color: next.target_color });
+      prewarmPlanRef.current(profile.profile_id, next.video_id);
     },
     [videos, selectedVideo, profile],
   );
@@ -294,6 +296,7 @@ export default function TonyApp() {
     setCurrentImageId('');
     setProfile(null);
     setPlan(null);
+    setPlanTargetVideoId('');
     setPlanError('');
     setPreviewProgress(0);
     setPreviewNotice('');
@@ -362,6 +365,7 @@ export default function TonyApp() {
     setCurrentPhotoUrl(previewUrl);
     setCurrentImageId(uploaded.image_id);
     setProfile(recognized);
+    prewarmPlanRef.current(recognized.profile_id, selectedVideo.video_id);
     setScreen('profile');
   };
 
@@ -411,10 +415,14 @@ export default function TonyApp() {
   );
 
   const calculatePlan = useCallback(
-    async (profileId: string) => {
+    async (
+      profileId: string,
+      navigate = true,
+      targetVideoId = selectedVideo?.video_id ?? '',
+    ) => {
       const requestId = planRequestRef.current + 1;
       planRequestRef.current = requestId;
-      setScreen('calculating');
+      if (navigate) setScreen('calculating');
       setPlanError('');
       setPlanStage(0);
       setPreviewProgress(0);
@@ -427,20 +435,18 @@ export default function TonyApp() {
         const result = await getPlanResult(profileId);
         if (planRequestRef.current !== requestId) return;
         setPlan(result);
+        setPlanTargetVideoId(targetVideoId);
         setSelectedRoute(result.default_route);
         setSelectedIntensity(result.default_preview_level);
         setRecommendation(null);
-        await wait(260);
-        if (planRequestRef.current === requestId) {
+        if (navigate) await wait(260);
+        if (planRequestRef.current === requestId && navigate) {
           setScreen('plan');
-          if (
-            (result.preview_status === 'queued' ||
-              result.preview_status === 'generating') &&
-            result.preview_task_id
-          ) {
-            void pollPreviewTask(result.preview_task_id, requestId);
-          }
         }
+        if (
+          (result.preview_status === 'queued' || result.preview_status === 'generating') &&
+          result.preview_task_id
+        ) void pollPreviewTask(result.preview_task_id, requestId);
       } catch (error) {
         if (planRequestRef.current !== requestId) return;
         setPlanError(error instanceof Error ? error.message : '方案计算失败');
@@ -448,41 +454,18 @@ export default function TonyApp() {
         timers.forEach((timer) => window.clearTimeout(timer));
       }
     },
-    [pollPreviewTask],
+    [pollPreviewTask, selectedVideo],
   );
 
-  const handleDemoPreview = useCallback(async () => {
-    if (!profile || !selectedVideo) return;
-    setDemoLoading(true);
-    setDemoError('');
-    try {
-      const demoProfile = await createDemoProfile({
-        source_profile_id: profile.source_profile_id ?? profile.profile_id,
-        entry_video_id: selectedVideo.video_id,
-      });
-      setProfile(demoProfile);
-      const nextDraft: FlowDraft = {
-        profile: demoProfile,
-        video: selectedVideo,
-        currentImageId,
-        currentPhotoUrl,
-        savedAt: new Date().toISOString(),
-      };
-      saveFlowDraft(nextDraft);
-      setDraft(nextDraft);
-      setRecommendation(null);
-      setSelectedProduct(null);
-      await calculatePlan(demoProfile.profile_id);
-    } catch (error) {
-      setDemoError(error instanceof Error ? error.message : '演示方案生成失败，请稍后再试');
-    } finally {
-      setDemoLoading(false);
-    }
-  }, [calculatePlan, currentImageId, currentPhotoUrl, profile, selectedVideo]);
+  useEffect(() => {
+    prewarmPlanRef.current = (profileId, targetVideoId) => {
+      if (!targetVideoId) return;
+      void calculatePlan(profileId, false, targetVideoId);
+    };
+  }, [calculatePlan]);
 
   const handleConfirmProfile = async (update: HairProfileUpdate) => {
     if (!profile || !selectedVideo) throw new Error('识别信息已经失效');
-    setDemoError('');
     await updateHairProfile(profile.profile_id, update);
     const confirmed: HairProfileData = {
       ...profile,
@@ -500,10 +483,9 @@ export default function TonyApp() {
     saveFlowDraft(nextDraft);
     setDraft(nextDraft);
 
-    // B 方案：先进实时试色，用户接受风险后才调 getPlanResult。
-    // 后端"调用 plan-result 即触发生图"，所以推迟调用 = 只有高意向用户才花那一张生图的钱。
     const level = confirmed.current_hair?.color?.level;
     if (typeof level === 'number') setMirrorLevel(level);
+    prewarmPlanRef.current(confirmed.profile_id, selectedVideo.video_id);
     if (!colorMatrix) {
       void getColorMatrix()
         .then(setColorMatrix)
@@ -895,9 +877,24 @@ export default function TonyApp() {
             video={entry}
             dyeHistory={profile.dye_history}
             currentTone={profile.current_hair?.color?.tone}
+            currentPhotoUrl={currentPhotoUrl}
+            targetPhotoUrl={selectedVideo.target_frame_url || selectedVideo.cover_url}
             onBack={() => setScreen('profile')}
-            // 试色屏自己按"能不能染"决定滑块含义，不需要外部再传意图进去
-            onGo={() => setScreen('mirror')}
+            onGo={(intent) => {
+              if (intent === 'preview' || intent === 'switch') {
+                setScreen('mirror');
+                return;
+              }
+              if (
+                plan &&
+                planTargetVideoId === selectedVideo.video_id &&
+                plan.generation_mode === 'post_bleach_ideal'
+              ) {
+                setScreen('plan');
+              } else {
+                void calculatePlan(profile.profile_id, true, selectedVideo.video_id);
+              }
+            }}
             // 换色是横向重新判断：留在这一屏，换完立刻显示新色的结论
             onPickColor={changeTargetColor}
           />
@@ -923,8 +920,22 @@ export default function TonyApp() {
             onLevelChange={changeBaseLevel}
             onColorChange={changeTargetColor}
             onBack={() => setScreen('verdict')}
-            // 接受风险 -> 此刻才算方案（并触发那唯一一张存档图的生成）
-            onAccept={() => void calculatePlan(profile.profile_id)}
+            onAccept={(choice) => {
+              void (async () => {
+                if (choice.videoId !== selectedVideo.video_id) {
+                  await changeTargetColor(choice.videoId);
+                }
+                if (
+                  plan &&
+                  planTargetVideoId === choice.videoId &&
+                  plan.generation_mode === 'current_base'
+                ) {
+                  setScreen('plan');
+                } else {
+                  await calculatePlan(profile.profile_id, true, choice.videoId);
+                }
+              })();
+            }}
           />
         ) : (
           <div className="grid h-full place-items-center bg-cream px-8 text-center text-sm text-ink-3">
@@ -950,15 +961,16 @@ export default function TonyApp() {
 
   if (screen === 'plan' && plan && selectedVideo) {
     return (
-      <AgentShell active="analysis" onChange={changeMainTab}><PlanScreen
+      <AgentShell active="analysis" onChange={changeMainTab}><PlanResultScreen
         plan={plan}
+        target={selectedVideo}
+        matrix={colorMatrix}
+        currentPhotoUrl={currentPhotoUrl}
+        currentLevel={mirrorLevel}
         selectedRoute={selectedRoute}
         selectedIntensity={selectedIntensity}
         previewProgress={previewProgress}
         previewNotice={previewNotice}
-        demoMode={false}
-        demoLoading={demoLoading}
-        demoError={demoError}
         onRouteChange={(route) => {
           setSelectedRoute(route);
           setRecommendation(null);
@@ -967,9 +979,10 @@ export default function TonyApp() {
           setSelectedIntensity(intensity);
           setRecommendation(null);
         }}
-        onBack={() => setScreen('mirror')}
+        onBack={() => setScreen(plan.generation_mode === 'post_bleach_ideal' ? 'verdict' : 'mirror')}
         onProducts={openProducts}
         verdict={planVerdict}
+        onChangeColor={() => setScreen(plan.generation_mode === 'post_bleach_ideal' ? 'verdict' : 'mirror')}
       /></AgentShell>
     );
   }

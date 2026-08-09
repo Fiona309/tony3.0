@@ -337,7 +337,7 @@ export type HairMirrorProps = {
   currentTone?: string;
   onLevelChange?: (level: number) => void;
   /** 在面板里换了色。必须同步回后端，否则商品页推的还是原来那个色 */
-  onColorChange?: (videoId: string) => void;
+  onColorChange?: (videoId: string) => void | Promise<void>;
   onBack?: () => void;
   /** 用户接受风险，进入方案与商品。此时才会触发生图（B 方案） */
   onAccept?: (choice: { videoId: string; colorName: string; level: number }) => void;
@@ -394,6 +394,12 @@ export function HairMirror({
   const picked: VideoColor | undefined = usable.find((v) => v.video_id === videoId) ?? usable[0];
   const kb = picked?.kb_color ?? '';
   const canDye = kb ? layer1CanDye(matrix, kb, level).can : false;
+  const levelChoices = useMemo(() => {
+    if (/粉/.test(kb)) return [8, 9];
+    if (/蓝|紫/.test(kb)) return [6, 7, 8, 9];
+    if (/红|冷茶|冷棕|黑茶/.test(kb)) return [3, 4, 5, 6, 7, 8, 9];
+    return [3, 4, 5, 6, 7, 8, 9].filter((candidate) => layer1CanDye(matrix, kb, candidate).can);
+  }, [kb, matrix]);
 
   // 同一根轴，两种含义：能染时是效果范围，不能染时是漂几次。
   // 滑块形态本身就是最强的模式提示——不能染那条多一根门槛线。
@@ -602,37 +608,37 @@ export function HairMirror({
   const biasWord = kb === '蓝色' ? '绿' : kb === '粉色' ? '橘' : '色';
 
   return (
-    <div className="relative flex h-full min-h-0 flex-col bg-[#111014] text-white">
-      <header className="shrink-0 bg-[#141317] pt-[max(10px,env(safe-area-inset-top))]">
+    <div className="relative flex h-full min-h-0 flex-col bg-[#fdfaf5] text-ink">
+      <header className="shrink-0 border-b border-ink/10 bg-[#fdfaf5] pt-[max(10px,env(safe-area-inset-top))]">
         <div className="flex items-center gap-2 px-3">
           <button type="button" onClick={onBack} aria-label="返回"
-            className="tap grid size-9 shrink-0 place-items-center rounded-full bg-white/10">
+            className="tap grid size-9 shrink-0 place-items-center rounded-full border border-line bg-white">
             <ArrowLeft size={17} weight="bold" />
           </button>
           <button type="button" onClick={() => setDetail(true)}
             className="tap flex min-w-0 flex-1 items-center justify-center gap-1.5">
             <span className={cx('size-2 shrink-0 rounded-full', canDye ? 'bg-[#7fd39a]' : 'bg-[#e5c169]')} />
             <span className="truncate text-[13px] font-black">{headline}</span>
-            <Info size={14} weight="bold" className="shrink-0 text-white/55" />
+            <Info size={14} weight="bold" className="shrink-0 text-ink-3" />
           </button>
           <button type="button" onClick={() => setEditLevel((v) => !v)}
-            className="tap shrink-0 rounded-full bg-white/10 px-2.5 py-1.5 text-[11px] font-bold">
+            className="tap shrink-0 rounded-full border border-line bg-white px-2.5 py-1.5 text-[11px] font-bold">
             <span className="numerals">{level}</span> 度
             <PencilSimple size={11} weight="bold" className="ml-0.5 inline" />
           </button>
         </div>
-        <FlowProgress stage="mirror" dark />
+        <FlowProgress stage="mirror" />
       </header>
 
       {editLevel && (
-        <div className="shrink-0 bg-[#141317] px-3 pb-3">
-          <p className="mb-1.5 text-[11px] text-white/50">光线会让自动识别偏 2~3 度，以你实际发根为准</p>
+        <div className="shrink-0 bg-[#fdfaf5] px-3 pb-3">
+          <p className="mb-1.5 text-[11px] text-ink-3">这里只展示目标色支持的底色色度</p>
           <div className="flex gap-1.5">
-            {[3, 4, 5, 6, 7, 8, 9].map((lv) => (
+            {levelChoices.map((lv) => (
               <button key={lv} type="button" onClick={() => { onLevelChange?.(lv); setEditLevel(false); }}
                 aria-pressed={lv === level}
                 className={cx('flex-1 rounded-[10px] border py-1.5 text-[13px] font-bold',
-                  lv === level ? 'border-pink bg-pink text-white' : 'border-white/20 text-white/70')}>
+                  lv === level ? 'border-pink bg-pink text-white' : 'border-line bg-white text-ink-2')}>
                 {lv}
               </button>
             ))}
@@ -738,7 +744,11 @@ export function HairMirror({
         {panel ? (
           <ColorPanel
             matrix={matrix} level={level} pickedId={picked?.video_id ?? ''}
-            onPick={(id) => { setVideoId(id); onColorChange?.(id); }}
+            onPick={setVideoId}
+            onConfirm={() => {
+              if (picked) void onColorChange?.(picked.video_id);
+              setPanel(false);
+            }}
             onClose={() => setPanel(false)}
           />
         ) : null}
@@ -753,9 +763,9 @@ export function HairMirror({
       </div>
 
       {/* 效果档位。能染 = 偏浅/一样/偏深/偏色；不能染 = 不漂/漂1次/漂2次 + 门槛线 */}
-      <div className="shrink-0 bg-[#1b1a1f] px-4 pb-2 pt-2.5">
+      <div className="shrink-0 border-t border-ink/10 bg-[#fdfaf5] px-4 pb-2 pt-2.5">
         <p className={cx('mb-1.5 text-center text-[12px] font-bold',
-          active?.risk && canDye ? 'text-[#e08a84]' : active?.ok ? 'text-[#7fd39a]' : 'text-white/85')}>
+          active?.risk && canDye ? 'text-[#c87f40]' : active?.ok ? 'text-[#4f9a65]' : 'text-ink-2')}>
           {activeNote}
         </p>
         {/* 两条小字。刻意用最低的视觉权重：实拍屏的主角是脸和颜色，
@@ -764,14 +774,14 @@ export function HairMirror({
         {!canDye && active?.ok ? (
           <p className="mb-1 text-center text-[10px] leading-4 text-white/40">
             官方提示：需漂至 8 度及以上并去黄，偏黄底色上色后会偏{biasWord}
-            <span className="mx-1.5 text-white/25">·</span>
+            <span className="mx-1.5 text-ink-3">·</span>
             漂 2 次损伤较大，建议去店里做
           </p>
         ) : null}
         <div className="relative">
           <input type="range" min={0} max={Math.max(0, variants.length - 1)} step={1} value={stop}
             onChange={(e) => setStop(Number(e.target.value))}
-            className={cx('w-full', active?.risk && canDye ? 'accent-[#e08a84]' : 'accent-white')}
+            className={cx('w-full', active?.risk && canDye ? 'accent-[#e5c169]' : 'accent-[#ee8aae]')}
             aria-label={canDye ? '效果档位' : '漂浅次数'} />
           {/* 门槛线：过了这条线才染得上。用户拖动时自己发现"得漂两次"，
               比任何一句文案说教都有效——结论是她自己得出来的。 */}
@@ -783,17 +793,17 @@ export function HairMirror({
         <div className="mt-0.5 flex justify-between text-[11px]">
           {variants.map((v, i) => (
             <span key={v.key} className={cx(
-              i === stop ? 'font-black' : 'text-white/45',
-              i === stop && v.risk && canDye ? 'text-[#e08a84]' : i === stop ? 'text-white' : '',
+              i === stop ? 'font-black' : 'text-ink-3',
+              i === stop && v.risk && canDye ? 'text-[#c68c27]' : i === stop ? 'text-ink' : '',
             )}>{v.label}</span>
           ))}
         </div>
       </div>
 
-      <div className="shrink-0 bg-[#141317] px-4 pb-[max(12px,env(safe-area-inset-bottom))] pt-2">
+      <div className="shrink-0 bg-[#fdfaf5] px-4 pb-[max(12px,env(safe-area-inset-bottom))] pt-2">
         <div className="flex gap-2.5">
           <button type="button" onClick={() => setPanel(true)}
-            className="tap shrink-0 rounded-full border border-white/25 px-4 py-3 text-[13px] font-bold">
+            className="tap shrink-0 rounded-full border border-pink px-4 py-3 text-[13px] font-bold text-pink-dark">
             换个颜色
           </button>
           <button type="button"
@@ -812,10 +822,10 @@ export function HairMirror({
  * 这就是引导，不需要额外一根信息条，也不会被忽略，因为它就是用户正在读的东西。
  */
 function ColorPanel({
-  matrix, level, pickedId, onPick, onClose,
+  matrix, level, pickedId, onPick, onConfirm, onClose,
 }: {
   matrix: ColorMatrix; level: number; pickedId: string;
-  onPick: (id: string) => void; onClose: () => void;
+  onPick: (id: string) => void; onConfirm: () => void; onClose: () => void;
 }) {
   const usable = matrix.videos.filter((v) => v.kb_color);
   const ok = usable.filter((v) => layer1CanDye(matrix, v.kb_color!, level).can);
@@ -823,16 +833,17 @@ function ColorPanel({
 
   return (
     <div className="absolute inset-0 z-20 flex flex-col justify-end" onClick={onClose}>
-      <div className="flex max-h-[64%] flex-col rounded-t-[24px] bg-[#17161b] pb-[max(14px,env(safe-area-inset-bottom))]"
+      <div className="flex max-h-[58%] flex-col rounded-t-[24px] border-t border-line bg-[#fdfaf5] pb-[max(14px,env(safe-area-inset-bottom))] text-ink shadow-[0_-10px_35px_rgba(61,55,51,.12)]"
         onClick={(e) => e.stopPropagation()}>
+        <span className="mx-auto mt-2 block h-1 w-9 rounded-full bg-ink/20" />
         <div className="flex shrink-0 items-center gap-2 px-5 pb-1 pt-4">
           <div className="min-w-0 flex-1">
             <p className="text-[15px] font-black">换个颜色</p>
-            <p className="mt-0.5 text-[11px] text-white/50">
+            <p className="mt-0.5 text-[11px] text-ink-3">
               按你的 <span className="numerals">{level}</span> 度底色 · 点一下上面的画面立刻变
             </p>
           </div>
-          <button type="button" onClick={onClose}
+          <button type="button" onClick={onConfirm}
             className="tap shrink-0 rounded-full bg-pink px-4 py-2 text-[12.5px] font-black text-white">
             用这个色
           </button>
@@ -857,7 +868,7 @@ function ColorPanel({
               <div className="space-y-2">
                 {need.map((v) => (
                   <ColorCard key={v.video_id} matrix={matrix} level={level} video={v}
-                    on={v.video_id === pickedId} onPick={onPick} />
+                    on={v.video_id === pickedId} onPick={onPick} disabled />
                 ))}
               </div>
             </>
@@ -869,9 +880,9 @@ function ColorPanel({
 }
 
 function ColorCard({
-  matrix, level, video, on, onPick,
+  matrix, level, video, on, onPick, disabled = false,
 }: {
-  matrix: ColorMatrix; level: number; video: VideoColor; on: boolean; onPick: (id: string) => void;
+  matrix: ColorMatrix; level: number; video: VideoColor; on: boolean; onPick: (id: string) => void; disabled?: boolean;
 }) {
   const kb = video.kb_color!;
   const can = layer1CanDye(matrix, kb, level).can;
@@ -881,14 +892,14 @@ function ColorCard({
   const rgb = lookup(matrix, kb, can ? level : Math.max(level, min ?? level))?.rgb;
 
   return (
-    <button type="button" onClick={() => onPick(video.video_id)} aria-pressed={on}
+    <button type="button" disabled={disabled} onClick={() => onPick(video.video_id)} aria-pressed={on}
       className={cx('tap flex w-full items-center gap-3 rounded-[16px] border-2 p-2.5 text-left',
-        on ? 'border-pink bg-white/[0.07]' : 'border-white/10')}>
-      <span className={cx('size-11 shrink-0 rounded-full border border-white/20', can ? '' : 'opacity-45')}
+        on ? 'border-pink bg-pink-soft/25' : 'border-line bg-white', disabled ? 'cursor-not-allowed opacity-55' : '')}>
+      <span className={cx('size-11 shrink-0 rounded-full border border-ink/10', can ? '' : 'opacity-45')}
         style={{ background: rgb ? `rgb(${rgb[0]},${rgb[1]},${rgb[2]})` : video.accent ?? '#555' }} />
       <span className="min-w-0 flex-1">
         <span className="block truncate text-[14px] font-black">{video.color_name}</span>
-        <span className="mt-0.5 block text-[11px] text-white/55">
+        <span className="mt-0.5 block text-[11px] text-ink-3">
           {can
             ? `保色 ${holdLabel(matrix, kb)}`
             : min !== null

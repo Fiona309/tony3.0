@@ -195,6 +195,8 @@ export interface PlanResultData {
   default_preview_level: number;
   can_recommend_product: boolean;
   color_rule?: ColorRule;
+  generation_mode?: 'current_base' | 'post_bleach_ideal';
+  required_base_level?: number | null;
 }
 
 export type PreviewTaskData =

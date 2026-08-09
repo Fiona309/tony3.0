@@ -448,15 +448,6 @@ MOCK_MEDIA_BY_TUTORIAL_ID = {
     item["tutorial_video_id"]: item
     for item in MOCK_MEDIA_LIBRARY.values()
 }
-PREVIEW_IMAGE_URLS = [
-    "/media/video-mock/frames/step-1-2.jpg",
-    "/media/video-mock/frames/step-2-2.jpg",
-    "/media/video-mock/frames/step-3-2.jpg",
-    "/media/video-mock/frames/step-4-1.jpg",
-    "/media/video-mock/frames/step-6-3.jpg",
-]
-
-
 DEMO_CURRENT_COLORS = {
     "blue": {
         **_color("gray", 8, "light", "8 度银灰演示底", 0.8),
@@ -839,24 +830,18 @@ class MockStore:
             ],
             "can_recommend_product": not black_history,
         }
-        current_color = (profile.get("current_hair") or {}).get("color") or {}
-        current_level = current_color.get("level", (decision.get("color_rule") or {}).get("current_level", 8))
-        if (decision.get("color_rule") or {}).get("result_quality") == "biased":
-            labels = [f"偏色风险（{current_level}度）", "低饱和", "标准色", "冷调", "高饱和"]
-        else:
-            labels = ["低饱和", "冷调", "标准色", "暖调", "高饱和"]
-        images = [
-            {
-                "preview_level": index + 1,
-                "label": label,
-                "url": PREVIEW_IMAGE_URLS[index],
-                "storage_key": PREVIEW_IMAGE_URLS[index].removeprefix("/media/"),
-                "enabled": True,
-            }
-            for index, label in enumerate(labels)
-        ]
-        preview_unavailable = not decision["can_recommend_product"]
-        preview_unavailable_message = "当前方案不建议居家操作，已停止生成真实效果图；可使用演示底色继续查看目标色效果。"
+        generation_mode = (
+            "current_base"
+            if decision["can_recommend_product"]
+            else "post_bleach_ideal"
+        )
+        labels = (
+            ["偏深", "标准", "偏浅", "偏色"]
+            if generation_mode == "current_base"
+            else ["偏深", "标准", "偏浅"]
+        )
+        # 真实模式下绝不拿演示素材冒充生成结果。任务完成前始终返回空数组。
+        images: list[dict] = []
         result = {
             "profile_id": profile_id,
             "plan_id": plan_id,
@@ -864,9 +849,9 @@ class MockStore:
             "summary": decision["summary"],
             "reachability_score": decision["reachability_score"],
             "risks": deepcopy(decision["risks"]),
-            "preview_status": "fallback" if preview_unavailable else "queued",
+            "preview_status": "queued",
             "preview_task_id": task_id,
-            "preview_images": deepcopy(images) if preview_unavailable else [],
+            "preview_images": [],
             "preview_labels": {str(index + 1): label for index, label in enumerate(labels)},
             "route_cards": [
                 {"route": "dye", "title": "染色", "recommended": True, "reason": "更接近目标色。"},
@@ -878,8 +863,10 @@ class MockStore:
                 },
             ],
             "default_route": "dye",
-            "default_preview_level": 3,
+            "default_preview_level": 2,
             "can_recommend_product": decision["can_recommend_product"],
+            "generation_mode": generation_mode,
+            "required_base_level": profile.get("target_color", {}).get("level"),
         }
         if "color_rule" in decision:
             result["color_rule"] = deepcopy(decision["color_rule"])
@@ -890,8 +877,9 @@ class MockStore:
             "labels": labels,
             "profile": deepcopy(profile),
             "rule_decision": deepcopy(decision),
-            "status": "fallback" if preview_unavailable else "queued",
-            "error": preview_unavailable_message if preview_unavailable else None,
+            "generation_mode": generation_mode,
+            "status": "queued",
+            "error": None,
         }
         self._persist("plan", plan_id, self.plans[plan_id], user_key)
         self._persist("preview_task", task_id, self.preview_tasks[task_id], user_key)
@@ -947,6 +935,7 @@ class MockStore:
             "profile": deepcopy(task["profile"]),
             "labels": list(task["labels"]),
             "rule_decision": deepcopy(task.get("rule_decision") or {}),
+            "generation_mode": task.get("generation_mode", "current_base"),
         }
 
     def complete_preview_generation(
@@ -991,7 +980,8 @@ class MockStore:
         recommendation_id = _id("recommendation")
         color_rule = plan.get("color_rule", {})
         result_quality = color_rule.get("result_quality")
-        if not plan["can_recommend_product"]:
+        allow_assumed_bleach = plan.get("generation_mode") == "post_bleach_ideal"
+        if not plan["can_recommend_product"] and not allow_assumed_bleach:
             risk = plan["risks"][0] if plan.get("risks") else {}
             result = {
                 "profile_id": request["profile_id"],
@@ -1039,7 +1029,9 @@ class MockStore:
                     "color_rule": deepcopy(color_rule) if color_rule else None,
                     "risk_level": "medium" if result_quality == "biased" else "low",
                     "risk_summary": (
-                        "当前底色可推荐商品，但需要明确接受偏色风险。"
+                        "以下商品按已经漂到建议底色后的条件推荐。"
+                        if allow_assumed_bleach
+                        else "当前底色可推荐商品，但需要明确接受偏色风险。"
                         if result_quality == "biased"
                         else "当前底色在官方效果矩阵中为正常推荐。"
                     ),
