@@ -344,11 +344,22 @@ export type HairMirrorProps = {
   onBack?: () => void;
   /** 用户接受风险，进入方案与商品。此时才会触发生图（B 方案） */
   onAccept?: (choice: { videoId: string; colorName: string; level: number }) => void;
+  /** 转场录制复用同一套实时试色，但不显示试色页本身的控件。 */
+  renderMode?: 'interactive' | 'surface';
+  /** surface 模式下由时间轴控制：前半段原发，遮镜后才开启染后效果。 */
+  effectEnabled?: boolean;
+  onSurfaceReady?: (surface: HairMirrorSurface) => void;
+};
+
+export type HairMirrorSurface = {
+  video: HTMLVideoElement;
+  canvas: HTMLCanvasElement;
 };
 
 export function HairMirror({
   matrix, level, entryVideoId, dyeHistory, currentTone, currentColorName,
   onLevelChange, onColorChange, onBack, onAccept,
+  renderMode = 'interactive', effectEnabled = true, onSurfaceReady,
 }: HairMirrorProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -358,6 +369,10 @@ export function HairMirror({
   const runRef = useRef(false);
   const variantRef = useRef<Variant | null>(null);
   const rawRef = useRef(false);
+  const effectEnabledRef = useRef(effectEnabled);
+  const onSurfaceReadyRef = useRef(onSurfaceReady);
+  useEffect(() => { effectEnabledRef.current = effectEnabled; }, [effectEnabled]);
+  useEffect(() => { onSurfaceReadyRef.current = onSurfaceReady; }, [onSurfaceReady]);
   const specKeepRef = useRef(SPEC_KEEP);
   const detailRef = useRef(DETAIL_BOOST);
   const rootRef = useRef(ROOT_KEEP);
@@ -485,6 +500,7 @@ export function HairMirror({
 
     let stream: MediaStream | null = null;
     let lastT = -1;
+    let lastSegmentationAt = 0;
 
     const uploadMask = (res: any) => {
       const masks = res.confidenceMasks;
@@ -551,7 +567,13 @@ export function HairMirror({
         canvas.height = video.videoHeight;
         gl.viewport(0, 0, canvas.width, canvas.height);
       }
-      segRef.current.segmentForVideo(video, performance.now(), uploadMask);
+      const now = performance.now();
+      // 相机画面仍按屏幕刷新率绘制，分割约 15fps 即可；降低录制时的 GPU
+      // 峰值，避免预览出现黑帧或明暗闪烁。
+      if (now - lastSegmentationAt >= 66) {
+        lastSegmentationAt = now;
+        segRef.current.segmentForVideo(video, now, uploadMask);
+      }
       gl.activeTexture(gl.TEXTURE0);
       gl.bindTexture(gl.TEXTURE_2D, camTex);
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, video);
@@ -559,7 +581,7 @@ export function HairMirror({
       gl.uniform3f(uT, (v?.rgb[0] ?? 0) / 255, (v?.rgb[1] ?? 0) / 255, (v?.rgb[2] ?? 0) / 255);
       gl.uniform1f(uS, v?.str ?? 1);
       gl.uniform1f(uL, v?.liftF ?? 1);
-      gl.uniform1f(uM, rawRef.current || !v ? 0 : 1);
+      gl.uniform1f(uM, rawRef.current || !effectEnabledRef.current || !v ? 0 : 1);
       /* baseY 要和 shader 里的 Y 处于同一状态：Y 是漂浅之后的，所以这里也要过一遍
          同样的 lift 公式，否则漂色档的明度缩放系数会算错 */
       /* baseY 要和着色器里的明度处于同一状态：Y 是漂浅之后的，
@@ -594,6 +616,7 @@ export function HairMirror({
         await video.play();
         runRef.current = true;
         loop();
+        onSurfaceReadyRef.current?.({ video, canvas });
       } catch (e: any) {
         setErr(/NotAllowed|denied|permission/i.test(e?.message || '')
           ? '需要摄像头权限，请在浏览器里允许后刷新页面'
@@ -602,6 +625,20 @@ export function HairMirror({
     })();
     return () => { runRef.current = false; stream?.getTracks().forEach((t) => t.stop()); };
   }, [ready]);
+
+  if (renderMode === 'surface') {
+    return (
+      <div className="relative size-full overflow-hidden bg-[#111014]">
+        <video ref={videoRef} playsInline muted className="hidden" />
+        <canvas ref={canvasRef} className="size-full object-cover" />
+        {(!ready || err) && (
+          <div className="absolute inset-0 grid place-items-center bg-black/75 px-8 text-center text-sm">
+            <p className="leading-6 text-white/85">{err || '正在准备实时试色…'}</p>
+          </div>
+        )}
+      </div>
+    );
+  }
 
   /* 顶部只讲一件事：我现在在看哪个色、它能不能染。
      放顶部而不是底部窄条——那是用户找"我在看什么"的地方，而且不和滑块抢注意力。
