@@ -106,13 +106,17 @@ export function TransitionRecorderScreen({
       audioSourceRef.current = null;
     }
     // createMediaElementSource 对同一个元素只能调一次，重复调用会抛错。
+    // 这里不吞异常：吞掉的话录制会带着空音轨照常跑完，用户拿到一条没声音的
+    // 成片却看不到任何提示。startCountdown 那边本来就 try 住了，不影响预览。
     try {
       audioSourceRef.current = audioContext.createMediaElementSource(template);
       audioSourceElementRef.current = template;
       audioSourceRef.current.connect(audioContext.destination);
       audioSourceRef.current.connect(audioDestinationRef.current);
-    } catch {
+    } catch (cause) {
       audioSourceElementRef.current = null;
+      audioSourceRef.current = null;
+      throw cause;
     }
   }, []);
 
@@ -138,7 +142,12 @@ export function TransitionRecorderScreen({
       const stream = output.captureStream(30);
       const audioDestination = audioDestinationRef.current;
       if (!audioDestination) throw new Error('音乐轨道初始化失败，请重新开始跟拍。');
-      audioDestination.stream.getAudioTracks().forEach((track) => stream.addTrack(track));
+      const audioTracks = audioDestination.stream.getAudioTracks();
+      // 音频图建失败时 getAudioTracks() 返回空数组，addTrack 一个都不加，
+      // 录制照常跑完、不报错，成片却是纯视频无音轨——那正是"没有声音"的样子。
+      // 与其静默出片，不如在这里就说清楚。
+      if (!audioTracks.length) throw new Error('没能接上模板音乐，请退出重进这个页面再试。');
+      audioTracks.forEach((track) => stream.addTrack(track));
       const mimeType = bestRecorderMimeType();
       const recorder = new MediaRecorder(stream, mimeType ? { mimeType, videoBitsPerSecond: 6_000_000 } : undefined);
       recorderRef.current = recorder;
@@ -252,7 +261,10 @@ export function TransitionRecorderScreen({
           </div>
         </header>
         <div className="relative min-h-0 flex-1 overflow-hidden bg-black">
-          <video ref={templateRef} src={TEMPLATE_URL} controls playsInline preload="auto" onLoadedMetadata={(event) => setTemplateDuration(event.currentTarget.duration)} className="size-full object-cover">
+          {/* crossOrigin 必须有：NEXT_PUBLIC_API_BASE_URL 是绝对地址时模板走
+              跨域取，没声明 crossOrigin 的话 createMediaElementSource 会认为音频
+              被 CORS 污染，静默把音轨路由成无声——不报错，就是没声音。 */}
+          <video ref={templateRef} src={TEMPLATE_URL} crossOrigin="anonymous" controls playsInline preload="auto" onLoadedMetadata={(event) => setTemplateDuration(event.currentTarget.duration)} className="size-full object-cover">
             当前浏览器无法播放转场模板。
           </video>
           <div className="pointer-events-none absolute left-4 top-4 rounded-full bg-black/55 px-3 py-1.5 text-[11px] font-bold backdrop-blur">
@@ -311,7 +323,9 @@ export function TransitionRecorderScreen({
 
       <div className="absolute left-4 top-[max(68px,calc(env(safe-area-inset-top)+58px))] z-20 w-[34%] max-w-[150px] overflow-hidden rounded-2xl border border-white/35 bg-black shadow-2xl">
         <div className="aspect-[9/16]">
-          <video ref={templateRef} src={TEMPLATE_URL} playsInline preload="auto" onLoadedMetadata={(event) => setTemplateDuration(event.currentTarget.duration)} className="size-full object-cover" />
+          {/* 录制阶段这个 <video> 才是真正给 MediaRecorder 供音的那个，
+              crossOrigin 少了它成片就没音轨。 */}
+          <video ref={templateRef} src={TEMPLATE_URL} crossOrigin="anonymous" playsInline preload="auto" onLoadedMetadata={(event) => setTemplateDuration(event.currentTarget.duration)} className="size-full object-cover" />
         </div>
         <p className="bg-black/85 py-1.5 text-center text-[9px] font-bold tracking-wide text-white/70">动作参考</p>
       </div>
