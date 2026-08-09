@@ -2168,7 +2168,10 @@ export function ProductsScreen({
       >
         {selectedProduct ? (
           <div className="grid gap-2">
-            {selectedProduct.purchase_mode === 'external_link' && selectedProduct.purchase_url ? (
+            {/* 只看有没有链接，不再枚举 purchase_mode：知识库补齐抖音链接后后端
+                回传的是 douyin_direct_link，写死 external_link 会把真链接挡在门外。
+                product-reference-view 那两处一直就是按 purchase_url 判的。 */}
+            {selectedProduct.purchase_url ? (
               <a
                 href={selectedProduct.purchase_url}
                 target="_blank"

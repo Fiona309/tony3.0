@@ -245,7 +245,13 @@ export interface ProductPrice {
   evidence_path?: string;
 }
 
-export type PurchaseMode = 'external_link' | 'mock' | 'douyin_link_pending';
+// douyin_direct_link：商品知识库里补齐了抖音商城链接，后端直接回传可点的地址。
+// douyin_link_pending 保留给知识库里还没补链接的商品。
+export type PurchaseMode =
+  | 'external_link'
+  | 'douyin_direct_link'
+  | 'mock'
+  | 'douyin_link_pending';
 
 export interface PrimaryProduct {
   sku_id: string;
