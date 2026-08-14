@@ -26,6 +26,8 @@ import {
   ShareFat,
   ShoppingBagOpen,
   Smiley,
+  SpeakerHigh,
+  SpeakerSlash,
   Sparkle,
   SpinnerGap,
   Star,
@@ -97,6 +99,7 @@ export function DiscoveryScreen({
   const [activeIndex, setActiveIndex] = useState(0);
   const [sameStyleVisible, setSameStyleVisible] = useState(false);
   const [paused, setPaused] = useState(false);
+  const [muted, setMuted] = useState(true);
   const [videoFailed, setVideoFailed] = useState(false);
   const [saved, setSaved] = useState(false);
   const [savedNotice, setSavedNotice] = useState(false);
@@ -154,6 +157,18 @@ export function DiscoveryScreen({
       video.pause();
       setPaused(true);
     }
+  };
+
+  const toggleSound = () => {
+    const video = videoRefs.current[activeIndex];
+    if (!video) return;
+    const nextMuted = !video.muted;
+    video.muted = nextMuted;
+    if (!nextMuted) {
+      video.volume = 1;
+      void video.play().catch(() => undefined);
+    }
+    setMuted(nextMuted);
   };
 
   const toggleSaved = () => {
@@ -255,7 +270,7 @@ export function DiscoveryScreen({
                   src={video.url}
                   poster={video.cover_url}
                   autoPlay={index === 0}
-                  muted
+                  muted={muted}
                   loop
                   playsInline
                   preload={Math.abs(index - activeIndex) <= 1 ? 'metadata' : 'none'}
@@ -309,6 +324,17 @@ export function DiscoveryScreen({
         </button>
 
         <div className="absolute bottom-[126px] right-2.5 z-[5] flex flex-col items-center gap-4">
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              toggleSound();
+            }}
+            className="tap grid size-11 place-items-center rounded-full bg-black/35 text-white backdrop-blur-md"
+            aria-label={muted ? '打开视频声音' : '关闭视频声音'}
+          >
+            {muted ? <SpeakerSlash size={23} weight="fill" /> : <SpeakerHigh size={23} weight="fill" />}
+          </button>
           <div className="relative">
             <div className="relative size-[50px] overflow-hidden rounded-full border-2 border-white bg-[#d9c2b1]">
               <MediaImage
