@@ -51,11 +51,10 @@ fi
 ok "Caddy $(caddy version | head -1)"
 
 say "3/8 拉代码"
-# 国内服务器直连 GitHub 经常超时或被重置，所以依次试几个入口，
-# 哪个通用哪个。全都不通时明确报错，而不是卡在那里让人干等。
+# 国内服务器直连 GitHub 时通时不通，所以依次试几个入口。
 clone_or_pull() {
   if [ -d "$APP/src/.git" ]; then
-    git -C "$APP/src" pull -q && return 0
+    if timeout 120 git -C "$APP/src" pull -q 2>/dev/null; then ok "代码已更新"; return 0; fi
     echo "  拉取更新失败，尝试镜像…"
   fi
   for url in \
@@ -63,41 +62,47 @@ clone_or_pull() {
     "https://ghfast.top/https://github.com/Fiona309/tony3.0.git" \
     "https://gitclone.com/github.com/Fiona309/tony3.0.git"
   do
-    rm -rf "$APP/src"
     echo "  尝试：${url%%/Fiona309*}"
-    if timeout 180 git clone -q --depth 1 "$url" "$APP/src" 2>/dev/null; then
+    # 下到临时目录，成功了才替换旧代码。
+    # 之前这里是先 rm -rf 再 clone，结果三个入口都不通时把已有代码一起删了。
+    rm -rf "$APP/src.new"
+    if timeout 180 git clone -q --depth 1 "$url" "$APP/src.new" 2>/dev/null; then
+      rm -rf "$APP/src"; mv "$APP/src.new" "$APP/src"
       ok "代码已下载"; return 0
     fi
   done
-  echo "  ✗ 所有下载入口都不通。请把这条信息发给我，我给你换别的方式。"
+  rm -rf "$APP/src.new"
+  if [ -d "$APP/src/.git" ]; then
+    echo "  ⚠ GitHub 暂时不通，沿用服务器上已有的代码"
+    return 0
+  fi
   return 1
 }
-mkdir -p "$APP/logs"
-clone_or_pull || exit 1
-mkdir -p "$APP/backend" "$APP/my-tony2.0"
-# --exclude data 不能省：backend/data 里是线上数据库和用户上传的照片，
-# 同步会把它们整个覆盖掉。
-rsync -a --delete --exclude data --exclude data-local --exclude .env --exclude .venv \
-  "$APP/src/backend/" "$APP/backend/"
-rsync -a --delete --exclude node_modules --exclude .next \
-  "$APP/src/my-tony2.0/" "$APP/my-tony2.0/"
-# 初次部署时把仓库里的种子数据复制过去；已存在则保留线上数据不动
-[ -d "$APP/backend/data" ] || cp -r "$APP/src/backend/data" "$APP/backend/data"
-ok "代码就位"
+mkdir -p "$APP/logs" "$APP/backend" "$APP/my-tony2.0"
+if clone_or_pull; then
+  # --exclude data 不能省：backend/data 里是线上数据库和用户上传的照片，
+  # 同步会把它们整个覆盖掉。
+  rsync -a --delete --exclude data --exclude data-local --exclude .env --exclude .venv \
+    "$APP/src/backend/" "$APP/backend/"
+  rsync -a --delete --exclude node_modules --exclude .next \
+    "$APP/src/my-tony2.0/" "$APP/my-tony2.0/"
+  [ -d "$APP/backend/data" ] || cp -r "$APP/src/backend/data" "$APP/backend/data"
+  ok "代码就位"
+elif [ -f "$APP/backend/app/main.py" ] && [ -f "$APP/my-tony2.0/package.json" ]; then
+  # 下载全挂，但上一轮已经把代码同步到运行目录了，直接用它，别让网络问题卡住部署
+  echo "  ⚠ GitHub 所有入口不通，但上次同步好的代码还在，直接用它继续"
+  ok "代码就位（沿用已有）"
+else
+  echo "  ✗ 所有下载入口都不通，服务器上也没有可用代码。请把这条信息发给我。"
+  exit 1
+fi
 
 say "4/8 检查密钥文件"
 # 这些是调用 AI 服务（识别发色、生图、语音）用的钥匙，属于机密，不能进代码仓库
 if [ ! -f "$APP/backend/.env" ]; then
-  cp "$APP/src/.env.example" "$APP/backend/.env"; chmod 600 "$APP/backend/.env"
-  cat <<'MSG'
-
-  ⚠️  还差最后一件事：填 API 密钥
-
-  请执行：  sudo vi /opt/meifa/backend/.env
-  把里面每个 =  后面填上对应的 key（和你本地 backend/.env 里的一样）
-  填完保存，再把这个脚本重新跑一遍即可。
-
-MSG
+  [ -f "$APP/src/.env.example" ] && cp "$APP/src/.env.example" "$APP/backend/.env" || : > "$APP/backend/.env"
+  chmod 600 "$APP/backend/.env"
+  echo "  ⚠️  还缺 API 密钥，填好 /opt/meifa/backend/.env 再重跑本脚本"
   exit 0
 fi
 grep -q "OPENROUTER_API_KEY=.\+" "$APP/backend/.env" || {
@@ -113,7 +118,7 @@ PIP_MIRROR="https://mirrors.aliyun.com/pypi/simple/"
   -i "$PIP_MIRROR" --trusted-host mirrors.aliyun.com
 ok "后端依赖就绪"
 
-say "6/8 构建前端（最慢的一步，约 3~8 分钟）"
+say "6/8 构建前端（最慢的一步，5~15 分钟，屏幕会长时间不动）"
 cd "$APP/my-tony2.0"
 # npm 官方源同理，换成国内镜像，否则 npm ci 会挂在下载上
 npm config set registry https://registry.npmmirror.com >/dev/null
@@ -122,13 +127,96 @@ NODE_OPTIONS=--max-old-space-size=1536 npm run build
 ok "前端构建完成"
 
 say "7/8 启动服务"
-cp "$APP/src/.deploy"/meifa-*.service /etc/systemd/system/
+# 配置直接写在脚本里，不从 $APP/src 复制——GitHub 拉不下来时那个目录可能不存在
+cat > /etc/systemd/system/meifa-backend.service <<'UNIT_BE'
+[Unit]
+Description=Meifa FastAPI backend
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/meifa/backend
+EnvironmentFile=-/opt/meifa/backend/.env
+# 只绑回环：Caddy 在同一台机器上反代，没有任何理由把明文端口暴露到公网。
+# 绑 0.0.0.0 的话，只要安全组漏放行一个端口，别人就能绕过 HTTPS 直连。
+Environment=HOST=127.0.0.1
+Environment=PORT=8000
+Environment=DATA_DIR=/opt/meifa/backend/data
+Environment=MEDIA_DIR=/opt/meifa/backend/data/media
+Environment=DB_PATH=/opt/meifa/backend/data/meifa.db
+Environment=CHROMA_DIR=/opt/meifa/backend/data/chroma_data
+Environment=MODEL_CACHE_DIR=/opt/meifa/backend/data/models
+Environment=MOCK_MODELS=false
+# ASR 走 siliconflow：HTTP 调同一个 SenseVoiceSmall 模型，不需要本地权重。
+# 改成 sensevoice 必须先装 requirements-local-asr.txt（funasr/torch 等约 2GB），
+# 否则语音输入会在运行时报 ImportError——而 requirements.txt 里没有这几个包。
+Environment=ASR_PROVIDER=siliconflow
+ExecStart=/opt/meifa/backend/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000
+Restart=always
+RestartSec=5
+StandardOutput=append:/opt/meifa/logs/backend.log
+StandardError=append:/opt/meifa/logs/backend.err.log
+
+[Install]
+WantedBy=multi-user.target
+UNIT_BE
+cat > /etc/systemd/system/meifa-frontend.service <<'UNIT_FE'
+[Unit]
+Description=Meifa Next.js frontend v2
+After=network-online.target meifa-backend.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/meifa/my-tony2.0
+Environment=NODE_ENV=production
+# 只绑回环：Caddy 在同一台机器上反代，没有任何理由把明文端口暴露到公网。
+# 绑 0.0.0.0 的话，只要安全组漏放行一个端口，别人就能绕过 HTTPS 直连。
+Environment=HOSTNAME=127.0.0.1
+Environment=PORT=3000
+Environment=NEXT_PUBLIC_API_MODE=real
+Environment=NEXT_PUBLIC_API_BASE_URL=/api
+Environment=NEXT_PUBLIC_BACKEND_URL=http://127.0.0.1:8000
+ExecStart=/usr/local/bin/npm start
+Restart=always
+RestartSec=5
+StandardOutput=append:/opt/meifa/logs/frontend.log
+StandardError=append:/opt/meifa/logs/frontend.err.log
+
+[Install]
+WantedBy=multi-user.target
+UNIT_FE
 systemctl daemon-reload
 systemctl enable -q --now meifa-backend meifa-frontend
 ok "前后端已启动"
 
 say "8/8 配置对外访问与 HTTPS"
-cp "$APP/src/.deploy/Caddyfile" /etc/caddy/Caddyfile
+cat > /etc/caddy/Caddyfile <<'CADDY_CONF'
+# 生产环境反向代理。备案通过后前后端都收在同一台国内服务器上，
+# 不再需要「海外节点做门面反代回国内」那套绕备案的架构——
+# 那样每个请求都要跨境往返，延迟至少多 300ms，还要吃两边的带宽。
+tony.xin, www.tony.xin {
+	encode zstd gzip
+
+	# 媒体文件直接由 Caddy 发，不经过 FastAPI。
+	# 196MB 的图片和视频走 Python 是纯浪费：多一次进程转发、多一份内存拷贝，
+	# 还占着 uvicorn 的 worker。静态文件交给 Caddy 是它最擅长的事。
+	handle_path /media/* {
+		root * /opt/meifa/backend/data/media
+		header Cache-Control "public, max-age=2592000"
+		file_server
+	}
+
+	handle /api/* {
+		reverse_proxy 127.0.0.1:8000
+	}
+
+	handle {
+		reverse_proxy 127.0.0.1:3000
+	}
+}
+CADDY_CONF
 systemctl enable -q --now caddy
 systemctl reload caddy
 ok "Caddy 已生效"
