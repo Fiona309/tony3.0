@@ -133,7 +133,10 @@ say "6/8 构建前端（最慢的一步，5~15 分钟，屏幕会长时间不动
 cd "$APP/my-tony2.0"
 # npm 官方源同理，换成国内镜像，否则 npm ci 会挂在下载上
 npm config set registry https://registry.npmmirror.com >/dev/null
-npm ci --no-audit --no-fund --silent
+# 不加 --silent：这一步要跑十几分钟，全程静默的话使用者无法判断是在装还是卡死了
+npm ci --no-audit --no-fund
+echo "  依赖装完，开始编译…"
+free -h | head -2
 NODE_OPTIONS=--max-old-space-size=1536 npm run build
 ok "前端构建完成"
 
