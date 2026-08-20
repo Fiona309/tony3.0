@@ -16,11 +16,13 @@ Environment=MEDIA_DIR=/opt/meifa/backend/data/media
 Environment=DB_PATH=/opt/meifa/backend/data/meifa.db
 Environment=CHROMA_DIR=/opt/meifa/backend/data/chroma_data
 Environment=MODEL_CACHE_DIR=/opt/meifa/backend/data/models
-Environment=MOCK_MODELS=false
-# ASR 走 siliconflow：HTTP 调同一个 SenseVoiceSmall 模型，不需要本地权重。
-# 改成 sensevoice 必须先装 requirements-local-asr.txt（funasr/torch 等约 2GB），
-# 否则语音输入会在运行时报 ImportError——而 requirements.txt 里没有这几个包。
-Environment=ASR_PROVIDER=siliconflow
+# 这里刻意不写 MOCK_MODELS / ASR_PROVIDER / VISION_PROVIDER 等业务开关。
+# systemd 里 Environment= 会覆盖 EnvironmentFile= 读进来的值，在这儿写一份
+# 等于把 .env 架空：线上实际用哪家服务，看的是这个文件而不是 .env，
+# 排查时极易被误导。本 unit 只负责「这台机器在哪、绑哪个端口」这类部署事实，
+# 业务配置一律以 /opt/meifa/backend/.env 为准。
+# 唯一的约束：ASR_PROVIDER 不要设成 sensevoice，那需要 requirements-local-asr.txt
+# 里约 2GB 的本地模型依赖，requirements.txt 没装，运行时会报 ImportError。
 ExecStart=/opt/meifa/backend/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000
 Restart=always
 RestartSec=5
