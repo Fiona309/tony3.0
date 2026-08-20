@@ -94,12 +94,17 @@ ok "密钥已配置"
 
 say "5/8 装后端依赖"
 [ -d "$APP/backend/.venv" ] || python3.11 -m venv "$APP/backend/.venv"
-"$APP/backend/.venv/bin/pip" install -q -U pip
-"$APP/backend/.venv/bin/pip" install -q -r "$APP/backend/requirements.txt"
+# PyPI 官方源在国外，国内服务器拉包极慢甚至超时，换阿里云镜像
+PIP_MIRROR="https://mirrors.aliyun.com/pypi/simple/"
+"$APP/backend/.venv/bin/pip" install -q -U pip -i "$PIP_MIRROR" --trusted-host mirrors.aliyun.com
+"$APP/backend/.venv/bin/pip" install -q -r "$APP/backend/requirements.txt" \
+  -i "$PIP_MIRROR" --trusted-host mirrors.aliyun.com
 ok "后端依赖就绪"
 
 say "6/8 构建前端（最慢的一步，约 3~8 分钟）"
 cd "$APP/my-tony2.0"
+# npm 官方源同理，换成国内镜像，否则 npm ci 会挂在下载上
+npm config set registry https://registry.npmmirror.com >/dev/null
 npm ci --no-audit --no-fund --silent
 NODE_OPTIONS=--max-old-space-size=1536 npm run build
 ok "前端构建完成"
