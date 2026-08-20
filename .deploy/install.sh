@@ -87,7 +87,8 @@ clone_or_pull() {
 mkdir -p "$APP/logs" "$APP/backend" "$APP/my-tony2.0"
 # SKIP_PULL=1 可跳过整个下载环节，直接用运行目录里已有的代码
 if [ "${SKIP_PULL:-0}" = "1" ]; then
-  [ -f "$APP/backend/app/main.py" ] && [ -f "$APP/my-tony2.0/package.json" ] || {
+  [ -f "$APP/backend/app/main.py" ] && [ -f "$APP/my-tony2.0/package.json" ] \
+    && [ -f "$APP/hair_full_pipeline/glm_hair_generator.py" ] || {
     echo "  ✗ SKIP_PULL=1，但运行目录里没有可用代码，不能跳过下载"; exit 1; }
   ok "已跳过下载（SKIP_PULL=1），沿用服务器上现有代码"
 elif clone_or_pull; then
@@ -97,9 +98,15 @@ elif clone_or_pull; then
     "$APP/src/backend/" "$APP/backend/"
   rsync -a --delete --exclude node_modules --exclude .next \
     "$APP/src/my-tony2.0/" "$APP/my-tony2.0/"
+  # 生图流水线是仓库顶层的独立目录，backend/ 和 my-tony2.0/ 都不包含它。
+  # 漏掉它后端会在调用时报 No module named 'glm_hair_generator'，
+  # 且只在用户真正点生图时才暴露——部署自检一切正常。
+  # 后端按 PROJECT_ROOT/hair_full_pipeline 查找，即 /opt/meifa/hair_full_pipeline。
+  rsync -a --delete "$APP/src/hair_full_pipeline/" "$APP/hair_full_pipeline/"
   [ -d "$APP/backend/data" ] || cp -r "$APP/src/backend/data" "$APP/backend/data"
   ok "代码就位"
-elif [ -f "$APP/backend/app/main.py" ] && [ -f "$APP/my-tony2.0/package.json" ]; then
+elif [ -f "$APP/backend/app/main.py" ] && [ -f "$APP/my-tony2.0/package.json" ] \
+     && [ -f "$APP/hair_full_pipeline/glm_hair_generator.py" ]; then
   # 下载全挂，但上一轮已经把代码同步到运行目录了，直接用它，别让网络问题卡住部署
   echo "  ⚠ GitHub 所有入口不通，但上次同步好的代码还在，直接用它继续"
   ok "代码就位（沿用已有）"
@@ -127,6 +134,12 @@ PIP_MIRROR="https://mirrors.aliyun.com/pypi/simple/"
 "$APP/backend/.venv/bin/pip" install -q -U pip -i "$PIP_MIRROR" --trusted-host mirrors.aliyun.com
 "$APP/backend/.venv/bin/pip" install -q -r "$APP/backend/requirements.txt" \
   -i "$PIP_MIRROR" --trusted-host mirrors.aliyun.com
+# 生图流水线要自己的依赖：requests / pydantic-settings，以及头发分割后端。
+# 没有 mediapipe 或 onnxruntime 时 _hair_mask_for 返回 None，换色会退化成
+# 【整图调色】——脸和背景一起变色，看起来像给照片加了滤镜，而不是染发。
+"$APP/backend/.venv/bin/pip" install -q -r "$APP/hair_full_pipeline/requirements.txt" \
+  -i "$PIP_MIRROR" --trusted-host mirrors.aliyun.com \
+  || echo "  ⚠ 生图流水线依赖未装全，生图质量会下降（分割失效）"
 ok "后端依赖就绪"
 
 say "6/8 构建前端（最慢的一步，5~15 分钟，屏幕会长时间不动）"
