@@ -133,8 +133,28 @@ say "6/8 构建前端（最慢的一步，5~15 分钟，屏幕会长时间不动
 cd "$APP/my-tony2.0"
 # npm 官方源同理，换成国内镜像，否则 npm ci 会挂在下载上
 npm config set registry https://registry.npmmirror.com >/dev/null
+# --ignore-scripts 不能省。有些包装完自己还要再下一个二进制文件，
+# 而那些下载地址是包自己写死的，绕过 npm 镜像直连 GitHub / 各家 CDN：
+#   ffmpeg-static → release-assets.githubusercontent.com 拉 ffmpeg
+#   playwright    → playwright CDN 拉 500MB 浏览器
+# 国内服务器连不上这两处，整个 npm ci 会连带失败（实测卡死在 ffmpeg-static）。
+# 跳过安装后脚本不影响 next build：构建只需要包本身，不需要这些二进制。
 # 不加 --silent：这一步要跑十几分钟，全程静默的话使用者无法判断是在装还是卡死了
-npm ci --no-audit --no-fund
+npm ci --no-audit --no-fund --ignore-scripts
+
+# ffmpeg-static 只被本地的 scripts/process-video.mjs 用到，线上不需要，跳过即可。
+# playwright 不一样：app/api/price/route.ts 在运行时要用它抓比价，浏览器得补上。
+# npmmirror 有 playwright 二进制的国内镜像，走它能下下来。
+echo "  补装 playwright 浏览器（走国内镜像）…"
+if PLAYWRIGHT_DOWNLOAD_HOST=https://cdn.npmmirror.com/binaries/playwright \
+   npx --yes playwright install chromium >/tmp/pw.log 2>&1; then
+  ok "playwright 浏览器已就绪"
+else
+  # 装不上也继续部署：只是比价这一个接口不可用，不该因此让整站上不了线
+  echo "  ⚠ playwright 浏览器没装上 → /api/price 比价功能不可用，其余功能正常"
+  tail -3 /tmp/pw.log
+fi
+
 echo "  依赖装完，开始编译…"
 free -h | head -2
 NODE_OPTIONS=--max-old-space-size=1536 npm run build
