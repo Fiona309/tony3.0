@@ -1,15 +1,23 @@
-47.85.88.209.sslip.io {
+# 生产环境反向代理。备案通过后前后端都收在同一台国内服务器上，
+# 不再需要「海外节点做门面反代回国内」那套绕备案的架构——
+# 那样每个请求都要跨境往返，延迟至少多 300ms，还要吃两边的带宽。
+tony.xin, www.tony.xin {
 	encode zstd gzip
 
-	handle /api/* {
-		reverse_proxy 8.138.40.33:8000
+	# 媒体文件直接由 Caddy 发，不经过 FastAPI。
+	# 196MB 的图片和视频走 Python 是纯浪费：多一次进程转发、多一份内存拷贝，
+	# 还占着 uvicorn 的 worker。静态文件交给 Caddy 是它最擅长的事。
+	handle_path /media/* {
+		root * /opt/meifa/backend/data/media
+		header Cache-Control "public, max-age=2592000"
+		file_server
 	}
 
-	handle /media/* {
-		reverse_proxy 8.138.40.33:8000
+	handle /api/* {
+		reverse_proxy 127.0.0.1:8000
 	}
 
 	handle {
-		reverse_proxy 8.138.40.33:3000
+		reverse_proxy 127.0.0.1:3000
 	}
 }

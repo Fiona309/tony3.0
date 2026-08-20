@@ -7,7 +7,9 @@ Wants=network-online.target
 Type=simple
 WorkingDirectory=/opt/meifa/backend
 EnvironmentFile=-/opt/meifa/backend/.env
-Environment=HOST=0.0.0.0
+# 只绑回环：Caddy 在同一台机器上反代，没有任何理由把明文端口暴露到公网。
+# 绑 0.0.0.0 的话，只要安全组漏放行一个端口，别人就能绕过 HTTPS 直连。
+Environment=HOST=127.0.0.1
 Environment=PORT=8000
 Environment=DATA_DIR=/opt/meifa/backend/data
 Environment=MEDIA_DIR=/opt/meifa/backend/data/media
@@ -15,9 +17,11 @@ Environment=DB_PATH=/opt/meifa/backend/data/meifa.db
 Environment=CHROMA_DIR=/opt/meifa/backend/data/chroma_data
 Environment=MODEL_CACHE_DIR=/opt/meifa/backend/data/models
 Environment=MOCK_MODELS=false
-Environment=ASR_PROVIDER=sensevoice
-Environment=SENSEVOICE_DEVICE=cpu
-ExecStart=/opt/meifa/backend/.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000
+# ASR 走 siliconflow：HTTP 调同一个 SenseVoiceSmall 模型，不需要本地权重。
+# 改成 sensevoice 必须先装 requirements-local-asr.txt（funasr/torch 等约 2GB），
+# 否则语音输入会在运行时报 ImportError——而 requirements.txt 里没有这几个包。
+Environment=ASR_PROVIDER=siliconflow
+ExecStart=/opt/meifa/backend/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000
 Restart=always
 RestartSec=5
 StandardOutput=append:/opt/meifa/logs/backend.log

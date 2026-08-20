@@ -7,7 +7,9 @@ Wants=network-online.target
 Type=simple
 WorkingDirectory=/opt/meifa/my-tony2.0
 Environment=NODE_ENV=production
-Environment=HOSTNAME=0.0.0.0
+# 只绑回环：Caddy 在同一台机器上反代，没有任何理由把明文端口暴露到公网。
+# 绑 0.0.0.0 的话，只要安全组漏放行一个端口，别人就能绕过 HTTPS 直连。
+Environment=HOSTNAME=127.0.0.1
 Environment=PORT=3000
 Environment=NEXT_PUBLIC_API_MODE=real
 Environment=NEXT_PUBLIC_API_BASE_URL=/api
