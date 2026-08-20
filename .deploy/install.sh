@@ -23,6 +23,8 @@ fi
 
 say "2/8 装运行环境"
 # 系统自带的 Python 是 3.6，太老跑不了这个项目，所以要单独装 3.11。
+command -v git >/dev/null || dnf install -y -q git
+command -v rsync >/dev/null || dnf install -y -q rsync
 command -v python3.11 >/dev/null || dnf install -y -q python3.11 python3.11-pip python3.11-devel gcc
 ok "Python $(python3.11 -V 2>&1 | awk '{print $2}')"
 # 前端框架 Next 16 要求 Node 20 以上
@@ -37,8 +39,29 @@ fi
 ok "Caddy $(caddy version | head -1)"
 
 say "3/8 拉代码"
+# 国内服务器直连 GitHub 经常超时或被重置，所以依次试几个入口，
+# 哪个通用哪个。全都不通时明确报错，而不是卡在那里让人干等。
+clone_or_pull() {
+  if [ -d "$APP/src/.git" ]; then
+    git -C "$APP/src" pull -q && return 0
+    echo "  拉取更新失败，尝试镜像…"
+  fi
+  for url in \
+    "https://github.com/Fiona309/tony3.0.git" \
+    "https://ghfast.top/https://github.com/Fiona309/tony3.0.git" \
+    "https://gitclone.com/github.com/Fiona309/tony3.0.git"
+  do
+    rm -rf "$APP/src"
+    echo "  尝试：${url%%/Fiona309*}"
+    if timeout 180 git clone -q --depth 1 "$url" "$APP/src" 2>/dev/null; then
+      ok "代码已下载"; return 0
+    fi
+  done
+  echo "  ✗ 所有下载入口都不通。请把这条信息发给我，我给你换别的方式。"
+  return 1
+}
 mkdir -p "$APP/logs"
-if [ -d "$APP/src/.git" ]; then git -C "$APP/src" pull -q; else git clone -q "$REPO" "$APP/src"; fi
+clone_or_pull || exit 1
 mkdir -p "$APP/backend" "$APP/my-tony2.0"
 # --exclude data 不能省：backend/data 里是线上数据库和用户上传的照片，
 # 同步会把它们整个覆盖掉。
