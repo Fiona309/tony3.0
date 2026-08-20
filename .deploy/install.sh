@@ -15,11 +15,21 @@ ok()  { printf '  \033[32m✓\033[0m %s\n' "$*"; }
 say "1/8 加交换内存（swap）"
 # 这台机器只有 2 GiB 内存，而前端构建峰值要 2~3 GB。
 # 不加 swap，构建会被系统直接杀掉，而且只报一句 Killed，根本看不出是内存不够。
-if swapon --show | grep -q swapfile; then ok "已有 swap，跳过"; else
-  fallocate -l 4G /swapfile && chmod 600 /swapfile && mkswap -q /swapfile && swapon /swapfile
+if swapon --show 2>/dev/null | grep -q swapfile; then
+  ok "已有 swap，跳过"
+else
+  rm -f /swapfile
+  # fallocate 在部分文件系统上不可用，退回 dd
+  fallocate -l 4G /swapfile 2>/dev/null || dd if=/dev/zero of=/swapfile bs=1M count=4096 status=none
+  chmod 600 /swapfile
+  mkswap /swapfile >/dev/null      # 不能加 -q，这个系统的 util-linux 版本不认这个参数
+  swapon /swapfile
   grep -q '^/swapfile' /etc/fstab || echo '/swapfile none swap sw 0 0' >> /etc/fstab
-  ok "已加 4G swap"
 fi
+# 无论新建还是已有，都以系统的真实读数为准，不凭执行成功就报成功
+SWAP_NOW=$(free -h | awk '/Swap/{print $2}')
+[ "$SWAP_NOW" != "0B" ] || { echo "  ✗ swap 未生效，第 6 步构建会因内存不足失败"; exit 1; }
+ok "swap 可用：$SWAP_NOW"
 
 say "2/8 装运行环境"
 # 系统自带的 Python 是 3.6，太老跑不了这个项目，所以要单独装 3.11。
@@ -33,7 +43,9 @@ ok "Node $(node -v)"
 # Caddy 负责对外服务，并自动申请 HTTPS 证书
 if ! command -v caddy >/dev/null; then
   dnf install -y -q 'dnf-command(copr)'
-  dnf copr enable -y -q @caddy/caddy
+  # Alibaba Cloud Linux 3 基于 RHEL 8，但 copr 认不出它，会去找不存在的 epel-3，
+  # 必须显式指定 epel-8-x86_64
+  dnf copr enable -y @caddy/caddy epel-8-x86_64
   dnf install -y -q caddy
 fi
 ok "Caddy $(caddy version | head -1)"
