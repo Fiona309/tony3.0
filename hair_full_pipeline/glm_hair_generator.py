@@ -411,16 +411,20 @@ def _hair_mask_for(pil_image):
         # hair_full_pipeline 不在 sys.path 上，`from segmentation import ...`
         # 会 ModuleNotFoundError → 这里返回 None → _recolor_to 退化成【整图】调色，
         # 于是每一档的脸和背景都被染成不同颜色，看起来就像加了不同的滤镜。
+        # 用 segmentation.py 里的模块级单例，不要 SegmentationService()。
+        # 分割后端（mediapipe / onnxruntime）缓存在实例上，每次新建实例等于
+        # 每张图都重新加载一遍模型再扔掉。本机感觉不明显，2 核服务器上开销可观。
+        # hair_dye_engine 也是复用单例的写法。
         try:
-            from segmentation import SegmentationService
+            from segmentation import segmentation_service
         except ModuleNotFoundError:
             import sys as _sys
             _pkg = os.path.dirname(os.path.abspath(__file__))
             if _pkg not in _sys.path:
                 _sys.path.insert(0, _pkg)
-            from segmentation import SegmentationService
+            from segmentation import segmentation_service
         import cv2
-        mask, _conf = SegmentationService().segment_hair(pil_image)
+        mask, _conf = segmentation_service.segment_hair(pil_image)
         arr = np.array(pil_image.convert("RGB"))
         binary = (mask > 127).astype(np.uint8)
 
