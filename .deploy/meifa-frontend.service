@@ -14,7 +14,10 @@ Environment=PORT=3000
 Environment=NEXT_PUBLIC_API_MODE=real
 Environment=NEXT_PUBLIC_API_BASE_URL=/api
 Environment=NEXT_PUBLIC_BACKEND_URL=http://127.0.0.1:8000
-ExecStart=/usr/local/bin/npm start
+# 路径由 install.sh 用 command -v npm 探测后填入。
+# 写死 /usr/local/bin/npm 会踩坑：NodeSource 的 rpm 装到 /usr/bin/npm，
+# systemd 找不到就报 203/EXEC，且服务会无限重启，日志里看不出是路径问题。
+ExecStart=__NPM_BIN__ start
 Restart=always
 RestartSec=5
 StandardOutput=append:/opt/meifa/logs/frontend.log

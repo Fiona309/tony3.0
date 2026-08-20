@@ -212,7 +212,7 @@ Environment=PORT=3000
 Environment=NEXT_PUBLIC_API_MODE=real
 Environment=NEXT_PUBLIC_API_BASE_URL=/api
 Environment=NEXT_PUBLIC_BACKEND_URL=http://127.0.0.1:8000
-ExecStart=/usr/local/bin/npm start
+ExecStart=__NPM_BIN__ start
 Restart=always
 RestartSec=5
 StandardOutput=append:/opt/meifa/logs/frontend.log
@@ -221,6 +221,10 @@ StandardError=append:/opt/meifa/logs/frontend.err.log
 [Install]
 WantedBy=multi-user.target
 UNIT_FE
+# systemd 的 ExecStart 必须是绝对路径，不认 PATH，所以这里探测后填进去
+sed -i "s|__NPM_BIN__|$(command -v npm)|" /etc/systemd/system/meifa-frontend.service
+grep -q "^ExecStart=/" /etc/systemd/system/meifa-frontend.service || {
+  echo "  ✗ 找不到 npm 可执行文件，前端无法启动"; exit 1; }
 systemctl daemon-reload
 systemctl enable -q --now meifa-backend meifa-frontend
 ok "前后端已启动"
