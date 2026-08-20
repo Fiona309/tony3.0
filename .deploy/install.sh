@@ -157,6 +157,12 @@ fi
 
 echo "  依赖装完，开始编译…"
 free -h | head -2
+# NEXT_PUBLIC_* 必须在这里给，不能只写在 systemd 的 Environment= 里。
+# Next.js 把这类变量在「构建时」直接写死进前端 JS 包，运行时再设已经晚了：
+# 漏掉 NEXT_PUBLIC_API_MODE 时它会编译成默认的 'mock'，线上前端全程用假数据、
+# 一次后端都不调，而服务却一切正常，极难发现。
+NEXT_PUBLIC_API_MODE=real \
+NEXT_PUBLIC_API_BASE_URL=/api \
 NODE_OPTIONS=--max-old-space-size=1536 npm run build
 ok "前端构建完成"
 
@@ -211,9 +217,8 @@ Environment=NODE_ENV=production
 # 绑 0.0.0.0 的话，只要安全组漏放行一个端口，别人就能绕过 HTTPS 直连。
 Environment=HOSTNAME=127.0.0.1
 Environment=PORT=3000
-Environment=NEXT_PUBLIC_API_MODE=real
-Environment=NEXT_PUBLIC_API_BASE_URL=/api
-Environment=NEXT_PUBLIC_BACKEND_URL=http://127.0.0.1:8000
+# 这里不放 NEXT_PUBLIC_*：Next 在构建时就把它们写死进 JS 包了，
+# 运行时再设一份不起任何作用，只会让人误以为配置生效了。
 ExecStart=__NPM_BIN__ start
 Restart=always
 RestartSec=5

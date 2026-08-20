@@ -11,9 +11,8 @@ Environment=NODE_ENV=production
 # 绑 0.0.0.0 的话，只要安全组漏放行一个端口，别人就能绕过 HTTPS 直连。
 Environment=HOSTNAME=127.0.0.1
 Environment=PORT=3000
-Environment=NEXT_PUBLIC_API_MODE=real
-Environment=NEXT_PUBLIC_API_BASE_URL=/api
-Environment=NEXT_PUBLIC_BACKEND_URL=http://127.0.0.1:8000
+# 这里不放 NEXT_PUBLIC_*：Next 在构建时就把它们写死进 JS 包了，
+# 运行时再设一份不起任何作用，只会让人误以为配置生效了。
 # 路径由 install.sh 用 command -v npm 探测后填入。
 # 写死 /usr/local/bin/npm 会踩坑：NodeSource 的 rpm 装到 /usr/bin/npm，
 # systemd 找不到就报 203/EXEC，且服务会无限重启，日志里看不出是路径问题。
