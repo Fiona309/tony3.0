@@ -67,8 +67,14 @@ clone_or_pull() {
     # 之前这里是先 rm -rf 再 clone，结果三个入口都不通时把已有代码一起删了。
     rm -rf "$APP/src.new"
     if timeout 180 git clone -q --depth 1 "$url" "$APP/src.new" 2>/dev/null; then
-      rm -rf "$APP/src"; mv "$APP/src.new" "$APP/src"
-      ok "代码已下载"; return 0
+      # 光看 git 的退出码不够。gitclone.com 这类缓存代理会返回一个空的或
+      # 过期的仓库，git 认为“克隆成功”，但里面根本没有 backend/。
+      # 所以必须验一眼真实内容，验不过就换下一个入口。
+      if [ -f "$APP/src.new/backend/app/main.py" ] && [ -f "$APP/src.new/my-tony2.0/package.json" ]; then
+        rm -rf "$APP/src"; mv "$APP/src.new" "$APP/src"
+        ok "代码已下载"; return 0
+      fi
+      echo "    ↳ 这个入口返回的内容不完整，跳过"
     fi
   done
   rm -rf "$APP/src.new"
@@ -79,7 +85,12 @@ clone_or_pull() {
   return 1
 }
 mkdir -p "$APP/logs" "$APP/backend" "$APP/my-tony2.0"
-if clone_or_pull; then
+# SKIP_PULL=1 可跳过整个下载环节，直接用运行目录里已有的代码
+if [ "${SKIP_PULL:-0}" = "1" ]; then
+  [ -f "$APP/backend/app/main.py" ] && [ -f "$APP/my-tony2.0/package.json" ] || {
+    echo "  ✗ SKIP_PULL=1，但运行目录里没有可用代码，不能跳过下载"; exit 1; }
+  ok "已跳过下载（SKIP_PULL=1），沿用服务器上现有代码"
+elif clone_or_pull; then
   # --exclude data 不能省：backend/data 里是线上数据库和用户上传的照片，
   # 同步会把它们整个覆盖掉。
   rsync -a --delete --exclude data --exclude data-local --exclude .env --exclude .venv \
