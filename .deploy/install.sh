@@ -35,6 +35,11 @@ say "2/8 装运行环境"
 # 系统自带的 Python 是 3.6，太老跑不了这个项目，所以要单独装 3.11。
 command -v git >/dev/null || dnf install -y -q git
 command -v rsync >/dev/null || dnf install -y -q rsync
+# cv2 的运行时依赖。后端自己用的是 opencv-python-headless（不需要图形库），
+# 但 mediapipe 会带上完整版 opencv-contrib-python 顶替它，那个要链接 libGL.so.1。
+# 纯命令行的服务器没有图形库，结果是 import cv2 直接 ImportError，
+# 连带 segmentation.py 整个导不进来——而 pip 显示安装成功，日志里毫无异常。
+rpm -q mesa-libGL >/dev/null 2>&1 || dnf install -y -q mesa-libGL glib2
 command -v python3.11 >/dev/null || dnf install -y -q python3.11 python3.11-pip python3.11-devel gcc
 ok "Python $(python3.11 -V 2>&1 | awk '{print $2}')"
 # 前端框架 Next 16 要求 Node 20 以上
